@@ -1,0 +1,16 @@
+# Nội dung cho file backend/.gitignore
+
+# Bỏ qua môi trường ảo
+venv/
+
+# Bỏ qua các file cache của Python
+__pycache__/
+
+# Bỏ qua database SQLite
+db.sqlite3
+
+# Bỏ qua các file log
+*.log
+
+# Bỏ qua file biến môi trường
+.env
