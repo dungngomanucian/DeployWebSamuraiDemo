@@ -18,6 +18,11 @@ DB_PASSWORD=
 DB_HOST=
 DB_PORT=5432
 
+DJANGO_SECRET_KEY=
+
+SUPABASE_URL= 
+SUPABASE_API_KEY= 
+
 # create .env file
 cp .env.example .env
 
