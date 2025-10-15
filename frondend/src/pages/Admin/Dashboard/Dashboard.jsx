@@ -1,6 +1,6 @@
 // frontend/src/pages/admin/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
-import {adminApiClient}  from '../../api/axiosConfig'; // Import trung tâm liên lạc
+import {adminApiClient}  from '../../../api/axiosConfig'; // Import trung tâm liên lạc
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);

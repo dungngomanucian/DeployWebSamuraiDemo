@@ -14,9 +14,14 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.contrib import admin
+# backend/config/urls.py
 from django.urls import path, include
 
 urlpatterns = [
-    path('admin/', include('dashboard.urls')), # API cho admin
+    # ... các path khác ...
+    
+    # 👇 Chỉ cần một dòng này để quản lý toàn bộ khu vực admin
+    path('admin/', include('admin.urls')),
+
+    # ... các path khác ...
 ]
