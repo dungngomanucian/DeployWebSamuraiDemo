@@ -145,3 +145,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173", # Cổng mặc định của Vite
     "http://127.0.0.1:5173",
 ]
+
+SUPABASE_URL =  os.getenv('SUPABASE_URL')
+SUPABASE_PUBLISHABLE_KEY=os.getenv('SUPABASE_PUBLISHABLE_KEY')
+SUPABASE_SECRET_KEY=os.getenv('SUPABASE_SECRET_KEY')
