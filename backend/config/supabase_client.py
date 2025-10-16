@@ -8,7 +8,7 @@ def get_supabase_client(key: Optional[str] = None, url: Optional[str] = None) ->
     Trả về Supabase client. Tham số dùng cho test hoặc override.
     """
     supabase_url = url or settings.SUPABASE_URL
-    supabase_key = key or settings.SUPABASE_SERVICE_ROLE_KEY  # hoặc SUPABASE_ANON_KEY tuỳ use-case
+    supabase_key = key or settings.SUPABASE_SECRET_KEY  # hoặc SUPABASE_ANON_KEY tuỳ use-case
     # --- BẮT ĐẦU PHẦN THÊM VÀO ĐỂ DEBUG ---
     print("--- get_supabase_client() was called ---")
     print(f"URL being used: {supabase_url}")
