@@ -18,10 +18,5 @@ Including another URLconf
 from django.urls import path, include
 
 urlpatterns = [
-    # ... các path khác ...
-    
-    # 👇 Chỉ cần một dòng này để quản lý toàn bộ khu vực admin
-    path('admin/', include('admin.urls')),
-
-    # ... các path khác ...
+    path('api/v1/admin/', admin.site.urls),
 ]
