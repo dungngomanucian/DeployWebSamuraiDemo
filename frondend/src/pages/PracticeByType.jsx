@@ -191,38 +191,64 @@ export default function PracticeByType() {
           <div className="relative h-[432px]">
             <div className="flex items-center justify-center gap-16 h-full">
               {/* Left 2 pills */}
-              {leftIndices.map((idx) => (
-                <div key={`L-${LEVELS[idx].code}`} className="flex items-center justify-center">
-                  <div
+              {leftIndices.map((idx, i) => (
+                <motion.div 
+                  key={`L-${LEVELS[idx].code}`} 
+                  className="flex items-center justify-center"
+                  initial={{ opacity: 0, scale: 0.8, rotateY: -20 }}
+                  animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+                  transition={{ 
+                    duration: 0.5, 
+                    delay: i * 0.1,
+                    type: "spring",
+                    stiffness: 100
+                  }}
+                >
+                  <motion.div
                     onClick={() => setActiveIndex(idx)}
                     role="button"
                     tabIndex={0}
                     className="relative select-none bg-white rounded-[62px] shadow-lg w-[125px] h-[432px] border border-[rgba(15,23,42,0.04)] cursor-pointer hover:shadow-xl transition-shadow"
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    whileTap={{ scale: 0.95 }}
                   >
                     <div className="absolute left-1/2 -translate-x-1/2 bottom-3 w-[99px] h-[99px] rounded-full bg-[#E5E7EB] flex items-center justify-center shadow">
                       <span className="text-[#0B1320] font-bold text-2xl">{LEVELS[idx].code}</span>
                     </div>
-                  </div>
-                </div>
+                  </motion.div>
+                </motion.div>
               ))}
 
               {/* Spacer equals to detail card width */}
               <div className="w-[430px] h-[432px] shrink-0" />
 
               {/* Right 2 pills */}
-              {rightIndices.map((idx) => (
-                <div key={`R-${LEVELS[idx].code}`} className="flex items-center justify-center">
-                  <div
+              {rightIndices.map((idx, i) => (
+                <motion.div 
+                  key={`R-${LEVELS[idx].code}`} 
+                  className="flex items-center justify-center"
+                  initial={{ opacity: 0, scale: 0.8, rotateY: 20 }}
+                  animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+                  transition={{ 
+                    duration: 0.5, 
+                    delay: i * 0.1,
+                    type: "spring",
+                    stiffness: 100
+                  }}
+                >
+                  <motion.div
                     onClick={() => setActiveIndex(idx)}
                     role="button"
                     tabIndex={0}
                     className="relative select-none bg-white rounded-[62px] shadow-lg w-[125px] h-[432px] border border-[rgba(15,23,42,0.04)] cursor-pointer hover:shadow-xl transition-shadow"
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    whileTap={{ scale: 0.95 }}
                   >
                     <div className="absolute left-1/2 -translate-x-1/2 bottom-3 w-[99px] h-[99px] rounded-full bg-[#E5E7EB] flex items-center justify-center shadow">
                       <span className="text-[#0B1320] font-bold text-2xl">{LEVELS[idx].code}</span>
                     </div>
-                  </div>
-                </div>
+                  </motion.div>
+                </motion.div>
               ))}
             </div>
           </div>

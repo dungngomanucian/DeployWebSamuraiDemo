@@ -28,19 +28,24 @@ export default function PracticeEJU() {
           </p>
             
             {/* Nút Khám phá ngay */}
-          <button className="btn rounded-full bg-[#4169E1] hover:bg-[#365AAB] text-white border-none px-8 text-base md:text-lg">
-            Khám phá ngay
-          </button>
+          <button 
+            onClick={() => {
+              document.getElementById('che-do-luyen-thi')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="btn rounded-full bg-[#4169E1] hover:bg-[#365AAB] text-white border-none px-8 text-base md:text-lg"
+          >
+            Khám phá ngay
+          </button>
         </div>
       </section>
 
-      {/* 2. Practice modes - CHẾ ĐỘ LUYỆN THI (ĐÃ SỬA KHOẢNG CÁCH) */}
+      {/* 2. Practice modes - CHẾ ĐỘ LUYỆN THI (ĐÃ SỬA KHOẢNG CÁCH) */}
       {/* Thay pb-10 bằng pb-0 để giảm tối đa khoảng đệm dưới section */}
-      <section className="w-full bg-white pt-14 pb-0"> 
-        <div className="max-w-6xl mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-[#0B1320] mb-12">
-            THỰC CHIẾN EJU VỚI <br /> CÁC CHẾ ĐỘ LUYỆN THI
-          </h2>
+      <section id="che-do-luyen-thi" className="w-full bg-white pt-14 pb-0"> 
+        <div className="max-w-6xl mx-auto px-4 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-[#0B1320] mb-12">
+            THỰC CHIẾN EJU VỚI <br /> CÁC CHẾ ĐỘ LUYỆN THI
+          </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
             {/* Card 1 */}

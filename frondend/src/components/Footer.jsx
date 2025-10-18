@@ -6,9 +6,9 @@ export default function Footer() {
     <footer className="bg-white text-[#111827] py-16 px-6 md:px-12 lg:px-24 border-t border-gray-200">
       <div className="max-w-[1440px] mx-auto space-y-12">
         {/* === LƯỚI CHÍNH: Cột logo + 3 nhóm nội dung + HỆ SINH THÁI phía dưới === */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 md:gap-16">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-12 md:gap-16">
           {/* === CỘT 1: Logo + Thông tin trung tâm === */}
-          <div className="flex flex-col">
+          <div className="md:col-span-2 flex flex-col">
             {/* Logo */}
             <img
               src={logo}
@@ -17,7 +17,7 @@ export default function Footer() {
             />
 
             {/* Tên trung tâm */}
-            <h3 className="font-extrabold text-xl leading-snug mb-6">
+            <h3 className="font-extrabold text-2xl leading-snug mb-6">
               Trung tâm giáo dục & Tư vấn Du học Nhật Bản Samurai
             </h3>
 
@@ -44,8 +44,8 @@ export default function Footer() {
           </div>
 
           {/* === KHỐI PHẢI: 3 cột nội dung + HỆ SINH THÁI bên dưới === */}
-          <div className="md:col-span-3 mt-21">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-12 md:gap-16 items-start">
+          <div className="md:col-span-3 mt-22">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 md:gap-8 items-start">
               {/* CỘT 2: VỀ SAMURAI */}
               <div>
                 <h4 className="font-bold text-lg mb-4">VỀ SAMURAI</h4>
@@ -90,10 +90,9 @@ export default function Footer() {
             </div>
 
             {/* HỆ SINH THÁI: nằm dưới 3 cột, độc lập */}
-            <div className="mt-12">
+            <div className="mt-4">
               <div className="flex items-center gap-6">
                 <h4 className="font-bold text-lg">HỆ SINH THÁI</h4>
-                <div className="w-10 h-10 bg-gray-300 rounded-md"></div>
                 <div className="w-10 h-10 bg-gray-300 rounded-md"></div>
                 <div className="w-10 h-10 bg-gray-300 rounded-md"></div>
                 <div className="w-10 h-10 bg-gray-300 rounded-md"></div>

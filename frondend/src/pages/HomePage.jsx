@@ -84,7 +84,14 @@ const FeatureCard = ({
           
           {/* Button 2: Vào học ngay (Yellow pill) */}
           {showSecondary && (
-            <button className="relative inline-flex items-center justify-center gap-3 rounded-full bg-[#FBBF24] text-black w-full h-[52px] px-6 text-[16px] font-medium shadow-sm hover:bg-[#F59E0B]">
+            <button 
+              onClick={() => {
+                if (title === 'Luyện đề') {
+                  document.getElementById('luyen-thi')?.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+              className="relative inline-flex items-center justify-center gap-3 rounded-full bg-[#FBBF24] text-black w-full h-[52px] px-6 text-[16px] font-medium shadow-sm hover:bg-[#F59E0B]"
+            >
               {secondaryText}
               <span className="absolute right-4 inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/90 text-[#2D5BFF]">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-3.5 h-3.5"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
@@ -402,19 +409,16 @@ export default function HomePage() {
         ))}
 
         {/* Overlay tối nhẹ để text nổi bật */}
-        <div className="absolute inset-0 bg-black/40" />
-
-          {/* Content container - Text đẩy lên cao theo thiết kế */}
-          <div className="absolute top-14 md:top-18 lg:top-26 left-0 right-0 z-10 px-6 sm:px-12 md:px-20 lg:px-40">
-              <h1 className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-white leading-tight drop-shadow-lg">
-                NỀN TẢNG HỌC & LUYỆN THI <br />
-                TIẾNG NHẬT TOÀN DIỆN
-        </h1>
-          </div>
+        <div className="absolute inset-0"/>
 
           {/* Button nằm giữa phía dưới, lùi xuống (Điều chỉnh bottom thấp) */}
           <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10">
-              <button className="btn rounded-full bg-[#4169E1] hover:bg-[#365AAB] text-white border-none text-[16px] font-medium w-[239px] h-[52px] shadow-lg">
+              <button 
+                onClick={() => {
+                  document.getElementById('kham-pha-tinh-nang')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="btn rounded-full bg-[#4169E1] hover:bg-[#365AAB] text-white border-none text-[16px] font-medium w-[239px] h-[52px] shadow-lg"
+              >
                   Khám phá ngay
               </button>
           </div>
@@ -439,11 +443,11 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Features Section (Đã sử dụng component FeatureCard) */}
-      <section className="py-16 sm:py-20 bg-white px-4 text-center">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-10 sm:mb-12 text-[#0B1320]">
-          Khám phá tính năng
-        </h2>
+      {/* Features Section (Đã sử dụng component FeatureCard) */}
+      <section id="kham-pha-tinh-nang" className="py-16 sm:py-20 bg-white px-4 text-center">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-10 sm:mb-12 text-[#0B1320]">
+          Khám phá tính năng
+        </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 max-w-4xl mx-auto">
           {/* Card Học bài */}
