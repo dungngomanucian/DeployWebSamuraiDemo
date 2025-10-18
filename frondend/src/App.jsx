@@ -6,6 +6,7 @@ import MockExamJLPT from "./pages/MockExamJLPT";
 import PracticeByType from "./pages/PracticeByType";
 import PracticeLevelDetail from "./pages/PracticeLevelDetail";
 import HomePage from "./pages/HomePage";
+import StudentDashboard from "./pages/StudentDashboard";
 
 export default function App() {
   return (
@@ -19,6 +20,10 @@ export default function App() {
           <Route path="/mock-exam-jlpt" element={<MockExamJLPT />} />
           <Route path="/practice-by-type" element={<PracticeByType />} />
           <Route path="/practice-level-detail" element={<PracticeLevelDetail />} />
+          
+          <Route path="/student-dashboard" element={<StudentDashboard />} />
+
+
           
           {/* (Tùy chọn) Thêm một route để xử lý các trang không tồn tại */}
           <Route path="*" element={<div>404 - Trang không tìm thấy</div>} />
