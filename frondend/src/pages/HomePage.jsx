@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import heroBg from "../assets/hero-bg.png";
@@ -373,6 +374,7 @@ const TabsGallery = () => {
 };
 
 export default function HomePage() {
+  const navigate = useNavigate();
   // Images for the hero background (using the same placeholder for now)
   const heroImages = useMemo(() => [heroBg, back1, back2, back3, background], []);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -513,7 +515,7 @@ export default function HomePage() {
                 cardMaxWidthClass="max-w-[420px]"
                 cardHeightClass="min-h-[320px]"
                 primaryVariant="yellow"
-                onPrimaryClick={() => window.location.href = '/practice-eju'}
+                onPrimaryClick={() => navigate ('/practice-eju') }
               />
 
               <FeatureCard 
@@ -526,7 +528,7 @@ export default function HomePage() {
                 cardMaxWidthClass="max-w-[420px]"
                 cardHeightClass="min-h-[320px]"
                 primaryVariant="yellow"
-                onPrimaryClick={() => window.location.href = '/practice-jlpt'}
+                onPrimaryClick={() => navigate = ('/practice-jlpt')}
               />
             </div>
           </div>
