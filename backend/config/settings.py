@@ -1,5 +1,6 @@
 # ...
 import os
+import sys
 from dotenv import load_dotenv
 from pathlib import Path
 from datetime import timedelta # Cần thêm import này
@@ -7,7 +8,6 @@ from datetime import timedelta # Cần thêm import này
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -31,12 +31,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    # Thư viện CORS đã có
     'corsheaders', 
     'api',
-    
-    # [1] THÊM ỨNG DỤNG ACCOUNTS CỦA BẠN VÀO ĐÂY
     'accounts',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
@@ -50,7 +48,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'samurai_app_backend.urls'
+ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
     {
@@ -67,7 +65,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'samurai_app_backend.wsgi.application'
+WSGI_APPLICATION = 'config.wsgi.application'
 
 
 # Database
@@ -76,7 +74,7 @@ WSGI_APPLICATION = 'samurai_app_backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
+        'DBNAME': os.getenv('DB_NAME'),
         'USER': os.getenv('DB_USER'),
         'PASSWORD': os.getenv('DB_PASSWORD'),
         'HOST': os.getenv('DB_HOST'),
@@ -84,6 +82,12 @@ DATABASES = {
     }
 }
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -135,10 +139,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 #những địa chỉ sau đây sẽ được gọi API.
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    # [3] THÊM ĐỊA CHỈ FRONTEND MỚI CỦA BẠN VÀO ĐÂY
-    "http://localhost:5173", 
+    "http://localhost:5173", # Cổng mặc định của Vite
+    "http://127.0.0.1:5173",
 ]
 
 
@@ -164,3 +166,8 @@ ACCESS_TOKEN_LIFETIME = timedelta(minutes=30)
 
 # Giới hạn số lượng phiên đăng nhập đồng thời (2 thiết bị)
 MAX_CONCURRENT_SESSIONS = 2
+
+SUPABASE_URL =  os.getenv('SUPABASE_URL')
+SUPABASE_PUBLISHABLE_KEY=os.getenv('SUPABASE_PUBLISHABLE_KEY')
+SUPABASE_SECRET_KEY=os.getenv('SUPABASE_SECRET_KEY')
+

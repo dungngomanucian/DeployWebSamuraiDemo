@@ -2,15 +2,26 @@
 
 import axios from 'axios';
 
-// Tạo một instance của Axios với các cấu hình mặc định
-const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+// --- Client cho Admin ---
+export const adminApiClient  = axios.create({
+  baseURL: import.meta.env.API_ADMIN_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Sau này bạn có thể thêm các cấu hình khác như interceptor để tự động
-// đính kèm token xác thực vào mỗi request.
+// --- Client cho Student ---
+export const studentApiClient = axios.create({
+  baseURL: import.meta.env.API_STUDENT_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-export default apiClient;
+// --- Client cho Teacher ---
+export const teacherApiClient = axios.create({
+  baseURL: import.meta.env.API_TEACHER_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
