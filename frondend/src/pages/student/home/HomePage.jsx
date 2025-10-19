@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Navbar from "../components/Navbar";
-import Footer from "../components/Footer";
-import heroBg from "../assets/hero-bg.png";
-import background from "../assets/background.png";
-import back1 from "../assets/back1.png";
-import back2 from "../assets/back2.png";
-import back3 from "../assets/back3.png";
-import back4 from "../assets/back4.png";
+import Navbar from "../../../components/Navbar";
+import Footer from "../../../components/Footer";
+import heroBg from "../../../assets/hero-bg.png";
+import background from "../../../assets/background.png";
+import back1 from "../../../assets/back1.png";
+import back2 from "../../../assets/back2.png";
+import back3 from "../../../assets/back3.png";
+import back4 from "../../../assets/back4.png";
 
 const FeatureCard = ({
   title,
@@ -88,7 +88,7 @@ const FeatureCard = ({
             <button 
               onClick={() => {
                 if (title === 'Luyện đề') {
-                  document.getElementById('luyen-thi')?.scrollIntoView({ behavior: 'smooth' });
+                  document.getElementById('lua-chon-ky-thi')?.scrollIntoView({ behavior: 'smooth' });
                 }
               }}
               className="relative inline-flex items-center justify-center gap-3 rounded-full bg-[#FBBF24] text-black w-full h-[52px] px-6 text-[16px] font-medium shadow-sm hover:bg-[#F59E0B]"
@@ -499,7 +499,7 @@ export default function HomePage() {
           </div>
 
           {/* Lựa chọn kỳ thi bạn muốn luyện tập */}
-          <div className="mt-16">
+          <div id="lua-chon-ky-thi" className="mt-16 scroll-mt-25">
             <h4 className="text-2xl md:text-3xl font-bold text-[#0B1320] text-center mb-10">
               LỰA CHỌN KỲ THI BẠN MUỐN LUYỆN TẬP
             </h4>
@@ -515,7 +515,10 @@ export default function HomePage() {
                 cardMaxWidthClass="max-w-[420px]"
                 cardHeightClass="min-h-[320px]"
                 primaryVariant="yellow"
-                onPrimaryClick={() => navigate ('/practice-eju') }
+                onPrimaryClick={() => {
+                  navigate('/practice-eju');
+                  window.scrollTo(0, 0);
+                }}
               />
 
               <FeatureCard 
@@ -528,7 +531,10 @@ export default function HomePage() {
                 cardMaxWidthClass="max-w-[420px]"
                 cardHeightClass="min-h-[320px]"
                 primaryVariant="yellow"
-                onPrimaryClick={() => navigate = ('/practice-jlpt')}
+                onPrimaryClick={() => {
+                  navigate('/practice-jlpt');
+                  window.scrollTo(0, 0);
+                }}
               />
             </div>
           </div>

@@ -1,8 +1,11 @@
 import React from "react";
-import Navbar from "../components/Navbar";
-import Footer from "../components/Footer";
+import { useNavigate } from "react-router-dom";
+import Navbar from "../../../components/Navbar";
+import Footer from "../../../components/Footer";
 
 export default function MockExamJLPT() {
+  const navigate = useNavigate();
+  
   const levels = [
     { code: "N5", tests: 30, score: "80/180" },
     { code: "N4", tests: 30, score: "90/180" },
@@ -40,9 +43,10 @@ export default function MockExamJLPT() {
             {levels.map((lv, idx) => (
               <div
                 key={lv.code}
-                className={`flex flex-col items-center ${
+                className={`flex flex-col items-center cursor-pointer hover:scale-105 transition-transform ${
                   idx >= 3 ? "md:col-span-1" : ""
                 }`}
+                onClick={() => navigate(`/exam-list?level=${lv.code}`)}
               >
                 {/* Level Label */}
                 <div className="border border-black rounded-full px-8 py-2 text-base font-bold text-[#0B1320] mb-2">
