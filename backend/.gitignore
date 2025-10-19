@@ -14,3 +14,5 @@ db.sqlite3
 
 # Bỏ qua file biến môi trường
 .env
+
+node_modules
