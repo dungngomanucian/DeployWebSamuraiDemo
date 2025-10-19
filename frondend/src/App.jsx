@@ -7,6 +7,7 @@ import PracticeByType from "./pages/PracticeByType";
 import PracticeLevelDetail from "./pages/PracticeLevelDetail";
 import HomePage from "./pages/HomePage";
 import StudentLogin from "./pages/StudentLogin";
+import SignUpForm from "./pages/SignUpForm";
 
 export default function App() {
   return (
@@ -22,7 +23,7 @@ export default function App() {
           <Route path="/practice-level-detail" element={<PracticeLevelDetail />} />
 
           <Route path="/login" element={<StudentLogin />} />
-          
+          <Route path="/register" element={<SignUpForm />} />
           {/* (Tùy chọn) Thêm một route để xử lý các trang không tồn tại */}
           <Route path="*" element={<div>404 - Trang không tìm thấy</div>} />
         </Routes>
