@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import Navbar from "../components/Navbar";
-import Footer from "../components/Footer";
-import heroBg from "../assets/hero-bg.png"; // Giữ nguyên background hero
+import Navbar from "../../../components/Navbar";
+import Footer from "../../../components/Footer";
+import heroBg from "../../../assets/hero-bg.png"; // Giữ nguyên background hero
 
 export default function PracticeJLPT() {
   // Bỏ các state và array liên quan đến jlptLevels vì không còn sử dụng Level Picker
