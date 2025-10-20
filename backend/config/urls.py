@@ -22,6 +22,6 @@ from student.reset_password import reset_password
 urlpatterns = [
     path('api/v1/admin/', admin.site.urls), # Đã sửa admin.urls thành admin.site.urls
     path('api/', include('accounts.urls')),
-    path("api/student/forgot-password/", forgot_password),
-    path("api/student/reset-password/", reset_password)
+    path("api/forgot-password/", forgot_password),
+    path("api/reset-password/", reset_password)
 ]

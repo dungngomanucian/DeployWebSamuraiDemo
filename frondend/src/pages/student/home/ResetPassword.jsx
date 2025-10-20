@@ -99,7 +99,7 @@ const ResetPasswordForm = () => {
     setIsSubmitting(true);
 
     try {
-      const { data } = await studentApiClient.post('student/reset-password/', {
+      const { data } = await studentApiClient.post('/reset-password/', {
         token,
         new_password: password
       });

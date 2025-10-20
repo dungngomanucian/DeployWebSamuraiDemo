@@ -77,7 +77,7 @@ const ForgotPasswordForm = () => {
     }
 
     try {
-      const response = await studentApiClient.post("/student/forgot-password/", {
+      const response = await studentApiClient.post("/forgot-password/", {
         email: formData.email,
       });
 
