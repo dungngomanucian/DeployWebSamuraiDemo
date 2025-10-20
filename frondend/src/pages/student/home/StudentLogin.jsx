@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 // FIX: DÒNG NÀY ĐÃ ĐƯỢC THAY THẾ bằng placeholder URL để biên dịch trong môi trường ảo.
-import logo from '../assets/logo.png'
+import logo from '../../../assets/logo.png'
 
 // Import icons
 import { Mail, Lock, X, Eye, EyeOff, CheckSquare, CheckCircle, Loader2, AlertTriangle } from 'lucide-react'; 
