@@ -6,7 +6,7 @@ import MockExamJLPT from "./pages/MockExamJLPT";
 import PracticeByType from "./pages/PracticeByType";
 import PracticeLevelDetail from "./pages/PracticeLevelDetail";
 import HomePage from "./pages/HomePage";
-import StudentDashboard from "./pages/StudentDashboard";
+import StudentDashboard from "./pages/student/StudentDashboard";
 
 export default function App() {
   return (

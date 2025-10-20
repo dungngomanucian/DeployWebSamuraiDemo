@@ -5,7 +5,7 @@ import logoFull from '../assets/Logo Samurai (chữ ngang).png';
 const TopBar = ({ isOpen, onToggleSidebar }) => { // Thêm prop 'isOpen'
   return (
     <div className="flex items-center justify-between w-full h-16 pl-5 pr-9 bg-white/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-shrink-0">
         
         {/* Nút Hamburger */}
         <button 
@@ -25,19 +25,17 @@ const TopBar = ({ isOpen, onToggleSidebar }) => { // Thêm prop 'isOpen'
           `}
           style={{ overflow: 'hidden' }}
         />
-
-        
-        {/* Thanh tìm kiếm */}
-        <div className="relative hidden md:block"> {/* Ẩn trên mobile nhỏ */}
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-            <HiSearch className="w-5 h-5" />
-          </span>
-          <input 
-            type="text" 
-            placeholder="Tìm kiếm"
-            className="pl-10 pr-4 py-2 w-64 rounded-lg bg-gray-100 border border-transparent focus:bg-white focus:border-blue-300 outline-none transition-colors"
-          />
-        </div>
+      </div>
+      {/* Thanh tìm kiếm */}
+      <div className="relative hidden md:block flex-grow max-w-xl mx-auto"> {/* Ẩn trên mobile nhỏ */}
+        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">
+          <HiSearch className="w-5 h-5" />
+        </span>
+        <input 
+          type="text"
+          placeholder="Tìm kiếm"
+          className="pl-12 pr-5 py-2 w-full rounded-full bg-gray-100 border border-transparent focus:bg-white focus:border-blue-300 outline-none transition-colors"
+        />
       </div>
 
       {/* Profile Section */}
