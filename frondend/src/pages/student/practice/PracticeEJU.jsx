@@ -1,7 +1,7 @@
 import React from "react";
-import Navbar from "../components/Navbar";
-import Footer from "../components/Footer";
-import heroBg from "../assets/hero-bg.png"; 
+import Navbar from "../../../components/Navbar";
+import Footer from "../../../components/Footer";
+import heroBg from "../../../assets/hero-bg.png"; 
 
 export default function PracticeEJU() {
   return (
