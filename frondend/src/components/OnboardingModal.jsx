@@ -170,10 +170,10 @@ const OnboardingModal = ({ show, onHide }) => {
                   onClick={() => setGoalLevel(`JLPT ${level}`)}
                   
                   // SỬA TOÀN BỘ DÒNG CLASSNAME NÀY
-                  className={`py-3 rounded-xl font-semibold transition-all duration-200 ${ // <-- Đổi thành rounded-xl
+                  className={`py-3 mx-1 rounded-xl font-semibold transition-all duration-200 ${
                     goalLevel === `JLPT ${level}` 
-                      ? 'bg-blue-100 text-blue-700 shadow-lg shadow-blue-500/30 transform scale-105 border border-blue-200' // <-- Style "NỔI BẬT"
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50' // <-- Style MẶC ĐỊNH
+                      ? 'bg-blue-100 text-blue-700 shadow-lg shadow-blue-500/30 transform scale-105 border border-blue-200'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                   }`}
                   // KẾT THÚC SỬA
                   
