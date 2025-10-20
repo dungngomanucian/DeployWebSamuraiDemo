@@ -1,5 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import HomePage from "./pages/student/home/HomePage";
+import Home from "./pages/HomePage";
+import PracticeJLPT from "./pages/PracticeJLPT";
+import PracticeEJU from "./pages/PracticeEJU";
+import MockExamJLPT from "./pages/MockExamJLPT";
+import PracticeByType from "./pages/PracticeByType";
+import PracticeLevelDetail from "./pages/PracticeLevelDetail";
+import HomePage from "./pages/HomePage";
+import StudentLogin from "./pages/StudentLogin";
+import SignUpForm from "./pages/SignUpForm";
 import PracticeJLPT from "./pages/student/practice/PracticeJLPT";
 import PracticeEJU from "./pages/student/practice/PracticeEJU";
 import MockExamJLPT from "./pages/student/exam/MockExamJLPT";
@@ -20,6 +28,8 @@ export default function App() {
           <Route path="/mock-exam-jlpt" element={<MockExamJLPT />} />
           <Route path="/practice-by-type" element={<PracticeByType />} />
           <Route path="/practice-level-detail" element={<PracticeLevelDetail />} />
+          <Route path="/login" element={<StudentLogin />} />
+          <Route path="/register" element={<SignUpForm />} />
           <Route path="/exam-list" element={<ExamListPage />} />
           <Route path="/exam-intro" element={<ExamIntro />} />
           
