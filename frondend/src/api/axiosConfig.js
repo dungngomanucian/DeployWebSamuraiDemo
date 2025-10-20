@@ -2,9 +2,11 @@
 
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+
 // --- Client cho Admin ---
-export const adminApiClient  = axios.create({
-  baseURL: import.meta.env.API_ADMIN_BASE_URL,
+export const adminApiClient = axios.create({
+  baseURL: `${API_BASE_URL}/admin`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -12,7 +14,7 @@ export const adminApiClient  = axios.create({
 
 // --- Client cho Student ---
 export const studentApiClient = axios.create({
-  baseURL: import.meta.env.API_STUDENT_BASE_URL,
+  baseURL: `${API_BASE_URL}/student`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -20,7 +22,7 @@ export const studentApiClient = axios.create({
 
 // --- Client cho Teacher ---
 export const teacherApiClient = axios.create({
-  baseURL: import.meta.env.API_TEACHER_BASE_URL,
+  baseURL: `${API_BASE_URL}/teacher`,
   headers: {
     'Content-Type': 'application/json',
   },
