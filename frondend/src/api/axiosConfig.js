@@ -12,7 +12,7 @@ export const adminApiClient  = axios.create({
 
 // --- Client cho Student ---
 export const studentApiClient = axios.create({
-  baseURL: import.meta.env.API_STUDENT_BASE_URL,
+  baseURL: import.meta.env.VITE_API_STUDENT_BASE_URL, // ✅ phải có VITE_
   headers: {
     'Content-Type': 'application/json',
   },

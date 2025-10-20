@@ -3,6 +3,7 @@ import HomePage from "./pages/student/home/HomePage";
 import StudentLogin from "./pages/student/home/StudentLogin";
 import SignUpForm from "./pages/student/home/SignUpForm";
 import ForgotPassword from "./pages/student/home/ForgotPassword";
+import ResetPassword from "./pages/student/home/ResetPassword";
 import PracticeJLPT from "./pages/student/practice/PracticeJLPT";
 import PracticeEJU from "./pages/student/practice/PracticeEJU";
 import MockExamJLPT from "./pages/student/exam/MockExamJLPT";
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/login" element={<StudentLogin />} />
           <Route path="/register" element={<SignUpForm />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/exam-list" element={<ExamListPage />} />
           <Route path="/exam-intro" element={<ExamIntro />} />
           

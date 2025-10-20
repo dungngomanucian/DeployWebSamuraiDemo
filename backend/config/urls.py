@@ -15,9 +15,13 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include # <--- LỖI ĐÃ ĐƯỢC KHẮC PHỤC Ở ĐÂY
+from django.urls import path, include 
+from student.forgot_password import forgot_password
+from student.reset_password import reset_password
 
 urlpatterns = [
     path('api/v1/admin/', admin.site.urls), # Đã sửa admin.urls thành admin.site.urls
     path('api/', include('accounts.urls')),
+    path("api/student/forgot-password/", forgot_password),
+    path("api/student/reset-password/", reset_password)
 ]

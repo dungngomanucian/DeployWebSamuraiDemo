@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Mail, X } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { studentApiClient } from "../../../api/axiosConfig";
 
 // Giả lập component Link cho môi trường demo (Canvas/VSCode)
 const Link = ({ to, children, className }) => (
@@ -55,7 +56,7 @@ const ForgotPasswordForm = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const emailPattern = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
@@ -75,10 +76,26 @@ const ForgotPasswordForm = () => {
       return;
     }
 
-    // Gửi yêu cầu đặt lại mật khẩu (demo)
-    console.log("Gửi yêu cầu quên mật khẩu cho:", formData.email);
+    try {
+      const response = await studentApiClient.post("/student/forgot-password/", {
+        email: formData.email,
+      });
 
-    toast.success("Đã gửi liên kết đặt lại mật khẩu đến Gmail của bạn!");
+
+      if (response.data?.message) {
+        toast.success("Đã gửi liên kết đặt lại mật khẩu!");
+      } else {
+        toast.error(response.data?.error || "Có lỗi xảy ra khi gửi yêu cầu.");
+      }
+    } catch (error) {
+      console.error("Lỗi gửi yêu cầu:", error);
+      // Xử lý lỗi riêng khi email không tồn tại
+      if (error.response?.status === 404) {
+        toast.error("Email không tồn tại trong hệ thống.");
+      } else {
+        toast.error("Không thể gửi yêu cầu, vui lòng thử lại.");
+      }
+    }
   };
 
   return (
