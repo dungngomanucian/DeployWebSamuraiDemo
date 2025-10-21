@@ -13,6 +13,7 @@ import {
 
 const menuItems = [
   { to: "/admin/dashboard", icon: HiChartPie, label: "Dashboard" },
+  { to: "/admin/accounts", icon: HiUsers, label: "Quản lý tài khoản" },
   { to: "/admin/students", icon: HiUsers, label: "Quản lý học viên" },
   { to: "/admin/teachers", icon: HiAcademicCap, label: "Quản lý giáo viên" },
   { to: "/admin/courses", icon: HiBookOpen, label: "Quản lý khóa học" },
