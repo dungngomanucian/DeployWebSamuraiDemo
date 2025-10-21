@@ -1,16 +1,38 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Sidebar from "../../../components/SideBar";
 import TopBar from "../../../components/TopBar";
 import OnboardingModal from "../../../components/OnboardingModal";
 import Calendar from "../../../components/Calendar";
 
+import { getStudentProfile, getDashboardGridData } from "../../../api/studentDashboardService";
 // =============================
 // COMPONENT CON: Onboarding Modal, DashboardGrid
 // =============================
 
-const DashboardGrid = () => {
-  // Đây là nơi bạn sẽ build các card từ Ảnh 4
-  // Tôi sẽ tạo các placeholder
+const DashboardGrid = ({ gridData, isLoading }) => {
+  // === LOGIC COUNTDOWN ===
+  let countdownDays = 0;
+  if (gridData && gridData.target_date) {
+    const targetDate = new Date(gridData.target_date);
+    const today = new Date();
+    // Bỏ qua phần giờ, chỉ tính ngày
+    targetDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    const diffTime = targetDate - today;
+    countdownDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  }
+  // Hiển thị loading nếu chưa có data
+  if (isLoading) {
+    return <div className="p-8">Đang tải dữ liệu dashboard...</div>;
+  }
+
+  // Hiển thị nếu có lỗi (gridData là null)
+  if (!gridData) {
+     return <div className="p-8 text-red-500">Không thể tải dữ liệu dashboard.</div>;
+  }
+  
+  //build các card (Nếu có data, render)
   return (
     <div className="p-8 grid grid-cols-1 lg:grid-cols-4 gap-6">
       
@@ -28,7 +50,7 @@ const DashboardGrid = () => {
             
             {/* 3. Body (Khối 43 ngày) */}
             <div className="relative w-10/12 mx-auto bg-blue-600 text-white pt-10 pb-3 px-5 rounded-b-xl text-center border-5 border-white shadow-lg">
-              <p className="text-6xl font-bold">43</p>
+              <p className="text-6xl font-bold">{countdownDays > 0 ? countdownDays : '0'}</p>
               <p className="text-l">ngày</p>
             </div>
           </div>
@@ -39,7 +61,7 @@ const DashboardGrid = () => {
           {/* Streak */}
           <div className="bg-white p-6 rounded-xl shadow-md text-center">
             <div className="w-32 h-32 bg-gray-200 mx-auto rounded-lg mb-4"></div>
-            <p className="text-gray-600">Bạn đang giữ Streak học liên tục <span className="font-bold text-blue-600">5 ngày</span>. Hãy cố gắng nhé!</p>
+            <p className="text-gray-600">Bạn đang giữ Streak học liên tục <span className="font-bold text-blue-600">{gridData.streak_day || 0} ngày</span>. Hãy cố gắng nhé!</p>
           </div>
 
         </div>
@@ -72,8 +94,8 @@ const DashboardGrid = () => {
         <div className="bg-white p-6 pt-0 rounded-xl shadow-md border-black text-center">
           <div className="w-full bg-blue-600 text-white text-xl py-3 rounded-lg font-bold mb-6">PROFILE HỌC VIÊN</div>
           <div className="w-32 h-32 bg-gray-300 mx-auto rounded-full mb-4"></div>
-          <h2 className="text-xl font-bold">Nguyễn Bình Minh</h2>
-          <p className="text-gray-500 text-sm mb-6">2501.SAMURAI.N2</p>
+          <h2 className="text-xl font-bold">{`${gridData.first_name} ${gridData.last_name}`}</h2>
+          <p className="text-gray-500 text-sm mb-6">{gridData.id}</p>
 
           <div className="flex justify-around mb-6">
             {/* Mục tiêu */}
@@ -88,7 +110,7 @@ const DashboardGrid = () => {
             <div className="flex flex-col items-center gap-2">
               <span className="bg-gray-200 text-gray-700 text-xm font-semibold px-2 py-1 rounded-full">Latest Score</span>
               <div className="w-24 h-24 bg-gray-100 rounded-full flex flex-col justify-center items-center shadow-inner">
-                <p className="text-3xl font-bold">98</p>
+                <p className="text-3xl font-bold">{gridData.score_latest || 0}</p>
                 <p className="text-sm text-gray-400">/180</p>
               </div>
             </div>
@@ -106,7 +128,7 @@ const DashboardGrid = () => {
                  <div className="w-4 h-4 bg-gray-200 rounded"></div>
                  <span className="text-gray-600">Tổng thời lượng học</span>
                </div>
-               <span className="font-semibold">12 hours</span>
+               <span className="font-semibold">{gridData.total_exam_hour || 0} hours</span>
              </div>
              {/* Item */}
              <div className="flex items-center justify-between">
@@ -114,7 +136,7 @@ const DashboardGrid = () => {
                  <div className="w-4 h-4 bg-gray-200 rounded"></div>
                  <span className="text-gray-600">Tổng số bài test đã làm</span>
                </div>
-               <span className="font-semibold">12/30</span>
+               <span className="font-semibold">{gridData.total_test || 0}/30</span>
              </div>
              {/* Item */}
              <div className="flex items-center justify-between">
@@ -122,7 +144,7 @@ const DashboardGrid = () => {
                  <div className="w-4 h-4 bg-gray-200 rounded"></div>
                  <span className="text-gray-600">Tổng số đề luyện</span>
                </div>
-               <span className="font-semibold">10/30</span>
+               <span className="font-semibold">{gridData.total_exam || 0}/30</span>
              </div>
           </div>
 
@@ -151,38 +173,76 @@ const DashboardGrid = () => {
 
 export default function DashboardPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [showOnboarding, setShowOnboarding] = useState(true); // Đặt là true để test modal
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeLink, setActiveLink] = useState('OVERVIEW');
-
+  
   const [currentAccountId, setCurrentAccountId] = useState('account35');
+  
+  const [profileData, setProfileData] = useState(null);
+  const [gridData, setGridData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchAllData = async () => {
+    console.log("Đang gọi API cho:", currentAccountId);
+    setIsLoading(true); // Bắt đầu loading
+
+    const [profileResponse, gridResponse] = await Promise.all([
+      getStudentProfile(currentAccountId),
+      getDashboardGridData(currentAccountId)
+    ]);
+    
+    if (profileResponse.data) {
+      setProfileData(profileResponse.data);
+    } else {
+      console.error("Lỗi khi lấy profile:", profileResponse.error);
+    }
+
+    if (gridResponse.data) {
+      setGridData(gridResponse.data);
+      // Logic hiện modal (giữ nguyên)
+      if (!gridResponse.data.target_date) { 
+        setShowOnboarding(true); 
+      } else {
+        setShowOnboarding(false);
+      }
+    } else {
+      console.error("Lỗi khi lấy grid data:", gridResponse.error);
+      setShowOnboarding(true); 
+    }
+    
+    setIsLoading(false); // Kết thúc loading
+  };
+
+  useEffect(() => {
+    fetchAllData(); 
+  }, [currentAccountId]);
 
   return (
     <div className="flex min-h-screen bg-blue-50">
-      {/* Modal sẽ hiển thị par-dessus mọi thứ */}
       <OnboardingModal 
         show={showOnboarding} 
         onHide={() => setShowOnboarding(false)} 
         accountId={currentAccountId}
+        onSuccess={fetchAllData}
       />
-
-      {/* Sidebar */}
       <Sidebar 
         isOpen={isSidebarOpen}
-        activeLink={activeLink} // <-- TRUYỀN PROPS
-        setActiveLink={setActiveLink} // <-- TRUYỀN PROPS
+        activeLink={activeLink}
+        setActiveLink={setActiveLink}
       />
-
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col">
-        {/* Top Bar */}
+        {/* === CẬP NHẬT TOPBAR === */}
         <TopBar 
-          isOpen={isSidebarOpen} // <-- THÊM PROP 'isOpen'
+          isOpen={isSidebarOpen}
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
+          profileData={profileData} // <-- Truyền data xuống
+          isLoading={isLoading}   // <-- Truyền trạng thái loading
         />
         
-        {/* Nội dung Dashboard (Grid) */}
         <main className="flex-1 overflow-y-auto">
-          <DashboardGrid />
+
+          <DashboardGrid gridData={gridData} isLoading={isLoading} />
+
         </main>
       </div>
     </div>

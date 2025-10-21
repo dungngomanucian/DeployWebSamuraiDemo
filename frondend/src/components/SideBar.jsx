@@ -55,7 +55,7 @@ const Sidebar = ({ isOpen, activeLink, setActiveLink }) => {
       style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)' }}
     >
       {/* Logo Section */}
-      <div className={`flex items-center justify-center mb-1/4 h-14 transition-all duration-300 overflow-hidden py-2`}> {/* <-- SỬA Ở ĐÂY: Tăng h-16 (64px) lên h-20 (80px) */}
+      <div className={`flex items-center justify-center mb-1/4 h-18 transition-all duration-300 overflow-hidden py-2`}> {/* <-- SỬA Ở ĐÂY: Tăng h-16 (64px) lên h-20 (80px) */}
         <img
           src={logoFull}
           alt="Samurai Japanese"

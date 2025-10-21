@@ -2,7 +2,7 @@ import React from 'react';
 import { HiMenu, HiOutlineBell, HiSearch } from 'react-icons/hi';
 import logoFull from '../assets/Logo Samurai (chữ ngang).png';
 
-const TopBar = ({ isOpen, onToggleSidebar }) => { // Thêm prop 'isOpen'
+const TopBar = ({ isOpen, onToggleSidebar, profileData, isLoading }) => { // Thêm prop 'isOpen'
   return (
     <div className="flex items-center justify-between w-full h-16 pl-5 pr-9 bg-white/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
       <div className="flex items-center gap-4 flex-shrink-0">
@@ -47,12 +47,24 @@ const TopBar = ({ isOpen, onToggleSidebar }) => { // Thêm prop 'isOpen'
           <HiOutlineBell className="w-6 h-6" />
         </button>
         <div className="flex items-center gap-3">
-          {/* Avatar */}
+          
+          {/* === CẬP NHẬT AVATAR === */}
           <div className="w-10 h-10 rounded-full bg-gray-300 overflow-hidden flex-shrink-0">
-            {/* <img src="..." alt="Avatar" /> */}
+            {profileData && profileData.image_path && (
+              <img src={profileData.image_path} alt="Avatar" className="w-full h-full object-cover" />
+            )}
+            {/* (Nếu không có avatar_url, nó sẽ hiện nền xám) */}
           </div>
+          
+          {/* === CẬP NHẬT TÊN === */}
           <span className="font-semibold text-gray-700 whitespace-nowrap hidden sm:block">
-            Nguyễn Bình Minh
+            {isLoading ? (
+              <span className="text-sm text-gray-500">Đang tải...</span>
+            ) : profileData ? (
+              profileData.user_name
+            ) : (
+              'Guest'
+            )}
           </span>
         </div>
       </div>

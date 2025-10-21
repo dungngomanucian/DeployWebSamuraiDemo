@@ -49,7 +49,7 @@ const ProgressBar = ({ step }) => {
 };
 
 // Component OnboardingModal chính
-const OnboardingModal = ({ show, onHide, accountId }) => {
+const OnboardingModal = ({ show, onHide, accountId, onSuccess }) => {
   const [step, setStep] = useState(1);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -167,13 +167,17 @@ const OnboardingModal = ({ show, onHide, accountId }) => {
     const { data, error } = await updateOnboardingData(dataToSend);
     
     if (error) {
-      // Thất bại: Service đã xử lý lỗi, chúng ta chỉ cần hiển thị
       console.error("Lỗi từ service:", error);
       setErrorMessage(error);
     } else {
-      // Thành công!
       console.log("Cập nhật thành công!", data);
-      handleClose(); // Đóng modal
+      
+      // === GỌI CALLBACK KHI THÀNH CÔNG ===
+      if (onSuccess) {
+        onSuccess();
+      }
+      
+      handleClose();
     }
     setIsLoading(false);
   };

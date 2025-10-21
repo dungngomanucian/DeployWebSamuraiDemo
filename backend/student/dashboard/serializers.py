@@ -42,3 +42,40 @@ class OnboardingSerializer(serializers.Serializer):
             data['target_jlpt_degree'] = None 
 
         return data
+    
+
+class AccountProfileSerializer(serializers.Serializer):
+    """
+    Serializer để trả về user_name và image_path từ bảng Account.
+    """
+    user_name = serializers.CharField(read_only=True)
+    image_path = serializers.CharField(read_only=True, allow_null=True)
+
+
+class DashboardGridSerializer(serializers.Serializer):
+    """
+    Serializer để trả về TẤT CẢ dữ liệu cho Dashboard Grid,
+    lấy từ bảng 'students'.
+    """
+    # Dùng cho Countdown
+    target_date = serializers.DateField(read_only=True, allow_null=True)
+    
+    # Dùng cho Card "Streak"
+    streak_day = serializers.IntegerField(read_only=True, allow_null=True)
+    
+    id = serializers.CharField(read_only=True)
+
+    # Dùng cho Card "Profile"
+    first_name = serializers.CharField(read_only=True)
+    last_name = serializers.CharField(read_only=True)
+    
+    # Dùng cho "Latest Score"
+    score_latest = serializers.IntegerField(read_only=True, allow_null=True)
+    
+    total_exam_hour = serializers.DecimalField(max_digits=5, decimal_places=2, read_only=True, allow_null=True)
+    total_test = serializers.IntegerField(read_only=True, allow_null=True)
+    total_exam = serializers.IntegerField(read_only=True, allow_null=True)
+
+
+    # Dùng cho Card "Mục tiêu" (ví dụ)
+    #target_jlpt_degree = serializers.CharField(read_only=True, allow_null=True)
