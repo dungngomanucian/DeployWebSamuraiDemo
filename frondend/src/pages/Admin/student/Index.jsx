@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useCallback } from 'react'; // Thêm useCallback
 import { useNavigate } from 'react-router-dom';
 import IndexLayout from '../../../layouts/IndexLayout';
+import StudentTable from '../../../components/admin/ContentTable';       
+import PaginationControls from '../../../components/admin/PaginationControls';
 import { HiPencil, HiTrash } from "react-icons/hi2";
 import { getAllStudent } from '../../../api/admin/manageStudentService';
 import { format } from 'date-fns';
@@ -128,109 +130,56 @@ export default function ManageStudents() {
   const handleDelete = (id) => console.log(`Xóa học viên ID: ${id}`);
 
   return (
-    <IndexLayout
-      title="Quản lý học viên"
-      onAddNew={handleAddNew}
-      onSearch={handleSearch} // Truyền hàm handleSearch mới
-    >
-      {/* === UI Controls Phân trang === */}
-      <div className="flex justify-between items-center mb-4">
-        {/* Dropdown chọn PageSize */}
-        <div>
-          <label htmlFor="pageSize" className="mr-2 text-sm">Hiển thị:</label>
-          <select 
-            id="pageSize" 
-            value={pageSize} 
-            onChange={handlePageSizeChange}
-            className="select select-bordered select-sm"
-            disabled={loading} // Disable khi đang tải
-          >
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-            <option value={30}>30</option>
-          </select>
-          <span className="ml-2 text-sm">bản ghi/trang</span>
-        </div>
-
-        {/* Thông tin số lượng bản ghi */}
-        <span className="text-sm">
-          Hiển thị {filteredData.length > 0 ? ((currentPage - 1) * pageSize) + 1 : 0}-
-          {Math.min(currentPage * pageSize, totalCount)} trên tổng số {totalCount} bản ghi
-        </span>
-      </div>
-
-      {/* === Hiển thị Loading/Error/Bảng === */}
-      {loading && (
-        <div className="flex justify-center items-center h-64"><span className="loading loading-spinner loading-lg"></span></div>
-      )}
-      {error && (
-        <div className="alert alert-error shadow-lg">...</div> // Giữ nguyên
-      )}
-      {!loading && !error && (
-        <div className="overflow-x-auto">
-          <table className="table w-full table-zebra">{/* Thêm table-zebra cho đẹp */}
-            <thead>
-              <tr>
-                <th>#</th>
-                {columns.map((col) => (
-                  <th key={col.accessor}>{col.header}</th>
-                ))}
-                <th>Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredData.length > 0 ? (
-                 filteredData.map((row, index) => (
-                    <tr key={row.id} className="hover">
-                      {/* Tính số thứ tự đúng theo trang */}
-                      <th>{((currentPage - 1) * pageSize) + index + 1}</th> 
-                      {columns.map((col) => (
-                        <td key={col.accessor}>
-                          {col.format ? col.format(row[col.accessor]) : row[col.accessor]}
-                        </td>
-                      ))}
-                      <td>
-                        <div className="flex gap-2">
-                          <button onClick={() => handleEdit(row.id)} className="btn btn-sm btn-outline btn-info"><HiPencil /></button>
-                          <button onClick={() => handleDelete(row.id)} className="btn btn-sm btn-outline btn-error"><HiTrash /></button>
-                        </div>
-                      </td>
-                    </tr>
-                 ))
-              ) : (
-                <tr>
-                    <td colSpan={columns.length + 2} className="text-center p-4">Không tìm thấy dữ liệu phù hợp.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* === Component Phân trang (Pagination) === */}
-      {!loading && !error && totalPages > 1 && (
-        <div className="flex justify-center mt-6">
-          <div className="join">
-            <button 
-              className="join-item btn btn-sm" 
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
+      <IndexLayout
+        title="Quản lý học viên"
+        onAddNew={handleAddNew}
+        onSearch={handleSearch}
+      >
+        {/* === UI Controls Phân trang === */}
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <label htmlFor="pageSize" className="mr-2 text-sm">Hiển thị:</label>
+            <select 
+              id="pageSize" 
+              value={pageSize} 
+              onChange={handlePageSizeChange}
+              className="select select-bordered select-sm"
+              disabled={loading}
             >
-              «
-            </button>
-            <button className="join-item btn btn-sm">
-              Trang {currentPage} / {totalPages}
-            </button>
-            <button 
-              className="join-item btn btn-sm" 
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-            >
-              »
-            </button>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={30}>30</option>
+            </select>
+            <span className="ml-2 text-sm">bản ghi/trang</span>
           </div>
+          <span className="text-sm">
+            Hiển thị {filteredData.length > 0 ? ((currentPage - 1) * pageSize) + 1 : 0}-
+            {Math.min(currentPage * pageSize, totalCount)} trên tổng số {totalCount} bản ghi
+          </span>
         </div>
-      )}
-    </IndexLayout>
-  );
+
+        {/* === Hiển thị Loading/Error === */}
+        {loading && ( <div className="flex justify-center items-center h-64"><span className="loading loading-spinner loading-lg"></span></div> )}
+        {error && ( <div className="alert alert-error shadow-lg">...</div> )}
+
+        {/* === Gọi Component Bảng và Phân trang === */}
+        {!loading && !error && (
+          <>
+            <StudentTable 
+              columns={columns}
+              data={filteredData}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              currentPage={currentPage}
+              pageSize={pageSize}
+            />
+            <PaginationControls 
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          </>
+        )}
+      </IndexLayout>
+    );
 }

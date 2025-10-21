@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { HiBars3 } from "react-icons/hi2";
-import Sidebar from '../components/Admin/Sidebar'; // 1. Import Sidebar mới
+import Sidebar from '../components/admin/Sidebar'; // 1. Import Sidebar mới
 
 export default function AdminLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
