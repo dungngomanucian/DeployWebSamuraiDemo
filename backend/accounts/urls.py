@@ -7,7 +7,7 @@ app_name = 'accounts'
 
 urlpatterns = [
     # Đường dẫn sẽ là: /api/login/
-    path('login/', StudentLoginAPIView.as_view(), name='student-login'),
+    path('auth-login/', StudentLoginAPIView.as_view(), name='student-login'),
     
     # Đường dẫn sẽ là: /api/test-session/
     path('test-session/', TestSessionAPIView.as_view(), name='test-session'),

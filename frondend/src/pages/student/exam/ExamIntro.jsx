@@ -1,13 +1,60 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "../../../components/Navbar";
 import Footer from "../../../components/Footer";
+import { getExamById } from "../../../api/examService";
 
 export default function ExamIntro() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const level = params.get("level") || "N3";
-  const examId = params.get("examId") || "1";
+  const examId = params.get("examId");
+  
+  const [examData, setExamData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadExamData = async () => {
+      if (!examId) {
+        navigate("/mock-exam-jlpt");
+        return;
+      }
+
+      setLoading(true);
+      const { data, error } = await getExamById(examId);
+
+      if (error) {
+        console.error("Error loading exam:", error);
+        alert("Không thể tải thông tin đề thi. Vui lòng thử lại!");
+        navigate(-1);
+        return;
+      }
+
+      setExamData(data);
+      setLoading(false);
+    };
+
+    loadExamData();
+  }, [examId, navigate]);
+
+  const handleStartExam = () => {
+    navigate(`/exam-start?examId=${examId}`);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#E9EFFC]">
+        <div className="text-2xl font-bold text-[#0B1320]">Đang tải thông tin đề thi...</div>
+      </div>
+    );
+  }
+
+  if (!examData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#E9EFFC]">
+        <div className="text-2xl font-bold text-red-600">Không tìm thấy đề thi!</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#E9EFFC]">
@@ -19,7 +66,9 @@ export default function ExamIntro() {
           <div className="bg-white rounded-3xl shadow-xl border border-gray-200 px-8 md:px-14 py-10">
             {/* Title */}
             <div className="text-center">
-              <div className="text-6xl md:text-7xl font-extrabold tracking-wide text-[#0B1320]">{level}</div>
+              <div className="text-6xl md:text-7xl font-extrabold tracking-wide text-[#0B1320]">
+                {examData.level.title}
+              </div>
               <div
                 className="mt-2 text-3xl md:text-[40px] leading-none text-[#0B1320]"
                 style={{
@@ -38,7 +87,7 @@ export default function ExamIntro() {
                   letterSpacing: "0"
                 }}
               >
-                (105分)
+                ({examData.total_duration}分)
               </div>
             </div>
 
@@ -96,10 +145,7 @@ export default function ExamIntro() {
                 QUAY LẠI
               </button>
               <button
-                onClick={() => {
-                  // TODO: Navigate to actual exam page when available
-                  console.log("Start exam", level, examId);
-                }}
+                onClick={handleStartExam}
                 className="rounded-full px-6 md:px-8 h-[42px] bg-[#874FFF] text-white font-semibold shadow-sm border-2 border-[#5427B4]"
               >
                 BẮT ĐẦU NGAY

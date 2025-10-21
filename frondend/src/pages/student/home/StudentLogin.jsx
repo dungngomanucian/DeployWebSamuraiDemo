@@ -9,7 +9,7 @@ import { Mail, Lock, X, Eye, EyeOff, CheckSquare, CheckCircle, Loader2, AlertTri
 const Link = ({ to, children, className }) => <a href={to} className={className}>{children}</a>;
 
 // Cấu hình API Backend - QUAN TRỌNG: Phải khớp với địa chỉ chạy Django
-const API_BASE_URL = 'http://127.0.0.1:8000/'; 
+const API_BASE_URL = 'http://127.0.0.1:8000/api/login/'; 
 
 /**
  * Component InputField tùy chỉnh với thiết kế bottom border (viền dưới)
@@ -140,7 +140,7 @@ const StudentLogin = () => {
     
     try {
         // GỌI API ĐẾN BACKEND DJANGO
-        const response = await fetch(`${API_BASE_URL}/api/login/`, {
+        const response = await fetch(`${API_BASE_URL}auth-login/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

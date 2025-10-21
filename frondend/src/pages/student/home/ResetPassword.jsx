@@ -1,8 +1,8 @@
 // SAMURAI_JAPANESE_APP - Reset Password Page
-import React, { useState } from 'react';
-import { LockClosedIcon, EyeIcon, EyeSlashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import React, { useState, useEffect } from 'react';
+import { LockClosedIcon, EyeIcon, EyeSlashIcon, XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import toast, { Toaster } from 'react-hot-toast';
-import { studentApiClient } from "../../../api/axiosConfig";
+import { resetPassword, verifyResetToken, checkTokenStatus } from "../../../api/ForgotPasswordService";
 import { useSearchParams } from 'react-router-dom';
 
 // Link giả lập
@@ -53,10 +53,43 @@ const InputField = ({ label, placeholder, icon: Icon, type = 'text', name, value
 const ResetPasswordForm = () => {
   const [formData, setFormData] = useState({ password: '', confirmPassword: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isValidatingToken, setIsValidatingToken] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [tokenValid, setTokenValid] = useState(false);
+  const [tokenError, setTokenError] = useState('');
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
+
+  // Validate token khi component mount
+  useEffect(() => {
+    const validateToken = async () => {
+      if (!token) {
+        setTokenError('Token không hợp lệ. Vui lòng kiểm tra lại liên kết.');
+        setIsValidatingToken(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await verifyResetToken(token);
+        
+        if (error) {
+          setTokenError('Token không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu đặt lại mật khẩu mới.');
+          setTokenValid(false);
+        } else {
+          setTokenValid(true);
+        }
+      } catch (err) {
+        console.error('Lỗi validate token:', err);
+        setTokenError('Không thể xác thực token. Vui lòng thử lại.');
+        setTokenValid(false);
+      } finally {
+        setIsValidatingToken(false);
+      }
+    };
+
+    validateToken();
+  }, [token]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -99,21 +132,63 @@ const ResetPasswordForm = () => {
     setIsSubmitting(true);
 
     try {
-      const { data } = await studentApiClient.post('/reset-password/', {
-        token,
-        new_password: password
-      });
+      const { data, error } = await resetPassword(token, password, password);
 
-      toast.success(data.message || "Đặt lại mật khẩu thành công!");
+      if (error) {
+        toast.error(error || "Không thể kết nối đến máy chủ.");
+        return;
+      }
+
+      toast.success(data?.message || "Đặt lại mật khẩu thành công!");
       setFormData({ password: '', confirmPassword: '' });
       setShowSuccessModal(true);
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.error || "Không thể kết nối đến máy chủ.");
+      toast.error("Không thể kết nối đến máy chủ.");
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Loading state khi đang validate token
+  if (isValidatingToken) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans">
+        <div className="w-full max-w-md bg-white p-6 rounded-2xl shadow-2xl border border-gray-100 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Đang xác thực...</h2>
+          <p className="text-gray-600">Vui lòng chờ trong giây lát</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Token không hợp lệ
+  if (!tokenValid) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans">
+        <div className="w-full max-w-md bg-white p-6 rounded-2xl shadow-2xl border border-gray-100 text-center">
+          <ExclamationTriangleIcon className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Token không hợp lệ</h2>
+          <p className="text-gray-600 mb-6">{tokenError}</p>
+          <div className="space-y-3">
+            <Link 
+              to="/forgot-password" 
+              className="block w-full py-3 px-4 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition duration-200"
+            >
+              Yêu cầu đặt lại mật khẩu mới
+            </Link>
+            <Link 
+              to="/login" 
+              className="block w-full py-3 px-4 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition duration-200"
+            >
+              Quay lại đăng nhập
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans">

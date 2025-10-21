@@ -11,6 +11,7 @@ import PracticeByType from "./pages/student/practice/PracticeByType";
 import PracticeLevelDetail from "./pages/student/practice/PracticeLevelDetail";
 import ExamListPage from "./pages/student/exam/ExamListPage";
 import ExamIntro from "./pages/student/exam/ExamIntro";
+import ExamPage from "./pages/student/exam/ExamPage";
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/exam-list" element={<ExamListPage />} />
           <Route path="/exam-intro" element={<ExamIntro />} />
+          <Route path="/exam-start" element={<ExamPage />} />
           
           {/* (Tùy chọn) Thêm một route để xử lý các trang không tồn tại */}
           <Route path="*" element={<div>404 - Trang không tìm thấy</div>} />
