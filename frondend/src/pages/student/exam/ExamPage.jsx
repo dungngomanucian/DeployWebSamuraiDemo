@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "../../../components/Navbar";
 import Footer from "../../../components/Footer";
-import { getFullExamData } from "../../../api/backendService";
+import { getFullExamData } from "../../../api/examService";
 
 export default function ExamPage() {
   const navigate = useNavigate();

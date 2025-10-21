@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "../../../components/Navbar";
 import Footer from "../../../components/Footer";
-import { getExamById } from "../../../api/backendService";
+import { getExamById } from "../../../api/examService";
 
 export default function ExamIntro() {
   const navigate = useNavigate();

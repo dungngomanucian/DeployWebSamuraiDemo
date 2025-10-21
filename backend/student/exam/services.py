@@ -1,6 +1,6 @@
 """
-Business logic for student operations
-Handles all Supabase queries
+Business logic for exam operations
+Handles all Supabase queries for exam-related functionality
 """
 from config.supabase_client import supabase
 from typing import Dict, List, Optional
@@ -255,4 +255,3 @@ class ExamService:
                 'success': False,
                 'error': str(e)
             }
-

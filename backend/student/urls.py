@@ -1,22 +1,18 @@
 """
 URL Configuration for Student App
 """
-from django.urls import path
-from . import views
+from django.urls import path, include
 
 app_name = 'student'
 
 urlpatterns = [
-    # Levels
-    path('levels/', views.get_levels, name='levels'),
+    # Exam functionality
+    path('exam/', include('student.exam.urls')),
     
-    # Exams
-    path('exams/<str:exam_id>/', views.get_exam_by_id, name='exam-detail'),
-    path('exams/level/<str:level_id>/', views.get_exams_by_level, name='exams-by-level'),
-    path('exams/<str:exam_id>/full/', views.get_full_exam_data, name='exam-full-data'),
+    # Auth functionality (to be added)
+    # path('auth/', include('student.auth.urls')),
     
-    # Results
-    path('results/', views.save_exam_result, name='save-result'),
-    path('answers/', views.save_student_answers, name='save-answers'),
+    # Profile functionality (to be added)
+    # path('profile/', include('student.profile.urls')),
 ]
 
