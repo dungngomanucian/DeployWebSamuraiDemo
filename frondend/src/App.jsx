@@ -7,6 +7,7 @@ import PracticeByType from "./pages/student/practice/PracticeByType";
 import PracticeLevelDetail from "./pages/student/practice/PracticeLevelDetail";
 import ExamListPage from "./pages/student/exam/ExamListPage";
 import ExamIntro from "./pages/student/exam/ExamIntro";
+import ExamPage from "./pages/student/exam/ExamPage";
 
 import AdminLayout from './layouts/AdminLayout';
 import Dashboard from './pages/Admin/Dashboard/Dashboard';
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/practice-level-detail" element={<PracticeLevelDetail />} />
           <Route path="/exam-list" element={<ExamListPage />} />
           <Route path="/exam-intro" element={<ExamIntro />} />
+          <Route path="/exam-start" element={<ExamPage />} />
           
           {/* Cụm route dành cho Admin */}
           <Route path="/admin" element={<AdminLayout />}>
