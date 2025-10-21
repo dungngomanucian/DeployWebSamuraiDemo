@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { updateOnboardingData } from "../api/studentDashboardService";
 
 // Component con để bọc các step, tránh lặp code
 const ModalCard = ({ children, onBackStep, onHide }) => (
@@ -36,7 +37,6 @@ const ModalCard = ({ children, onBackStep, onHide }) => (
 
 // Thanh tiến trình
 const ProgressBar = ({ step }) => {
-  // Chúng ta có 4 bước sau khi "Sẵn sàng"
   // 1: Exam, 2: Goal, 3: Time, 4: Hours
   const widths = ['w-1/4', 'w-2/4', 'w-3/4', 'w-4/4'];
   const currentWidth = widths[step - 1] || 'w-1/4';
@@ -49,13 +49,21 @@ const ProgressBar = ({ step }) => {
 };
 
 // Component OnboardingModal chính
-const OnboardingModal = ({ show, onHide }) => {
+const OnboardingModal = ({ show, onHide, accountId }) => {
   const [step, setStep] = useState(1);
-  const [examType, setExamType] = useState('JLPT');
-  const [goalLevel, setGoalLevel] = useState('N1');
   const [isVisible, setIsVisible] = useState(false);
 
-  // SỬA: Thêm state cho animation NỘI DUNG
+  const [formData, setFormData] = useState({
+    target_exam: 'JLPT',
+    target_jlpt_degree: 'N1',
+    target_date: '', // Lưu ngày đầy đủ 'YYYY-MM-DD'
+    hour_per_day: '',
+  });
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+
   const [contentVisible, setContentVisible] = useState(false);
   const [contentHeight, setContentHeight] = useState(null);
   const contentRef = useRef(null);
@@ -82,22 +90,93 @@ const OnboardingModal = ({ show, onHide }) => {
   }, [contentVisible, step]); // Chạy lại mỗi khi content (step) thay đổi
 
   const handleClose = () => {
-    setContentVisible(false); // Fade-out content
-    setIsVisible(false); // Fade-out backdrop
+    setContentVisible(false);
+    setIsVisible(false);
     setTimeout(() => {
       onHide();
+      // Reset về step 1 khi đóng
+      setTimeout(() => {
+        setStep(1);
+        // Reset cả form
+        setFormData({
+            target_exam: 'JLPT',
+            target_jlpt_degree: 'N1',
+            target_date: '',
+            hour_per_day: '',
+        });
+      }, 200);
     }, 300);
   };
 
-  // SỬA: Hàm xử lý chuyển step mượt mà
   const handleStepChange = (newStep) => {
-    setContentVisible(false); // 1. Bắt đầu fade-out
+    setErrorMessage(''); // Xóa lỗi cũ khi chuyển step
+    setContentVisible(false);
     setTimeout(() => {
-      setStep(newStep); // 2. Đổi step
-      setContentVisible(true); // 3. Bắt đầu fade-in
-    }, 300); // Khớp với duration
+      setStep(newStep);
+      setContentVisible(true);
+    }, 300);
   };
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Xử lý riêng cho input số giờ (chỉ cho phép số)
+    if (name === 'hour_per_day') {
+        const val = value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1');
+        setFormData(prev => ({ ...prev, [name]: val }));
+    } else {
+        setFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  // === CẬP NHẬT: Thêm hàm `handleSubmit` ===
+  // Hàm này sẽ gọi API khi nhấn "Hoàn thành"
+  const handleSubmit = async () => {
+    if (isLoading) return;
+    
+    // 1. Validation (Giữ nguyên)
+    if (!formData.target_date) {
+        setErrorMessage("Vui lòng chọn ngày thi mục tiêu.");
+        handleStepChange(4);
+        return;
+    }
+    if (!formData.hour_per_day || isNaN(parseFloat(formData.hour_per_day)) || parseFloat(formData.hour_per_day) < 0.5) {
+        setErrorMessage("Vui lòng nhập số giờ học hợp lệ (ít nhất 0.5 giờ).");
+        return;
+    }
+
+    // 2. Bắt đầu gọi API
+    setIsLoading(true);
+    setErrorMessage('');
+
+    // Dữ liệu sẽ gửi lên backend (khớp với Serializer)
+    const dataToSend = {
+        account_id: accountId, // Lấy từ props
+        target_exam: formData.target_exam,
+        target_jlpt_degree: formData.target_jlpt_degree,
+        target_date: formData.target_date,
+        hour_per_day: parseFloat(formData.hour_per_day),
+    };
+    
+    // Nếu thi EJU, không gửi target_jlpt_degree
+    if (dataToSend.target_exam === 'EJU') {
+      dataToSend.target_jlpt_degree = null;
+    }
+
+    console.log("Đang gửi dữ liệu qua Service:", dataToSend);
+    const { data, error } = await updateOnboardingData(dataToSend);
+    
+    if (error) {
+      // Thất bại: Service đã xử lý lỗi, chúng ta chỉ cần hiển thị
+      console.error("Lỗi từ service:", error);
+      setErrorMessage(error);
+    } else {
+      // Thành công!
+      console.log("Cập nhật thành công!", data);
+      handleClose(); // Đóng modal
+    }
+    setIsLoading(false);
+  };
 
   if (!show) {
     return null;
@@ -138,15 +217,23 @@ const OnboardingModal = ({ show, onHide }) => {
             <h2 className="text-2xl font-bold text-gray-800 mb-8">Sắp tới bạn sẽ tham dự kỳ thi nào:</h2>
             <div className="flex justify-center gap-6">
               <button 
-                onClick={() => { setExamType('EJU'); handleStepChange(3); }} // SỬA
-                className="flex flex-col items-center justify-center w-40 h-40 rounded-2xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50"
+                onClick={() => { 
+                    handleChange({ target: { name: 'target_exam', value: 'EJU' } });
+                    handleStepChange(4); // Bỏ qua Step 3 nếu là EJU
+                }}
+                className={`flex flex-col items-center justify-center w-40 h-40 rounded-2xl border-2 hover:border-blue-500 hover:bg-blue-50
+                    ${formData.target_exam === 'EJU' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
               >
                 <div className="w-16 h-16 bg-gray-300 rounded-lg mb-3"></div>
                 <span className="text-2xl font-bold text-gray-700">EJU</span>
               </button>
               <button 
-                onClick={() => { setExamType('JLPT'); handleStepChange(3); }} // SỬA
-                className="flex flex-col items-center justify-center w-40 h-40 rounded-2xl border-2 border-blue-500 bg-blue-50"
+                onClick={() => { 
+                    handleChange({ target: { name: 'target_exam', value: 'JLPT' } });
+                    handleStepChange(3); 
+                }}
+                className={`flex flex-col items-center justify-center w-40 h-40 rounded-2xl border-2 hover:border-blue-500 hover:bg-blue-50
+                    ${formData.target_exam === 'JLPT' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
               >
                 <div className="w-16 h-16 bg-gray-300 rounded-lg mb-3"></div>
                 <span className="text-2xl font-bold text-blue-600">JLPT</span>
@@ -157,6 +244,14 @@ const OnboardingModal = ({ show, onHide }) => {
 
       // Bước 3: Mục tiêu
       case 3:
+        // === CẬP NHẬT: Tự động nhảy bước nếu không phải JLPT ===
+        if (formData.target_exam !== 'JLPT') {
+            // Dùng useEffect để tránh lỗi "Cannot update a component while rendering a different component"
+            useEffect(() => {
+                handleStepChange(4);
+            }, []);
+            return null; // Không render gì cả
+        }
         return (
           <div key="step3">
             <ProgressBar step={2} />
@@ -167,16 +262,14 @@ const OnboardingModal = ({ show, onHide }) => {
               {['N5', 'N4', 'N3', 'N2', 'N1'].map(level => (
                 <button 
                   key={level}
-                  onClick={() => setGoalLevel(`JLPT ${level}`)}
-                  
-                  // SỬA TOÀN BỘ DÒNG CLASSNAME NÀY
+                  // === CẬP NHẬT: Cập nhật state ===
+                  onClick={() => handleChange({ target: { name: 'target_jlpt_degree', value: level } })}
+                  // Cập nhật className để check state
                   className={`py-3 mx-1 rounded-xl font-semibold transition-all duration-200 ${
-                    goalLevel === `JLPT ${level}` 
+                    formData.target_jlpt_degree === level 
                       ? 'bg-blue-100 text-blue-700 shadow-lg shadow-blue-500/30 transform scale-105 border border-blue-200'
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                   }`}
-                  // KẾT THÚC SỬA
-                  
                 >
                   JLPT {level}
                 </button>
@@ -197,18 +290,24 @@ const OnboardingModal = ({ show, onHide }) => {
           <div key="step4">
             <ProgressBar step={3} />
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Thời gian bạn định thi:</h2>
-            <div className="flex justify-center gap-4 mb-8">
-              <select defaultValue="12" className="p-3 border rounded-lg bg-gray-50">
-                <option value="7">Tháng 7</option>
-                <option value="12">Tháng 12</option>
-              </select>
-              <select defaultValue="2025" className="p-3 border rounded-lg bg-gray-50">
-                <option value="2025">2025</option>
-                <option value="2026">2026</option>
-              </select>
+            <div className="flex justify-center mb-8">
+              {/* Bỏ 2 <select>, thay bằng 1 <input type="date"> */}
+              <input
+                type="date"
+                name="target_date"
+                value={formData.target_date}
+                onChange={handleChange}
+                // Lấy ngày hôm nay làm mốc tối thiểu
+                min={new Date().toISOString().split("T")[0]}
+                className="p-3 border rounded-lg bg-gray-50 text-lg w-3/4 text-center"
+              />
             </div>
+            {/* Hiển thị lỗi nếu có (ví dụ khi nhấn Hoàn thành mà chưa chọn) */}
+            {errorMessage && step === 4 && (
+                <p className="text-red-500 text-sm mb-4">{errorMessage}</p>
+            )}
             <button 
-              onClick={() => handleStepChange(5)} // SỬA
+              onClick={() => handleStepChange(5)}
               className="px-10 py-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
             >
               Tiếp theo
@@ -222,13 +321,32 @@ const OnboardingModal = ({ show, onHide }) => {
           <div key="step5">
             <ProgressBar step={4} />
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Một ngày bạn có thể dành bao nhiêu thời gian học (giờ)</h2>
-            <input type="text" placeholder="Ví dụ: 2" className="w-1/2 p-3 border rounded-lg text-center mb-8"/>
-            <br/>
+            {/* Cập nhật input để kết nối với state */}
+            <input 
+                type="text" 
+                name="hour_per_day"
+                placeholder="Ví dụ: 1.5 (cho 1 tiếng 30 phút)" 
+                value={formData.hour_per_day}
+                onChange={handleChange}
+                className="w-3/4 p-3 border rounded-lg text-center mb-4 text-lg"
+            />
+            
+            {/* Hiển thị lỗi (nếu có) */}
+            {errorMessage && step === 5 && (
+                <p className="text-red-500 text-sm mb-4">{errorMessage}</p>
+            )}
+
+            {/* Cập nhật button để gọi handleSubmit */}
             <button 
-              onClick={handleClose} // Hoàn thành
-              className="px-10 py-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+              onClick={handleSubmit} // THAY ĐỔI: từ handleClose thành handleSubmit
+              disabled={isLoading} // Thêm disabled khi đang load
+              className={`px-10 py-3 rounded-full font-semibold w-3/4
+                ${isLoading 
+                    ? 'bg-gray-400 text-gray-700 cursor-not-allowed' 
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
             >
-              Hoàn thành
+              {isLoading ? 'Đang lưu...' : 'Hoàn thành'}
             </button>
           </div>
         );
@@ -248,7 +366,9 @@ const OnboardingModal = ({ show, onHide }) => {
     `}>
       <ModalCard 
         onHide={handleClose}
-        onBackStep={step > 1 ? () => handleStepChange(step - 1) : null}
+        onBackStep={step > 1 ? () => handleStepChange(
+            (step === 4 && formData.target_exam === 'EJU') ? 2 : step - 1
+        ) : null}
       >
         {/* SỬA: Div này animate chiều cao (height) */}
         <div 

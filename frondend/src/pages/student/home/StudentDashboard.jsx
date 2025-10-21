@@ -1,17 +1,13 @@
 import React, { useState } from "react";
-import Sidebar from "../../components/SideBar";
-import TopBar from "../../components/TopBar";
-import OnboardingModal from "../../components/OnboardingModal";
-import Calendar from "../../components/Calendar";
+import Sidebar from "../../../components/SideBar";
+import TopBar from "../../../components/TopBar";
+import OnboardingModal from "../../../components/OnboardingModal";
+import Calendar from "../../../components/Calendar";
 
 // =============================
-// COMPONENT CON: Onboarding Modal
+// COMPONENT CON: Onboarding Modal, DashboardGrid
 // =============================
 
-
-// =============================
-// COMPONENT CON: DashboardGrid
-// =============================
 const DashboardGrid = () => {
   // Đây là nơi bạn sẽ build các card từ Ảnh 4
   // Tôi sẽ tạo các placeholder
@@ -149,14 +145,16 @@ const DashboardGrid = () => {
   );
 };
 
-
 // =============================
 // COMPONENT CHÍNH: DashboardPage
 // =============================
+
 export default function DashboardPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(true); // Đặt là true để test modal
   const [activeLink, setActiveLink] = useState('OVERVIEW');
+
+  const [currentAccountId, setCurrentAccountId] = useState('account35');
 
   return (
     <div className="flex min-h-screen bg-blue-50">
@@ -164,6 +162,7 @@ export default function DashboardPage() {
       <OnboardingModal 
         show={showOnboarding} 
         onHide={() => setShowOnboarding(false)} 
+        accountId={currentAccountId}
       />
 
       {/* Sidebar */}
