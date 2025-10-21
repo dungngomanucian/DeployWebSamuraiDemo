@@ -34,7 +34,7 @@ export default function Sidebar({ isSidebarOpen }) {
       ></label>
       <ul
         className={`menu p-4 min-h-full bg-base-200 text-base-content transition-all duration-300 ease-in-out ${
-          isSidebarOpen ? 'w-80' : 'w-24'
+          isSidebarOpen ? 'w-60' : 'w-24'
         }`}
       >
         {/* Header với Logo */}
@@ -44,7 +44,7 @@ export default function Sidebar({ isSidebarOpen }) {
             <img
               src={isSidebarOpen ? logoFull : logoIcon}
               alt="Samurai App Logo"
-              className={`transition-all duration-300 ${isSidebarOpen ? 'w-48' : 'w-16 h-16'}`}
+              className={`transition-all duration-300 ${isSidebarOpen ? 'w-45' : 'w-16 h-16'}`}
               style={{ objectFit: 'contain' }}
             />
           </div>

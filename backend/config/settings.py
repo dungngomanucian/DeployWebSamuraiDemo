@@ -43,7 +43,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'student',
     'admin.dashboard',
-    'admin.test',
+    'admin.manageStudent',
 ]
 
 MIDDLEWARE = [

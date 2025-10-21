@@ -1,21 +1,12 @@
 // frontend/src/pages/admin/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { adminApiClient } from '../../../api/axiosConfig';
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Giả sử API endpoint của bạn là /admin/dashboard/
-    adminApiClient.get('/admin/dashboard/')
-      .then(response => {
-        setStats(response.data);
-      })
-      .catch(err => {
-        setError('Không thể tải dữ liệu hoặc bạn không có quyền truy cập.');
-        console.error(err);
-      });
+
   }, []);
 
   if (error) return <div className="text-red-500 p-4 bg-red-100 rounded-lg">{error}</div>;
