@@ -16,12 +16,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include 
-from student.forgot_password import forgot_password
-from student.reset_password import reset_password
+from auth.forgot_password import forgot_password
+from auth.reset_password import reset_password
 
 urlpatterns = [
     path('api/v1/admin/', admin.site.urls), # Đã sửa admin.urls thành admin.site.urls
     path('api/', include('accounts.urls')),
-    path("api/forgot-password/", forgot_password),
-    path("api/reset-password/", reset_password)
+    path("api/v1/student/forgot-password/", forgot_password),
+    path("api/v1/student/reset-password/", reset_password)
 ]
