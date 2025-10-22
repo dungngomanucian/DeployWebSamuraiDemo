@@ -107,14 +107,14 @@ const [displayDate, setDisplayDate] = useState(new Date());
     <div className="bg-white p-6 rounded-xl shadow-md ">
       
       {/* 1. Header (Tựa đề + Nút tháng) */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex-1">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
+        <div className="">
           <p className="font-bold text-gray-800 uppercase">TẦN SUẤT HỌC</p>
           <div className="w-28 border-b-4 border-gray-300 rounded-full mt-1"></div>
         </div>
 
         {/* Bọc nút tháng trong 1 div flex để thêm 2 nút < > */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end sm:self-auto">
           {/* Nút LÙI tháng */}
           <button 
             onClick={handlePrevMonth} 

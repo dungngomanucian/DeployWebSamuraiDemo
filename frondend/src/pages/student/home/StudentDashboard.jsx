@@ -34,7 +34,7 @@ const DashboardGrid = ({ gridData, isLoading }) => {
   
   //build các card (Nếu có data, render)
   return (
-    <div className="p-8 grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <div className="p-8 grid grid-cols-1 xl:grid-cols-4 gap-6">
       
       {/* Cột 1 & 2: Nội dung chính */}
       <div className="lg:col-span-3 flex flex-col gap-6">
@@ -91,7 +91,7 @@ const DashboardGrid = ({ gridData, isLoading }) => {
       {/* Cột 3: Profile */}
       <div className="lg:col-span-1 flex flex-col gap-6">
         {/* Profile Card */}
-        <div className="bg-white p-6 pt-0 rounded-xl shadow-md border-black text-center">
+        <div className="bg-white p-6 pt-0 rounded-xl shadow-md text-center w-full">
           <div className="w-full bg-blue-600 text-white text-xl py-3 rounded-lg font-bold mb-6">PROFILE HỌC VIÊN</div>
           <div className="w-32 h-32 bg-gray-300 mx-auto rounded-full mb-4"></div>
           <h2 className="text-xl font-bold">{`${gridData.first_name} ${gridData.last_name}`}</h2>
@@ -172,7 +172,7 @@ const DashboardGrid = ({ gridData, isLoading }) => {
 // =============================
 
 export default function DashboardPage() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeLink, setActiveLink] = useState('OVERVIEW');
   
@@ -181,6 +181,14 @@ export default function DashboardPage() {
   const [profileData, setProfileData] = useState(null);
   const [gridData, setGridData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const handleLinkClick = (link) => {
+    setActiveLink(link);
+    // Nếu màn hình nhỏ hơn lg, đóng sidebar
+    if (window.innerWidth < 1024) { 
+      setIsSidebarOpen(false);
+    }
+  };
 
   const fetchAllData = async () => {
     console.log("Đang gọi API cho:", currentAccountId);
@@ -218,29 +226,40 @@ export default function DashboardPage() {
   }, [currentAccountId]);
 
   return (
-    <div className="flex min-h-screen bg-blue-50">
+    <div className="flex min-h-screen bg-blue-50 h-screen overflow-hidden">
       <OnboardingModal 
         show={showOnboarding} 
         onHide={() => setShowOnboarding(false)} 
         accountId={currentAccountId}
         onSuccess={fetchAllData}
       />
+
+      {/* === BACKDROP CHO MOBILE MENU === */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 z-20 bg-gray-900/50 backdrop-blur-sm lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      
       <Sidebar 
         isOpen={isSidebarOpen}
         activeLink={activeLink}
-        setActiveLink={setActiveLink}
+        setActiveLink={handleLinkClick}
       />
       <div className="flex-1 flex flex-col">
+
+        <main className="flex-1 overflow-y-auto">
+        
         {/* === CẬP NHẬT TOPBAR === */}
-        <TopBar 
+          <TopBar 
           isOpen={isSidebarOpen}
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
           profileData={profileData} // <-- Truyền data xuống
           isLoading={isLoading}   // <-- Truyền trạng thái loading
         />
         
-        <main className="flex-1 overflow-y-auto">
-
           <DashboardGrid gridData={gridData} isLoading={isLoading} />
 
         </main>

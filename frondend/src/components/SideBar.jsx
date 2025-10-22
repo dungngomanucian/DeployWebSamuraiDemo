@@ -49,10 +49,32 @@ const NavItem = ({ icon, text, active = false, isOpen, onClick }) => (
 const Sidebar = ({ isOpen, activeLink, setActiveLink }) => { 
   return (
     <div
-      className={`bg-white h-screen flex flex-col transition-all duration-300 ease-in-out sticky top-0 left-0 z-20
-        ${isOpen ? 'w-50 p-4' : 'w-16 px-2 py-4'}
-      `}
-      style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)' }}
+      className={`
+          bg-white h-screen flex flex-col transition-all duration-300 ease-in-out
+
+          /* === MOBILE (Mặc định) === */
+          /* Menu sẽ là 1 overlay cố định, z-index cao */
+          fixed top-0 left-0 bottom-0 z-30 
+          
+          ${isOpen 
+            /* Khi mở: Rộng 200px (w-50), có padding, trượt vào */
+            ? 'w-50 p-4 shadow-lg translate-x-0'
+            /* KHI ĐÓNG: Thêm "overflow-hidden" vào đây */
+            : 'w-0 p-0 -translate-x-full overflow-hidden'
+          }
+          
+          /* === DESKTOP (lg:) === */
+          /* Reset về sticky, z-index thấp hơn */
+          lg:sticky lg:top-0 lg:left-0 lg:bottom-auto 
+          lg:z-20 lg:translate-x-0
+          
+          ${isOpen 
+            /* Desktop mở: Giống mobile mở */
+            ? 'lg:w-50 lg:p-4 lg:shadow-lg' 
+            /* Desktop đóng: Rộng 80px (w-20) cho icon (đã có overflow-hidden) */
+            : 'lg:w-20 lg:px-4 lg:py-4 lg:overflow-hidden lg:shadow-none'
+          }
+        `}
     >
       {/* Logo Section */}
       <div className={`flex items-center justify-center mb-1/4 h-18 transition-all duration-300 overflow-hidden py-2`}> {/* <-- SỬA Ở ĐÂY: Tăng h-16 (64px) lên h-20 (80px) */}

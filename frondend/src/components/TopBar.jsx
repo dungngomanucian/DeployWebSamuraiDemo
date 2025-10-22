@@ -39,7 +39,7 @@ const TopBar = ({ isOpen, onToggleSidebar, profileData, isLoading }) => { // Th√
       </div>
 
       {/* Profile Section */}
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-3 md:gap-5">
         <button 
           className="text-gray-500 hover:text-gray-800 p-2 rounded-full hover:bg-gray-100 transition-colors"
           aria-label="Notifications"

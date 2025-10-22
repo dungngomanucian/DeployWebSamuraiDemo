@@ -4,7 +4,7 @@ import { updateOnboardingData } from "../api/studentDashboardService";
 // Component con để bọc các step, tránh lặp code
 const ModalCard = ({ children, onBackStep, onHide }) => (
   <div className={`
-    bg-white p-8 rounded-4xl shadow-xl w-full max-w-lg text-center relative
+    bg-white p-4 sm:p-8 rounded-4xl shadow-xl w-full max-w-lg mx-4 sm:mx-0 text-center relative
     transition-all duration-300 ease-in-out
   `}>
     
@@ -219,28 +219,28 @@ const OnboardingModal = ({ show, onHide, accountId, onSuccess }) => {
           <div key="step2">
             <ProgressBar step={1} />
             <h2 className="text-2xl font-bold text-gray-800 mb-8">Sắp tới bạn sẽ tham dự kỳ thi nào:</h2>
-            <div className="flex justify-center gap-6">
+            <div className="flex justify-center gap-4 sm:gap-6">
               <button 
                 onClick={() => { 
                     handleChange({ target: { name: 'target_exam', value: 'EJU' } });
                     handleStepChange(4); // Bỏ qua Step 3 nếu là EJU
                 }}
-                className={`flex flex-col items-center justify-center w-40 h-40 rounded-2xl border-2 hover:border-blue-500 hover:bg-blue-50
+                className={`flex flex-col items-center justify-center w-32 h-32 sm:w-40 sm:h-40 rounded-2xl border-2 hover:border-blue-500 hover:bg-blue-50
                     ${formData.target_exam === 'EJU' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
               >
-                <div className="w-16 h-16 bg-gray-300 rounded-lg mb-3"></div>
-                <span className="text-2xl font-bold text-gray-700">EJU</span>
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-300 rounded-lg mb-2 sm:mb-3"></div>
+                <span className="text-lg sm:text-2xl font-bold text-gray-700">EJU</span>
               </button>
               <button 
                 onClick={() => { 
                     handleChange({ target: { name: 'target_exam', value: 'JLPT' } });
                     handleStepChange(3); 
                 }}
-                className={`flex flex-col items-center justify-center w-40 h-40 rounded-2xl border-2 hover:border-blue-500 hover:bg-blue-50
+                className={`flex flex-col items-center justify-center w-32 h-32 sm:w-40 sm:h-40 rounded-2xl border-2 hover:border-blue-500 hover:bg-blue-50
                     ${formData.target_exam === 'JLPT' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
               >
-                <div className="w-16 h-16 bg-gray-300 rounded-lg mb-3"></div>
-                <span className="text-2xl font-bold text-blue-600">JLPT</span>
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-300 rounded-lg mb-2 sm:mb-3"></div>
+                <span className="text-lg sm:text-2xl font-bold text-blue-600">JLPT</span>
               </button>
             </div>
           </div>
