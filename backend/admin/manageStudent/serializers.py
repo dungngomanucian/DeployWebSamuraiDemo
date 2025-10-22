@@ -40,3 +40,14 @@ class StudentSerializer(serializers.Serializer):
 
     # Nếu bạn cần logic tạo (create) hoặc cập nhật (update) tùy chỉnh, 
     # bạn sẽ định nghĩa thêm các phương thức create() và update() ở đây.
+
+class StudentListSerializer(serializers.Serializer):
+    id = serializers.CharField(read_only=True)
+    classroom_code = serializers.CharField(max_length=100, allow_null=True, required=False)
+    account_id = serializers.CharField(max_length=255)
+    first_name = serializers.CharField(max_length=255)
+    last_name = serializers.CharField(max_length=255)
+    date_of_birth = serializers.DateField()
+    gender = serializers.IntegerField() # int2
+    address = serializers.CharField(allow_blank=True, allow_null=True, required=False)
+    parent_phone_number = serializers.CharField(max_length=20, allow_blank=True, allow_null=True, required=False)
