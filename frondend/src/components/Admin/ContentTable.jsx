@@ -1,8 +1,8 @@
 import React from 'react';
-import { HiPencil, HiTrash } from "react-icons/hi2";
 import SortableHeader from './SortableHeader';
+import ActionButtons from './ActionButtons';
 
-export default function StudentTable({ 
+export default function ContentTable({ 
   columns, 
   data, 
   onEdit, 
@@ -46,14 +46,10 @@ export default function StudentTable({
                 </td>
               ))}
               <td>
-                <div className="flex gap-2">
-                  <button onClick={() => onEdit(row.id)} className="btn btn-sm btn-outline btn-info">
-                    <HiPencil />
-                  </button>
-                  <button onClick={() => onDelete(row.id)} className="btn btn-sm btn-outline btn-error">
-                    <HiTrash />
-                  </button>
-                </div>
+                <ActionButtons
+                  onEdit={() => onEdit(row.id)}
+                  onDelete={() => onDelete(row.id)}
+                />
               </td>
             </tr>
           ))}

@@ -8,7 +8,7 @@ import { HiPencil, HiTrash } from "react-icons/hi2";
  */
 function ActionButtons({ onEdit, onDelete }) {
   return (
-    <div className="flex gap-2 justify-end">
+    <div className="flex gap-2">
       <button
         onClick={onEdit}
         className="btn btn-square btn-sm btn-ghost text-blue-500"

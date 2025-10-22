@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 
 // Layouts và Components
 import IndexLayout from '../../../layouts/IndexLayout';
-import StudentTable from '../../../components/admin/ContentTable';
+import ContentTable from '../../../components/admin/ContentTable';
 import PaginationControls from '../../../components/admin/PaginationControls';
 import PageSizeSelector from '../../../components/admin/PageSizeSelector';
 import PaginationInfo from '../../../components/admin/PaginationInfo';
@@ -158,7 +158,7 @@ function Index() {
       {/* Bảng dữ liệu và điều khiển phân trang */}
       {!loading && !error && (
         <>
-          <StudentTable 
+          <ContentTable 
             columns={columns}
             data={filteredData}
             onEdit={handleEdit}
