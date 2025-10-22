@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 // Layouts và Components
 import IndexLayout from '../../../layouts/IndexLayout';
 import StudentTable from '../../../components/admin/ContentTable';
+import SortableHeader from '../../../components/admin/SortableHeader';
 import PaginationControls from '../../../components/admin/PaginationControls';
 import PageSizeSelector from '../../../components/admin/PageSizeSelector';
 import PaginationInfo from '../../../components/admin/PaginationInfo';
@@ -14,11 +15,11 @@ import { getAllStudent } from '../../../api/admin/manageStudentService';
 
 // Cấu hình cột cho bảng học viên
 const COLUMN_CONFIG = {
-  'first_name': { 
+  'last_name': { 
     header: 'Họ',
     accessor: 'first_name'
   },
-  'last_name': { 
+  'first_name': { 
     header: 'Tên',
     accessor: 'last_name'
   },
@@ -30,7 +31,7 @@ const COLUMN_CONFIG = {
   'gender': {
     header: 'Giới tính',
     accessor: 'gender',
-    format: (value) => (value === 1 ? 'Nam' : value === 2 ? 'Nữ' : 'Khác')
+    format: (value) => (value === 1 ? 'Nam' : value === 0 ? 'Nữ' : 'Khác')
   },
   'parent_phone_number': { 
     header: 'SĐT Phụ huynh',
@@ -57,6 +58,51 @@ function Index() {
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState(''); // State cho tìm kiếm
+  const [sortConfig, setSortConfig] = useState({
+    key: null,
+    direction: 'asc'
+  });
+
+  // === Hàm xử lý sắp xếp ===
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+
+    const sortedData = [...filteredData].sort((a, b) => {
+      // Lấy giá trị từ config cột
+      const config = COLUMN_CONFIG[key];
+      let aValue = a[key];
+      let bValue = b[key];
+
+      // Xử lý giá trị null/undefined
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      // Xử lý đặc biệt cho các cột ngày tháng
+      if (key === 'date_of_birth' || key === 'target_date') {
+        const dateA = aValue ? new Date(aValue).getTime() : 0;
+        const dateB = bValue ? new Date(bValue).getTime() : 0;
+        return direction === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+
+      // So sánh dựa trên kiểu dữ liệu
+      if (typeof aValue === 'number') {
+        return direction === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+
+      // Xử lý chuỗi (mặc định)
+      aValue = String(aValue).toLowerCase();
+      bValue = String(bValue).toLowerCase();
+      if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    setFilteredData(sortedData);
+  };
 
   // === Hàm fetch dữ liệu (dùng useCallback để tối ưu) ===
   const fetchData = useCallback(async (page, limit, currentSearchTerm) => {
@@ -192,6 +238,8 @@ function Index() {
             onDelete={handleDelete}
             currentPage={currentPage}
             pageSize={pageSize}
+            sortConfig={sortConfig}
+            onSort={handleSort}
           />
           <PaginationControls 
             currentPage={currentPage}

@@ -1,8 +1,17 @@
-// frontend/src/components/admin/StudentTable.jsx
 import React from 'react';
 import { HiPencil, HiTrash } from "react-icons/hi2";
+import SortableHeader from './SortableHeader';
 
-export default function StudentTable({ columns, data, onEdit, onDelete, currentPage, pageSize }) {
+export default function StudentTable({ 
+  columns, 
+  data, 
+  onEdit, 
+  onDelete, 
+  currentPage, 
+  pageSize,
+  sortConfig,
+  onSort 
+}) {
   if (!data || data.length === 0) {
     return (
       <div className="text-center p-4">Không tìm thấy dữ liệu phù hợp.</div>
@@ -16,7 +25,13 @@ export default function StudentTable({ columns, data, onEdit, onDelete, currentP
           <tr>
             <th>#</th>
             {columns.map((col) => (
-              <th key={col.accessor}>{col.header}</th>
+              <th key={col.accessor}>
+                <SortableHeader
+                  column={col}
+                  sortConfig={sortConfig}
+                  onSort={onSort}
+                />
+              </th>
             ))}
             <th>Hành động</th>
           </tr>
