@@ -1,30 +1,48 @@
-// frontend/src/pages/admin/ManageStudents.jsx
-import React, { useState, useEffect, useCallback } from 'react'; // Thêm useCallback
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import IndexLayout from '../../../layouts/IndexLayout';
-import StudentTable from '../../../components/admin/ContentTable';       
-import PaginationControls from '../../../components/admin/PaginationControls';
-import { HiPencil, HiTrash } from "react-icons/hi2";
-import { getAllStudent } from '../../../api/admin/manageStudentService';
 import { format } from 'date-fns';
 
-// Config cột giữ nguyên
+// Layouts và Components
+import IndexLayout from '../../../layouts/IndexLayout';
+import StudentTable from '../../../components/admin/ContentTable';
+import PaginationControls from '../../../components/admin/PaginationControls';
+import PageSizeSelector from '../../../components/admin/PageSizeSelector';
+import PaginationInfo from '../../../components/admin/PaginationInfo';
+
+// Services
+import { getAllStudent } from '../../../api/admin/manageStudentService';
+
+// Cấu hình cột cho bảng học viên
 const COLUMN_CONFIG = {
-    'first_name': { header: 'Họ' },
-    'last_name': { header: 'Tên' },
-    'date_of_birth': { 
-      header: 'Ngày sinh',
-      format: (value) => value ? format(new Date(value), 'dd/MM/yyyy') : 'N/A'
-    },
-    'gender': {
-      header: 'Giới tính',
-      format: (value) => (value === 1 ? 'Nam' : value === 2 ? 'Nữ' : 'Khác')
-    },
-    'parent_phone_number': { header: 'SĐT Phụ huynh' },
-    'target_jlpt_degree': { header: 'Cấp độ' },
+  'first_name': { 
+    header: 'Họ',
+    accessor: 'first_name'
+  },
+  'last_name': { 
+    header: 'Tên',
+    accessor: 'last_name'
+  },
+  'date_of_birth': { 
+    header: 'Ngày sinh',
+    accessor: 'date_of_birth',
+    format: (value) => value ? format(new Date(value), 'dd/MM/yyyy') : 'N/A'
+  },
+  'gender': {
+    header: 'Giới tính',
+    accessor: 'gender',
+    format: (value) => (value === 1 ? 'Nam' : value === 2 ? 'Nữ' : 'Khác')
+  },
+  'parent_phone_number': { 
+    header: 'SĐT Phụ huynh',
+    accessor: 'parent_phone_number'
+  },
+  'target_jlpt_degree': { 
+    header: 'Cấp độ',
+    accessor: 'target_jlpt_degree'
+  }
 };
 
-export default function ManageStudents() {
+function Index() {
   const [students, setStudents] = useState([]); // Dữ liệu cho trang hiện tại
   const [filteredData, setFilteredData] = useState([]); // Dữ liệu sau khi tìm kiếm (trên trang hiện tại)
   const [columns, setColumns] = useState([]);
@@ -111,8 +129,7 @@ export default function ManageStudents() {
   };
 
   // === Xử lý thay đổi PageSize ===
-  const handlePageSizeChange = (event) => {
-    const newSize = parseInt(event.target.value, 10);
+  const handlePageSizeChange = (newSize) => {
     setPageSize(newSize);
     setCurrentPage(1); // Reset về trang 1 khi đổi số lượng/trang
   };
@@ -130,56 +147,61 @@ export default function ManageStudents() {
   const handleDelete = (id) => console.log(`Xóa học viên ID: ${id}`);
 
   return (
-      <IndexLayout
-        title="Quản lý học viên"
-        onAddNew={handleAddNew}
-        onSearch={handleSearch}
-      >
-        {/* === UI Controls Phân trang === */}
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <label htmlFor="pageSize" className="mr-2 text-sm">Hiển thị:</label>
-            <select 
-              id="pageSize" 
-              value={pageSize} 
-              onChange={handlePageSizeChange}
-              className="select select-bordered select-sm"
-              disabled={loading}
-            >
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={30}>30</option>
-            </select>
-            <span className="ml-2 text-sm">bản ghi/trang</span>
-          </div>
-          <span className="text-sm">
-            Hiển thị {filteredData.length > 0 ? ((currentPage - 1) * pageSize) + 1 : 0}-
-            {Math.min(currentPage * pageSize, totalCount)} trên tổng số {totalCount} bản ghi
-          </span>
+    <IndexLayout
+      title="Quản lý học viên"
+      onAddNew={handleAddNew}
+      onSearch={handleSearch}
+    >
+      {/* Phần điều khiển phân trang */}
+      <div className="flex justify-between items-center mb-4">
+        <PageSizeSelector 
+          pageSize={pageSize}
+          onPageSizeChange={handlePageSizeChange}
+          isDisabled={loading}
+        />
+        <PaginationInfo 
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalCount={totalCount}
+          currentCount={filteredData.length}
+        />
+      </div>
+
+      {/* Hiển thị trạng thái loading và lỗi */}
+      {loading && (
+        <div className="flex justify-center items-center h-64">
+          <span className="loading loading-spinner loading-lg"></span>
         </div>
+      )}
+      
+      {error && (
+        <div className="alert alert-error shadow-lg mb-4">
+          <div>
+            <span>Lỗi: {error}</span>
+          </div>
+        </div>
+      )}
 
-        {/* === Hiển thị Loading/Error === */}
-        {loading && ( <div className="flex justify-center items-center h-64"><span className="loading loading-spinner loading-lg"></span></div> )}
-        {error && ( <div className="alert alert-error shadow-lg">...</div> )}
-
-        {/* === Gọi Component Bảng và Phân trang === */}
-        {!loading && !error && (
-          <>
-            <StudentTable 
-              columns={columns}
-              data={filteredData}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              currentPage={currentPage}
-              pageSize={pageSize}
-            />
-            <PaginationControls 
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={handlePageChange}
-            />
-          </>
-        )}
-      </IndexLayout>
-    );
+      {/* Bảng dữ liệu và điều khiển phân trang */}
+      {!loading && !error && (
+        <>
+          <StudentTable 
+            columns={columns}
+            data={filteredData}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            currentPage={currentPage}
+            pageSize={pageSize}
+          />
+          <PaginationControls 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        </>
+      )}
+    </IndexLayout>
+  );
 }
+
+export default Index;
