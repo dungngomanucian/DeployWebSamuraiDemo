@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom"; // 1. Import các component cần thiết
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom"; // 1. Import các component cần thiết
 import logo from "../assets/logo.png";
 
 export default function Navbar() {
@@ -8,6 +8,8 @@ export default function Navbar() {
   const { pathname } = useLocation();
 
   const closeMobileMenu = () => setIsMenuOpen(false);
+
+  const navigate = useNavigate();
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-100 w-full sticky top-0 z-50">
@@ -55,7 +57,7 @@ export default function Navbar() {
             </li>
             
             <li>
-              <a className="text-[#111827] hover:text-[#4F46E5] cursor-pointer transition-all">
+              <a className="text-[#111827] hover:text-[#4F46E5] cursor-pointer transition-all"  href="/student-dashboard" >
                 Hồ sơ học viên
               </a>
             </li>
@@ -63,7 +65,9 @@ export default function Navbar() {
         </nav>
 
         {/* Nút đăng nhập - ẩn trên mobile */}
-        <button className="hidden sm:block bg-[#4F46E5] hover:bg-[#4338CA] text-white px-4 lg:px-8 py-2.5 rounded-lg font-medium transition-all text-sm lg:text-base">
+        <button className="hidden sm:block bg-[#4F46E5] hover:bg-[#4338CA] text-white px-4 lg:px-8 py-2.5 rounded-lg font-medium transition-all text-sm lg:text-base"
+          onClick={() => navigate('/login')}
+        >
           Đăng nhập
         </button>
 
