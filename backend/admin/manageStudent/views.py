@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .services import StudentService
-from .serializers import StudentSerializer
+from .serializers import StudentSerializer, ClassroomSerializer
 import math # Import math để tính total_pages
 
 @api_view(['GET'])
@@ -102,27 +102,6 @@ def delete_student(request, student_id):
         return Response(status=status.HTTP_204_NO_CONTENT)
     return Response({'error': result['error']}, status=status.HTTP_400_BAD_REQUEST)
 
-
-@api_view(['GET'])
-def get_student_exam_history(request, student_id):
-    """Get exam history for a specific student"""
-    result = StudentService.get_student_exam_history(student_id)
-    
-    if result['success']:
-        return Response(result['data'], status=status.HTTP_200_OK)
-    return Response({'error': result['error']}, status=status.HTTP_404_NOT_FOUND)
-
-
-@api_view(['GET'])
-def get_student_progress(request, student_id):
-    """Get learning progress for a specific student"""
-    result = StudentService.get_student_progress(student_id)
-    
-    if result['success']:
-        return Response(result['data'], status=status.HTTP_200_OK)
-    return Response({'error': result['error']}, status=status.HTTP_404_NOT_FOUND)
-
-
 @api_view(['GET'])
 def filter_students(request):
     """Filter students based on query parameters"""
@@ -140,3 +119,17 @@ def filter_students(request):
         serializer = StudentSerializer(result['data'], many=True)
         return Response(serializer.data, status=status.HTTP_200_OK) # Trả về list như cũ
     return Response({'error': result['error']}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+def get_active_classrooms_view(request):
+    """
+    API endpoint để lấy danh sách các lớp học đang hoạt động.
+    """
+    result = StudentService.get_active_classrooms()
+
+    if result['success']:
+        # Sử dụng ClassroomSerializer
+        serializer = ClassroomSerializer(result['data'], many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    return Response({'error': result.get('error', 'Unknown error')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

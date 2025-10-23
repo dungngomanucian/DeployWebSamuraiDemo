@@ -10,8 +10,9 @@ import ExamIntro from "./pages/student/exam/ExamIntro";
 import ExamPage from "./pages/student/exam/ExamPage";
 
 import AdminLayout from './layouts/AdminLayout';
-import Dashboard from './pages/Admin/Dashboard/Dashboard';
-import ManageStudents from './pages/Admin/Student/Index';
+import Dashboard from './pages/admin/Dashboard/Dashboard';
+import ManageStudents from './pages/admin/Student/Index';
+import CreateStudentPage from "./pages/admin/student/Form";
 
 export default function App() {
   return (
@@ -34,7 +35,10 @@ export default function App() {
             {/* Tự động chuyển /admin đến /admin/dashboard */}
             <Route index element={<Navigate to="/admin/dashboard" />} />
             <Route path="dashboard" element={<Dashboard />} />
+
             <Route path="students" element={<ManageStudents />} />
+            <Route path="students/new" element={<CreateStudentPage />} />
+
             <Route path="courses" element={<div>Trang quản lý khóa học</div>} />
             <Route path="settings" element={<div>Trang Cài đặt</div>} />
           </Route>

@@ -51,3 +51,14 @@ class StudentListSerializer(serializers.Serializer):
     gender = serializers.IntegerField() # int2
     address = serializers.CharField(allow_blank=True, allow_null=True, required=False)
     parent_phone_number = serializers.CharField(max_length=20, allow_blank=True, allow_null=True, required=False)
+
+class ClassroomSerializer(serializers.Serializer):
+    """
+    Serializer đơn giản cho danh sách lớp học,
+    chỉ chứa các trường cần thiết cho dropdown.
+    """
+    # Giả sử bảng classrooms có cột 'id' (UUID/text) và 'name' (varchar)
+    # Nếu tên cột khác, hãy sửa lại cho đúng
+    id = serializers.CharField(read_only=True)
+    class_code = serializers.CharField(read_only=True) 
+    class_name = serializers.CharField(read_only=True)

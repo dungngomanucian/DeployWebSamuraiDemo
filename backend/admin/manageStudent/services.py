@@ -129,46 +129,6 @@ class StudentService:
             }
     
     @staticmethod
-    def get_student_exam_history(student_id: str) -> Dict:
-        """Get exam history for a specific student"""
-        try:
-            response = supabase.table('student_exams')\
-                .select('*, exam:jlpt_exams(id, title, level_id), level:levels(id, title)')\
-                .eq('student_id', student_id)\
-                .order('created_at', desc=True)\
-                .execute()
-            
-            return {
-                'success': True,
-                'data': response.data
-            }
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
-    
-    @staticmethod
-    def get_student_progress(student_id: str) -> Dict:
-        """Get learning progress for a specific student"""
-        try:
-            response = supabase.table('student_progress')\
-                .select('*, level:levels(id, title)')\
-                .eq('student_id', student_id)\
-                .order('created_at', desc=True)\
-                .execute()
-            
-            return {
-                'success': True,
-                'data': response.data
-            }
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
-
-    @staticmethod
     def filter_students(filters: Dict, page: int = 1, limit: int = 10) -> Dict:
         """
         Filter students based on various criteria with pagination.
@@ -198,3 +158,32 @@ class StudentService:
                 'success': False,
                 'error': str(e)
             }
+    
+    @staticmethod
+    def get_active_classrooms() -> Dict[str, any]:
+        """
+        Lấy danh sách các lớp học đang hoạt động.
+
+        Returns:
+            Dict: Dictionary chứa 'success' và 'data' (list of classrooms).
+        """
+        try:            
+            # Query bảng 'classrooms' (thay đổi tên bảng nếu cần)
+            # Chỉ chọn cột 'id' và 'name' (hoặc code)
+            # Thêm điều kiện lọc lớp đang hoạt động nếu có (ví dụ: is_active=True)
+            response = supabase.table('classrooms')\
+                .select('id, class_code, class_name')\
+                .execute()
+
+            return {
+                'success': True,
+                'data': response.data
+            }
+        except Exception as e:
+            print(f"Lỗi khi lấy danh sách lớp học: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'data': []
+            }
+

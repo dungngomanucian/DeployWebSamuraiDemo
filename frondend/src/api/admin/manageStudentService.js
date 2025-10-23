@@ -9,3 +9,8 @@ export const getAllStudent = async (page = 1, limit = 10) => {
   const queryString = `?page=${page}&limit=${limit}`;
   return apiRequest(`${MANAGE_STUDENT_BASE_ENDPOINT}${queryString}`);
 };
+
+export const getAllClassroomActive = async ()=>{
+  const queryString = `/get-classrooms-active/`;
+  return apiRequest(`${MANAGE_STUDENT_BASE_ENDPOINT}/get-classrooms-active/`);
+}
