@@ -12,6 +12,7 @@ import PracticeLevelDetail from "./pages/student/practice/PracticeLevelDetail";
 import ExamListPage from "./pages/student/exam/ExamListPage";
 import ExamIntro from "./pages/student/exam/ExamIntro";
 import ExamPage from "./pages/student/exam/ExamPage";
+import StudentDashboard from "./pages/student/home/StudentDashboard";
 
 export default function App() {
   return (
@@ -33,6 +34,8 @@ export default function App() {
           <Route path="/exam-intro" element={<ExamIntro />} />
           <Route path="/exam-start" element={<ExamPage />} />
           
+          <Route path="/student-dashboard" element={<StudentDashboard />} />     
+
           {/* (Tùy chọn) Thêm một route để xử lý các trang không tồn tại */}
           <Route path="*" element={<div>404 - Trang không tìm thấy</div>} />
         </Routes>

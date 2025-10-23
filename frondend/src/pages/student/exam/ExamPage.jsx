@@ -20,7 +20,13 @@ export default function ExamPage() {
   const [activeSection, setActiveSection] = useState(null);
   const [activeQuestionType, setActiveQuestionType] = useState(null);
   const [groupedQuestions, setGroupedQuestions] = useState({});
+  const [expandedQuestionType, setExpandedQuestionType] = useState({}); // Track which tab is expanded per section
+  const [barWidths, setBarWidths] = useState({}); // Store bar widths for each tab
+  const [collapsedTabWidths, setCollapsedTabWidths] = useState({}); // Dynamic width for collapsed tabs per section
+  const [expandedTabWidths, setExpandedTabWidths] = useState({});
   const timerRef = useRef(null);
+  const tabContainerRefs = useRef({}); // Refs for tab containers per section
+
 
   // Load exam data
   useEffect(() => {
@@ -45,7 +51,7 @@ export default function ExamPage() {
       setTimeRemaining(totalSeconds);
       setTotalTime(totalSeconds);
       
-      // Group questions by question type
+      // Group questions by question type - avoid duplicates
       const grouped = {};
       data.sections.forEach((section) => {
         section.question_types.forEach((qt) => {
@@ -58,13 +64,17 @@ export default function ExamPage() {
             };
           }
           qt.questions.forEach((q) => {
-            grouped[qt.id].questions.push({
-              ...q,
-              sectionType: section.type,
-              sectionId: section.id,
-              questionTypeId: qt.id,
-              taskInstructions: qt.task_instructions,
-            });
+            // Check if question already exists to avoid duplicates
+            const existingQuestion = grouped[qt.id].questions.find(existing => existing.id === q.id);
+            if (!existingQuestion) {
+              grouped[qt.id].questions.push({
+                ...q,
+                sectionType: section.type,
+                sectionId: section.id,
+                questionTypeId: qt.id,
+                taskInstructions: qt.task_instructions,
+              });
+            }
           });
         });
       });
@@ -103,6 +113,92 @@ export default function ExamPage() {
 
     return () => clearInterval(timerRef.current);
   }, [examData, timeRemaining]);
+
+  // Calculate bar widths when expanded tab changes
+    useEffect(() => {
+      const expandedTabs = Object.values(expandedQuestionType).filter(Boolean);
+      if (expandedTabs.length > 0) {
+        setTimeout(() => {
+          expandedTabs.forEach(qtId => {
+            const container = document.getElementById(`question-buttons-${qtId}`);
+            if (container) {
+              const buttons = container.querySelectorAll('button');
+              if (buttons.length > 0) {
+                const firstButton = buttons[0];
+                const lastButton = buttons[buttons.length - 1];
+                const firstRect = firstButton.getBoundingClientRect();
+                const lastRect = lastButton.getBoundingClientRect();
+                const width = lastRect.right - firstRect.left;
+                setBarWidths(prev => ({ ...prev, [qtId]: width }));
+              }
+            }
+          });
+        }, 0);
+      }
+    }, [expandedQuestionType, groupedQuestions]);
+
+  // Calculate initial bar widths for all tabs
+  useEffect(() => {
+    if (examData && Object.keys(groupedQuestions).length > 0) {
+      const newWidths = {};
+      Object.keys(groupedQuestions).forEach(qtId => {
+        const questionCount = groupedQuestions[qtId]?.questions?.length || 0;
+        // Calculate estimated width: button width (40px) * count + gap (8px) * (count-1)
+        const estimatedWidth = questionCount > 0 ? (40 * questionCount + 8 * (questionCount - 1)) : 120;
+        newWidths[qtId] = estimatedWidth;
+      });
+      setBarWidths(newWidths);
+    }
+  }, [examData, groupedQuestions]);
+
+  // Calculate collapsed tab width when expanded tab changes (per section)
+  useEffect(() => {
+    if (examData && Object.keys(expandedQuestionType).length > 0) {
+      setTimeout(() => {
+        const newCollapsedWidths = {};
+        const newExpandedWidths = {};
+        
+        // For each section
+        examData.sections.forEach(section => {
+          const sectionType = section.type;
+          const expandedQtId = expandedQuestionType[sectionType];
+          const containerRef = tabContainerRefs.current[sectionType];
+          
+          if (expandedQtId && containerRef) {
+            const containerWidth = containerRef.offsetWidth;
+            const expandedTabBarWidth = barWidths[expandedQtId] || 0;
+            const totalTabs = section.question_types.length;
+            const collapsedTabCount = totalTabs - 1;
+            const gapWidth = 16; // gap-4 = 16px
+            const totalGaps = (totalTabs - 1) * gapWidth;
+            
+            // Start with minimum collapsed width
+            const minCollapsedWidth = 80;
+            
+            // Calculate available space
+            // Total container - gaps - (minCollapsedWidth * collapsedTabCount) = space for expanded
+            const spaceForExpanded = containerWidth - totalGaps - (minCollapsedWidth * collapsedTabCount);
+            
+            // Expanded tab: use bar width but don't exceed available space
+            const expandedWidth = Math.min(expandedTabBarWidth + 40, spaceForExpanded);
+            
+            // Recalculate collapsed width with actual expanded width
+            const remainingSpace = containerWidth - expandedWidth - totalGaps;
+            const collapsedWidth = remainingSpace / collapsedTabCount;
+            
+            // Final collapsed width (ensure it's reasonable)
+            const finalCollapsedWidth = Math.max(Math.min(collapsedWidth, 150), 70);
+            
+            newExpandedWidths[sectionType] = expandedWidth;
+            newCollapsedWidths[sectionType] = finalCollapsedWidth;
+          }
+        });
+        
+        setExpandedTabWidths(newExpandedWidths);
+        setCollapsedTabWidths(newCollapsedWidths);
+      }, 0);
+    }
+  }, [expandedQuestionType, barWidths, examData]);  
 
   // Format time display
   const formatTime = (seconds) => {
@@ -251,7 +347,15 @@ export default function ExamPage() {
   // Get questions filtered by active section and question type
   const getFilteredQuestions = () => {
     if (!activeQuestionType || !groupedQuestions[activeQuestionType]) return [];
-    return groupedQuestions[activeQuestionType].questions;
+    
+    const questions = groupedQuestions[activeQuestionType].questions;
+    
+    // Remove duplicates if any exist
+    const uniqueQuestions = questions.filter((question, index, self) => 
+      index === self.findIndex(q => q.id === question.id)
+    );
+    
+    return uniqueQuestions;
   };
 
   // Get question type tabs for current section
@@ -292,8 +396,12 @@ export default function ExamPage() {
 
   // Navigate to next question
   const handleNext = () => {
+    console.log('handleNext called', { currentQuestionIndex, filteredQuestionsLength: filteredQuestions.length });
     if (currentQuestionIndex < filteredQuestions.length - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
+      setCurrentQuestionIndex((prev) => {
+        console.log('Setting currentQuestionIndex to:', prev + 1);
+        return prev + 1;
+      });
     } else {
       // Move to next question type in same section
       const currentTabIndex = questionTypeTabs.findIndex(tab => tab.id === activeQuestionType);
@@ -422,15 +530,15 @@ export default function ExamPage() {
             {/* Time Remaining - Below Title */}
             <div className="mt-2 flex items-center justify-center">
               <div className="text-center">
-                <div className="text-lg font-semibold text-gray-700">
-                  残りの時間 : {formatTime(timeRemaining)}
+                <div className="text-xl font-bold text-[#874FFF]">
+                  <span style={{ color: '#585858' }}>残りの時間 :</span> {formatTime(timeRemaining)}
                 </div>
               </div>
             </div>
 
             {/* Progress Bar - Below Time */}
-            <div className="mt-3 flex items-center justify-center">
-              <div className="w-full max-w-4xl h-2.5 rounded-full bg-gray-200 overflow-hidden">
+            <div className="mt-3 w-full">
+              <div className="w-full h-2.5 rounded-full bg-gray-200 overflow-hidden">
                 <div
                   className={`h-2.5 transition-all duration-1000 ${getProgressBarColor()}`}
                   style={{ width: `${100 - progressPercentage}%` }}
@@ -440,119 +548,190 @@ export default function ExamPage() {
 
             {/* Question Type Progress Bar */}
             {questionTypeTabs.length > 0 && (
-              <div className="mt-4">
-                <div className="flex flex-wrap gap-4">
-                  {questionTypeTabs.map((tab) => (
-                    <div key={tab.id} className="flex flex-col items-center">
-                      <button
-                        onClick={() => handleQuestionTypeChange(tab.id)}
-                        className={`px-3 py-1 rounded text-sm font-semibold transition-all ${
-                          tab.id === activeQuestionType
-                            ? "bg-[#4169E1] text-white"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              <div className="mt-6">
+                <div 
+                  ref={(el) => tabContainerRefs.current[activeSection] = el}
+                  className={`flex gap-4 ${!expandedQuestionType[activeSection] ? 'grid' : ''}`}
+                  style={!expandedQuestionType[activeSection] ? { gridTemplateColumns: `repeat(${questionTypeTabs.length}, 1fr)` } : {}}>
+                  {questionTypeTabs.map((tab) => {
+                    // Calculate answered questions count
+                    const answeredCount = Array.from({ length: tab.questionCount }, (_, index) => {
+                      const question = groupedQuestions[tab.id]?.questions[index];
+                      return question ? (
+                        question.questionTypeId === "QT007" 
+                          ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
+                          : studentAnswers[question.id]
+                      ) : false;
+                    }).filter(Boolean).length;
+
+                    const isActive = expandedQuestionType[activeSection] === tab.id;
+                    const currentSectionExpanded = expandedQuestionType[activeSection];
+
+                    return (
+                      <div 
+                        key={tab.id} 
+                        className={`flex flex-col transition-all ${
+                          currentSectionExpanded 
+                            ? 'flex-shrink-0' 
+                            : ''
                         }`}
+                        style={
+                          currentSectionExpanded 
+                            ? (isActive 
+                                ? { width: expandedTabWidths[activeSection] ? `${expandedTabWidths[activeSection]}px` : 'auto' } 
+                                : { width: `${collapsedTabWidths[activeSection] || 150}px` }
+                              )
+                            : {}
+                        }
                       >
-                        {tab.taskInstructions || tab.name} {tab.questionCount > 0 ? `${tab.questionCount}/${tab.questionCount}` : '0/0'}
-                      </button>
-                      {/* Question navigation buttons */}
-                      <div className="flex gap-1 mt-2">
-                        {Array.from({ length: tab.questionCount }, (_, index) => {
-                          const question = groupedQuestions[tab.id]?.questions[index];
-                          const isAnswered = question ? (
-                            question.questionTypeId === "QT007" 
-                              ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
-                              : studentAnswers[question.id]
-                          ) : false;
-                          const isCurrent = tab.id === activeQuestionType && index === currentQuestionIndex;
-                          
-                          return (
-                            <button
-                              key={index}
-                              onClick={() => {
-                                handleQuestionTypeChange(tab.id);
-                                setCurrentQuestionIndex(index);
+                        {/* Tab button with top/bottom bar */}
+                        <div className="flex flex-col items-center">
+                          {/* Top bar (gray) - shown when not active */}
+                          {!isActive && (
+                            <div 
+                              className="h-0.5 bg-gray-300 mb-2 transition-all" 
+                              style={{ 
+                                width: currentSectionExpanded 
+                                  ? `${Math.min((collapsedTabWidths[activeSection] || 150) * 0.7, 100)}px`  // 70% of collapsed tab width or max 100px
+                                  : '100%'  // Full width when no tab is expanded
                               }}
-                              className={`w-8 h-8 text-xs font-semibold rounded transition-all ${
-                                isCurrent
-                                  ? "bg-[#4169E1] text-white"
-                                  : isAnswered
-                                  ? "bg-green-500 text-white"
-                                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                              }`}
-                            >
-                              {question?.position || index + 1}
-                            </button>
-                          );
-                        })}
+                            ></div>
+                          )}
+                          
+                          {/* Tab text */}
+                           <button
+                             onClick={() => {
+                               // Toggle expand/collapse per section
+                               setExpandedQuestionType(prev => ({
+                                 ...prev,
+                                 [activeSection]: isActive ? null : tab.id
+                               }));
+                               
+                               // Switch to this question type and go to first question
+                               handleQuestionTypeChange(tab.id);
+                               setCurrentQuestionIndex(0);
+                            
+                             }}
+                            className={`text-sm font-medium whitespace-nowrap transition-all ${
+                              isActive
+                                ? "text-[#4169E1]"
+                                : "text-gray-600 hover:text-gray-800"
+                            }`}
+                          >
+                            {tab.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || tab.name} {answeredCount}/{tab.questionCount}
+                          </button>
+                          
+                          {/* Bottom bar (blue) and question buttons - shown when active */}
+                          {isActive && (
+                            <>
+                              <div 
+                                className="h-0.5 bg-[#4169E1] mt-2 mb-3"
+                                style={{ width: barWidths[tab.id] || '100%' }}
+                              ></div>
+                              <div 
+                                id={`question-buttons-${tab.id}`}
+                                className="flex gap-2 overflow-x-auto"
+                              >
+                                {Array.from({ length: tab.questionCount }, (_, index) => {
+                                  const question = groupedQuestions[tab.id]?.questions[index];
+                                  const isAnswered = question ? (
+                                    question.questionTypeId === "QT007" 
+                                      ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
+                                      : studentAnswers[question.id]
+                                  ) : false;
+                                  const isCurrent = tab.id === activeQuestionType && index === currentQuestionIndex;
+                                  
+                                  return (
+                                    <button
+                                      key={index}
+                                      onClick={() => {
+                                        handleQuestionTypeChange(tab.id);
+                                        setCurrentQuestionIndex(index);
+                                        
+                                        // Auto scroll to the specific question
+                                        setTimeout(() => {
+                                          const questionElement = document.getElementById(`question-${question.id}`);
+                                          if (questionElement) {
+                                            questionElement.scrollIntoView({ 
+                                              behavior: 'smooth', 
+                                              block: 'start' 
+                                            });
+                                          }
+                                        }, 100);
+                                      }}
+                                      className={`w-10 h-10 text-sm font-semibold rounded transition-all ${
+                                        isCurrent
+                                          ? "bg-[#4169E1] text-white"
+                                          : isAnswered
+                                          ? "bg-green-500 text-white"
+                                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                                      }`}
+                                    >
+                                      {question?.position || index + 1}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
-
           </div>
 
           {/* Questions Container */}
-          <div className="bg-white rounded-2xl shadow-md px-6 md:px-8 py-8">
-            {/* Task Instructions - Display once for all questions of this type */}
-            {currentQuestion?.taskInstructions && (
-              <div className="mb-6">
-                <div className="px-4 py-2 rounded-xl bg-[#FFD24D] text-[#1E1E1E] font-extrabold text-base mb-4">
-                  問題 {filteredQuestions[0]?.position || 1}
-                </div>
-                <p className="text-lg md:text-xl font-bold text-[#0B1320] leading-relaxed">
-                  {currentQuestion.taskInstructions}
-                </p>
+          <div id="questions-container" className="bg-white rounded-2xl shadow-md px-6 md:px-8 py-8">
+            {/* Question Header */}
+            <div className="flex items-center gap-4 mb-4">
+              <div className="px-4 py-2 rounded-xl bg-[#FFD24D] text-[#1E1E1E] font-bold text-lg whitespace-nowrap">
+
+                {(() => {
+                  // Find the current active question type tab
+                  const currentTab = questionTypeTabs.find(tab => tab.id === activeQuestionType);
+                  return currentTab?.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || `問題 ${currentQuestionIndex + 1}`;
+                })()} 
+                {/* <span className="text-xs text-gray-500 ml-2">
+                  (Debug: {currentQuestionIndex}/{filteredQuestions.length})
+                </span>  */}
               </div>
-            )}
+              {currentQuestion?.taskInstructions && (
+                <p 
+                  className="text-xl font-bold text-[#0B1320] leading-relaxed cursor-pointer hover:text-[#4169E1] transition-colors break-words hyphens-auto"
+                  onClick={() => {
+                    // Toggle expand/collapse for current question type
+                    setExpandedQuestionType(prev => ({
+                      ...prev,
+                      [activeSection]: expandedQuestionType[activeSection] === currentQuestion.questionTypeId ? null : currentQuestion.questionTypeId
+                    }));
+                    
+                    // Auto scroll to questions section
+                    setTimeout(() => {
+                      const questionsSection = document.getElementById('questions-container');
+                      if (questionsSection) {
+                        questionsSection.scrollIntoView({ 
+                          behavior: 'smooth', 
+                          block: 'start' 
+                        });
+                      }
+                    }, 100);
+                  }}
+                >
+                  {currentQuestion.taskInstructions.replace(/^問題\s*[０-９0-9]+\s*[：:]\s*/, '')}
+                </p>
+              )}
+            </div>
 
             {/* Display all questions of current type */}
             {filteredQuestions.map((question, questionIndex) => (
-              <div key={question.id} className={`${questionIndex > 0 ? 'mt-8' : ''}`}>
-                {/* Individual Question */}
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="w-8 h-8 border-2 border-gray-300 rounded-md flex items-center justify-center text-sm font-semibold text-gray-700 select-none flex-shrink-0">
-                    {question.position}
-                  </div>
-                  <div className="flex-1">
-                    {/* Question Text */}
-                    <div className="text-lg font-medium text-[#0B1320] leading-relaxed mb-3">
-                      {question.underline_text ? (
-                        <>
-                          {question.question_text.split(question.underline_text)[0].split('<enter>').map((part, index) => (
-                            <span key={index}>
-                              {part}
-                              {index < question.question_text.split(question.underline_text)[0].split('<enter>').length - 1 && <br />}
-                            </span>
-                          ))}
-                          <span className="underline decoration-2 underline-offset-4">
-                            {question.underline_text.split('<enter>').map((part, index) => (
-                              <span key={index}>
-                                {part}
-                                {index < question.underline_text.split('<enter>').length - 1 && <br />}
-                              </span>
-                            ))}
-                          </span>
-                          {question.question_text.split(question.underline_text)[1].split('<enter>').map((part, index) => (
-                            <span key={index}>
-                              {part}
-                              {index < question.question_text.split(question.underline_text)[1].split('<enter>').length - 1 && <br />}
-                            </span>
-                          ))}
-                        </>
-                      ) : (
-                        (question?.question_text ?? '')
-                          .split('<enter>')
-                          .map((part, index, arr) => (
-                            <span key={index}>
-                              {part}
-                              {index < arr.length - 1 && <br />}
-                            </span>
-                          ))
-                      )}
-                    </div>
-
+              <div 
+                key={question.id} 
+                id={`question-${question.id}`}
+                className={`${questionIndex > 0 ? 'mt-8' : ''} scroll-mt-30`}
+              >
                 {/* Passage (if exists) */}
                 {question.passage && (
                   <div className="mb-6 p-6 bg-gray-50 rounded-lg">
@@ -568,7 +747,7 @@ export default function ExamPage() {
                     <div className="w-9 h-9 border-2 border-gray-300 rounded-md flex items-center justify-center text-base font-semibold text-gray-700 select-none">
                       {question.position}
                     </div>
-                    <div className="text-2xl font-semibold text-[#0B1320] leading-relaxed">
+                    <div className="text-xl font-normal text-[#0B1320] leading-relaxed">
                       {question.underline_text ? (
                         <>
                           {question.question_text.split(question.underline_text)[0].split('<enter>').map((part, index) => (
@@ -647,11 +826,11 @@ export default function ExamPage() {
                   </div>
                 )}
 
-                    {/* Answer Options - Vertical layout like in image */}
-                    <div className="space-y-2">
-                      {question.answers && question.answers.length > 0 ? (
-                        // Normalize answers: unique by show_order, sorted asc
-                        (() => {
+                {/* Answer Options - Horizontal for first 4 question types of section 1, vertical for others */}
+                <div className={activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4 ? "grid grid-cols-4 gap-3" : question.questionTypeId === "QT007" ? "grid grid-cols-4 gap-3" : "space-y-2"}>
+                  {question.answers && question.answers.length > 0 ? (
+                    // Normalize answers: unique by show_order, sorted asc
+                    (() => {
                           const byOrder = new Map();
                           question.answers.forEach((a) => {
                             const key = String(a.show_order);
@@ -674,7 +853,13 @@ export default function ExamPage() {
                           return (
                             <label
                               key={answer.id}
-                              className={`flex items-center p-3 border rounded-lg cursor-pointer transition-all ${
+                              className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all ${
+                                activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4
+                                  ? "flex-row"
+                                  : question.questionTypeId === "QT007"
+                                  ? "flex-row"
+                                  : "flex-row"
+                              } ${
                                 isSelected
                                   ? question.questionTypeId === "QT007"
                                     ? "border-[#874FFF] bg-purple-50 opacity-60"
@@ -709,19 +894,17 @@ export default function ExamPage() {
                                 </span>
                               )}
                               <span className="ml-3 text-base font-medium text-gray-800">
-                                {answer.show_order}. {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
+                                {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
                               </span>
                               {question.questionTypeId === "QT007" && (
                                 <span className="ml-auto text-xs text-gray-500">(Click để chọn)</span>
                               )}
                             </label>
                           );
-                        })
-                      ) : (
-                        <p className="text-gray-500">Không có đáp án</p>
-                      )}
-                    </div>
-                  </div>
+                    })
+                  ) : (
+                    <p className="text-gray-500">Không có đáp án</p>
+                  )}
                 </div>
               </div>
             ))}
@@ -768,29 +951,6 @@ export default function ExamPage() {
             </div>
           </div>
 
-          {/* Question Navigator - Simplified for current question type */}
-          <div className="mt-8 bg-white rounded-2xl shadow-md px-8 py-6">
-            <h3 className="text-lg font-bold text-[#0B1320] mb-4">
-              Câu hỏi hiện tại: {currentQuestion?.position || 'N/A'}
-            </h3>
-            <div className="flex gap-2">
-              {filteredQuestions.map((q, index) => (
-                <button
-                  key={`${q.id}-${index}`}
-                  onClick={() => setCurrentQuestionIndex(index)}
-                  className={`w-10 h-10 rounded font-semibold text-sm transition-all ${
-                    index === currentQuestionIndex
-                      ? "bg-[#4169E1] text-white"
-                      : (q.questionTypeId === "QT007" ? (answerOrder[q.id] && answerOrder[q.id].length > 0) : studentAnswers[q.id])
-                      ? "bg-green-500 text-white"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
-                >
-                  {q.position}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </main>
 
@@ -798,4 +958,3 @@ export default function ExamPage() {
     </div>
   );
 }
-

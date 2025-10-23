@@ -57,7 +57,7 @@ export default function Navbar() {
             </li>
             
             <li>
-              <a className="text-[#111827] hover:text-[#4F46E5] cursor-pointer transition-all">
+              <a className="text-[#111827] hover:text-[#4F46E5] cursor-pointer transition-all"  href="/student-dashboard" >
                 Hồ sơ học viên
               </a>
             </li>

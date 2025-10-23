@@ -6,9 +6,9 @@ from datetime import datetime, timedelta, timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-# from .serializers import LoginSerializer # Giả định LoginSerializer đã được định nghĩa
-# from config.supabase_client import get_supabase_client
-# from django.contrib.auth.hashers import check_password
+from .serializers import LoginSerializer # Giả định LoginSerializer đã được định nghĩa
+from config.supabase_client import get_supabase_client
+from django.contrib.auth.hashers import check_password
 
 # Thư viện này dùng để kiểm tra mật khẩu đã hash an toàn
 # from django.contrib.auth.hashers import check_password # Đã loại bỏ vì Supabase API xử lý
