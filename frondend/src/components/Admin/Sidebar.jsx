@@ -12,16 +12,16 @@ import {
 } from 'react-icons/hi2';
 
 const menuItems = [
-  { to: "/admin/dashboard", icon: HiChartPie, label: "Dashboard" },
-  { to: "/admin/accounts", icon: HiUsers, label: "Quản lý tài khoản" },
-  { to: "/admin/students", icon: HiUsers, label: "Quản lý học viên" },
-  { to: "/admin/teachers", icon: HiAcademicCap, label: "Quản lý giáo viên" },
-  { to: "/admin/courses", icon: HiBookOpen, label: "Quản lý khóa học" },
-  { to: "/admin/classes", icon: HiBuildingLibrary, label: "Quản lý lớp học" },
-  { to: "/admin/levels", icon: HiSignal, label: "Quản lý level học" },
-  { to: "/admin/exams", icon: HiPencilSquare, label: "Quản lý đề thi" },
+  { to: "/admin/dashboard", icon: "pi pi-chart-pie", label: "Dashboard" },
+  { to: "/admin/accounts", icon: "pi pi-users", label: "Quản lý tài khoản" },
+  { to: "/admin/students", icon: "pi pi-users", label: "Quản lý học viên" }, // Có thể đổi icon khác nếu muốn phân biệt với accounts
+  { to: "/admin/teachers", icon: "pi pi-id-card", label: "Quản lý giáo viên" }, // Dùng pi-id-card cho giáo viên
+  { to: "/admin/courses", icon: "pi pi-book", label: "Quản lý khóa học" },
+  { to: "/admin/classes", icon: "pi pi-building", label: "Quản lý lớp học" },
+  { to: "/admin/levels", icon: "pi pi-sliders-h", label: "Quản lý level học" }, // Dùng pi-sliders-h cho levels
+  { to: "/admin/exams", icon: "pi pi-file-edit", label: "Quản lý đề thi" }, // Dùng pi-file-edit cho đề thi
   { type: 'divider' },
-  { to: "/admin/settings", icon: HiCog6Tooth, label: "Cài đặt" },
+  { to: "/admin/settings", icon: "pi pi-cog", label: "Cài đặt" },
 ];
 
 export default function Sidebar({ isSidebarOpen }) {

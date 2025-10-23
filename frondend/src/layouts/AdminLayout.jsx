@@ -4,6 +4,7 @@ import { Outlet } from 'react-router-dom';
 import { HiBars3 } from "react-icons/hi2";
 import "primereact/resources/themes/lara-light-indigo/theme.css"; // theme
 import "primereact/resources/primereact.min.css";
+import "primeicons/primeicons.css";
 import Sidebar from '../components/admin/Sidebar'; // 1. Import Sidebar mới
 
 export default function AdminLayout() {
