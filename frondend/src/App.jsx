@@ -11,7 +11,9 @@ import ExamPage from "./pages/student/exam/ExamPage";
 
 import AdminLayout from './layouts/AdminLayout';
 import Dashboard from './pages/admin/Dashboard/Dashboard';
-import ManageStudents from './pages/admin/Student/Index';
+import ManageStudents from './pages/admin/student/Index';
+import ManageAccounts from './pages/admin/account/Index';
+import ManageTeachers from './pages/admin/teacher/Index';
 import CreateStudentPage from "./pages/admin/student/Form";
 
 export default function App() {
@@ -38,6 +40,10 @@ export default function App() {
 
             <Route path="students" element={<ManageStudents />} />
             <Route path="students/new" element={<CreateStudentPage />} />
+
+            <Route path="accounts" element={<ManageAccounts />} />
+
+            <Route path="teachers" element={<ManageTeachers />} />
 
             <Route path="courses" element={<div>Trang quản lý khóa học</div>} />
             <Route path="settings" element={<div>Trang Cài đặt</div>} />
