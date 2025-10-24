@@ -1,2 +1,55 @@
 @import "tailwindcss";
 /* @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap'); */
+
+@font-face {
+  font-family: 'UD Digi Kyokasho N-B';
+  src: url('/fonts/ud-digi-kyokasho-n-b.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'UD Digi Kyokasho N-R';
+  src: url('/fonts/ud-digi-kyokasho-n-r.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'UD Digi Kyokasho NK-B';
+  src: url('/fonts/UDDigiKyokashoNK-B-03.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'UD Digi Kyokasho NP-B';
+  src: url('/fonts/UDDigiKyokashoNP-B-02.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter-VariableFont_opsz,wght.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  src: url('/fonts/Nunito-VariableFont_wght.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('/fonts/Poppins-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+body {
+  font-family: 'UD Digi Kyokasho N-B', 'Noto Sans JP', sans-serif;
+}
