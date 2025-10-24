@@ -9,10 +9,11 @@ urlpatterns = [
     # Exam functionality
     path('exam/', include('student.exam.urls')),
     
-    # Auth functionality (to be added)
-    # path('auth/', include('student.auth.urls')),
+    # Auth functionality
+    path('auth/', include('student.auth.urls')),
+    path('login/', include('student.login.urls')),
     
-    # Profile functionality (to be added)
-    # path('profile/', include('student.profile.urls')),
+    path('dashboard/', include('student.dashboard.urls'))
+
 ]
 
