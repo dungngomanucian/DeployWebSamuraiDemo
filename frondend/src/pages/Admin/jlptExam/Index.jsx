@@ -121,13 +121,13 @@ function Index() {
     }
   };
 
-  const handleAddNew = () => navigate('/admin/teachers/new'); 
-  const handleEdit = (id) => navigate(`/admin/teachers/edit/${id}`);
+  const handleAddNew = () => navigate('/admin/jlpt-exams/new'); 
+  const handleEdit = (id) => navigate(`/admin/jlpt-exams/edit/${id}`);
   const handleDelete = async (id) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa giáo viên này?')) {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa đề thi này?')) {
       return;
     }
-    console.log(`Xóa giáo viên có ID: ${id}`);
+    console.log(`Xóa đề thi có ID: ${id}`);
     // Thêm logic gọi API xóa và fetch lại dữ liệu nếu thành công
     // Ví dụ:
     // const { error } = await deleteStudent(id);
@@ -140,7 +140,7 @@ function Index() {
 
   return (
     <IndexLayout
-      title="Quản lý giáo viên"
+      title="Quản lý đề thi"
       onAddNew={handleAddNew}
       onSearch={handleSearch} // Truyền hàm search từ hook useDataTable
     >

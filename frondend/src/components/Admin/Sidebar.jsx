@@ -17,7 +17,7 @@ const menuItems = [
   { to: "/admin/students", icon: "pi pi-users", label: "Quản lý học viên" },
   { to: "/admin/teachers", icon: "pi pi-id-card", label: "Quản lý giáo viên" },
   { to: "/admin/courses", icon: "pi pi-book", label: "Quản lý khóa học" },
-  { to: "/admin/classes", icon: "pi pi-building", label: "Quản lý lớp học" },
+  { to: "/admin/classrooms", icon: "pi pi-building", label: "Quản lý lớp học" },
   { to: "/admin/levels", icon: "pi pi-sliders-h", label: "Quản lý level học" },
   { to: "/admin/jlpt-exams", icon: "pi pi-file-edit", label: "Quản lý đề thi" },
   { type: 'divider' },

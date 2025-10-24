@@ -12,34 +12,49 @@ import PaginationInfo from '../../../components/admin/PaginationInfo';
 
 // Hooks và Services (Đảm bảo đường dẫn đúng)
 import { useDataTable } from '../../../hooks/useDataTable'; // Giả sử bạn có hook này
-import { getAllCourse } from '../../../api/admin/manageCourseService';
+import { getAllClassroom} from '../../../api/admin/manageClassroomService';
 
 // 1. FIX LẠI COLUMN_CONFIG
 //    - Đảm bảo keys (`first_name`, `last_name`...) khớp với API response.
 //    - Thêm `type` để hỗ trợ hook useDataTable (nếu có).
 //    - Sửa lại format giới tính nếu API trả về 0/1.
 // COLUMN_CONFIG cho bảng courses
+// COLUMN_CONFIG cho bảng classrooms
 const COLUMN_CONFIG = {
-  'name': {
-    header: 'Tên khóa học',
+  'class_code': {
+    header: 'Mã lớp',
     type: 'text'
   },
-  'short_des': {
-    header: 'Mô tả ngắn',
-    type: 'text',
-    // (Tùy chọn) Format để cắt ngắn nếu quá dài
-    // format: (value) => value && value.length > 100 ? `${value.substring(0, 100)}...` : value || ''
+  'class_name': {
+    header: 'Tên lớp học',
+    type: 'text'
   },
-  'image_path': {
-    header: 'Ảnh bìa',
-    type: 'image_url', // Đặt type khác nếu hook useDataTable hỗ trợ render ảnh
-    // Format để hiển thị ảnh thumbnail
-    format: (value) => value ? <img src={value} alt="Course Image" className="w-16 h-10 rounded object-cover" /> : 'Không có'
+  'course_id': { // Hoặc tên cột chứa tên khóa học nếu có join
+    header: 'Thuộc khóa học',
+    type: 'text'
+    // Format: Có thể cần gọi API khác hoặc join để lấy tên Course từ ID
   },
-  // 'description': { // Bỏ comment nếu muốn hiển thị cả mô tả đầy đủ
-  //   header: 'Mô tả chi tiết',
-  //   type: 'text',
-  // },
+  'schedule': {
+    header: 'Lịch học',
+    type: 'text', // Hoặc 'number' nếu chỉ là số
+    // Format: Cần logic để chuyển int2 thành text (VD: 1 -> "Thứ 2", 2 -> "Thứ 3")
+    // format: (value) => { /* logic chuyển đổi schedule */ } 
+  },
+  'start_date': {
+    header: 'Ngày bắt đầu',
+    type: 'date',
+    format: (value) => value ? format(new Date(value), 'dd/MM/yyyy') : 'N/A'
+  },
+  'end_date': {
+    header: 'Ngày kết thúc',
+    type: 'date',
+    format: (value) => value ? format(new Date(value), 'dd/MM/yyyy') : 'N/A'
+  },
+  'status': {
+    header: 'Trạng thái',
+    type: 'boolean', // Hoặc 'text' nếu sort theo text đã format
+    format: (value) => value ? 'Hoạt động' : 'Đã đóng' // Chuyển boolean thành text
+  },
 };
 
 function Index() {
@@ -76,7 +91,7 @@ function Index() {
       setLoading(true);
       setError(null);
       // Gọi API với page và limit hiện tại
-      const { data: apiResponse, error: apiError } = await getAllCourse(currentPage, pageSize);
+      const { data: apiResponse, error: apiError } = await getAllClassroom(currentPage, pageSize);
 
       if (apiError) {
         setError(apiError);
@@ -116,13 +131,13 @@ function Index() {
     }
   };
 
-  const handleAddNew = () => navigate('/admin/courses/new'); 
-  const handleEdit = (id) => navigate(`/admin/courses/edit/${id}`);
+  const handleAddNew = () => navigate('/admin/classrooms/new'); 
+  const handleEdit = (id) => navigate(`/admin/classrooms/edit/${id}`);
   const handleDelete = async (id) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa khoá học này?')) {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa lớp này?')) {
       return;
     }
-    console.log(`Xóa khoá học ID: ${id}`);
+    console.log(`Xóa lớp có ID: ${id}`);
     // Thêm logic gọi API xóa và fetch lại dữ liệu nếu thành công
     // Ví dụ:
     // const { error } = await deleteStudent(id);
@@ -135,7 +150,7 @@ function Index() {
 
   return (
     <IndexLayout
-      title="Quản lý khoá học"
+      title="Quản lý lớp học"
       onAddNew={handleAddNew}
       onSearch={handleSearch} // Truyền hàm search từ hook useDataTable
     >

@@ -12,34 +12,26 @@ import PaginationInfo from '../../../components/admin/PaginationInfo';
 
 // Hooks và Services (Đảm bảo đường dẫn đúng)
 import { useDataTable } from '../../../hooks/useDataTable'; // Giả sử bạn có hook này
-import { getAllCourse } from '../../../api/admin/manageCourseService';
+import { getAllLevel} from '../../../api/admin/manageLevelService';
 
 // 1. FIX LẠI COLUMN_CONFIG
 //    - Đảm bảo keys (`first_name`, `last_name`...) khớp với API response.
 //    - Thêm `type` để hỗ trợ hook useDataTable (nếu có).
 //    - Sửa lại format giới tính nếu API trả về 0/1.
 // COLUMN_CONFIG cho bảng courses
+// COLUMN_CONFIG cho bảng classrooms
+// COLUMN_CONFIG cho bảng levels
 const COLUMN_CONFIG = {
-  'name': {
-    header: 'Tên khóa học',
+  'title': {
+    header: 'Tên Level', // Ví dụ: N1, N2
     type: 'text'
   },
-  'short_des': {
-    header: 'Mô tả ngắn',
+  'description': {
+    header: 'Mô tả',
     type: 'text',
-    // (Tùy chọn) Format để cắt ngắn nếu quá dài
+    // (Tùy chọn) Format để cắt ngắn mô tả nếu quá dài
     // format: (value) => value && value.length > 100 ? `${value.substring(0, 100)}...` : value || ''
   },
-  'image_path': {
-    header: 'Ảnh bìa',
-    type: 'image_url', // Đặt type khác nếu hook useDataTable hỗ trợ render ảnh
-    // Format để hiển thị ảnh thumbnail
-    format: (value) => value ? <img src={value} alt="Course Image" className="w-16 h-10 rounded object-cover" /> : 'Không có'
-  },
-  // 'description': { // Bỏ comment nếu muốn hiển thị cả mô tả đầy đủ
-  //   header: 'Mô tả chi tiết',
-  //   type: 'text',
-  // },
 };
 
 function Index() {
@@ -76,7 +68,7 @@ function Index() {
       setLoading(true);
       setError(null);
       // Gọi API với page và limit hiện tại
-      const { data: apiResponse, error: apiError } = await getAllCourse(currentPage, pageSize);
+      const { data: apiResponse, error: apiError } = await getAllLevel(currentPage, pageSize);
 
       if (apiError) {
         setError(apiError);
@@ -116,13 +108,13 @@ function Index() {
     }
   };
 
-  const handleAddNew = () => navigate('/admin/courses/new'); 
-  const handleEdit = (id) => navigate(`/admin/courses/edit/${id}`);
+  const handleAddNew = () => navigate('/admin/levels/new'); 
+  const handleEdit = (id) => navigate(`/admin/levels/edit/${id}`);
   const handleDelete = async (id) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa khoá học này?')) {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa cấp độ này?')) {
       return;
     }
-    console.log(`Xóa khoá học ID: ${id}`);
+    console.log(`Xóa cấp độ có ID: ${id}`);
     // Thêm logic gọi API xóa và fetch lại dữ liệu nếu thành công
     // Ví dụ:
     // const { error } = await deleteStudent(id);
@@ -135,7 +127,7 @@ function Index() {
 
   return (
     <IndexLayout
-      title="Quản lý khoá học"
+      title="Quản lý cấp độ học"
       onAddNew={handleAddNew}
       onSearch={handleSearch} // Truyền hàm search từ hook useDataTable
     >
