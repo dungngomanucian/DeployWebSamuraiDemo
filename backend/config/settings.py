@@ -33,9 +33,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'student',
     'corsheaders', 
-    'accounts',
-    'admin.dashboard',
-    'admin.manageStudent',
+    'accounts'
 ]
 
 MIDDLEWARE = [
@@ -168,10 +166,6 @@ ACCESS_TOKEN_LIFETIME = timedelta(minutes=30)
 # Giới hạn số lượng phiên đăng nhập đồng thời (2 thiết bị)
 MAX_CONCURRENT_SESSIONS = 2
 
-SUPABASE_URL =  os.getenv('SUPABASE_URL')
-SUPABASE_PUBLISHABLE_KEY=os.getenv('SUPABASE_PUBLISHABLE_KEY')
-SUPABASE_SECRET_KEY=os.getenv('SUPABASE_SECRET_KEY')
-
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
@@ -181,4 +175,3 @@ EMAIL_HOST_USER = os.getenv("SMTP_USER")
 EMAIL_HOST_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-SUPABASE_SERVICE_ROLE_KEY=os.getenv('SUPABASE_SERVICE_ROLE_KEY')
