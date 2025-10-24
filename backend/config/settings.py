@@ -166,10 +166,6 @@ ACCESS_TOKEN_LIFETIME = timedelta(minutes=30)
 # Giới hạn số lượng phiên đăng nhập đồng thời (2 thiết bị)
 MAX_CONCURRENT_SESSIONS = 2
 
-SUPABASE_URL =  os.getenv('SUPABASE_URL')
-SUPABASE_PUBLISHABLE_KEY=os.getenv('SUPABASE_PUBLISHABLE_KEY')
-SUPABASE_SECRET_KEY=os.getenv('SUPABASE_SECRET_KEY')
-
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587

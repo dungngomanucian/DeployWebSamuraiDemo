@@ -14,6 +14,17 @@ import ExamIntro from "./pages/student/exam/ExamIntro";
 import ExamPage from "./pages/student/exam/ExamPage";
 import StudentDashboard from "./pages/student/home/StudentDashboard";
 
+import AdminLayout from './layouts/AdminLayout';
+import Dashboard from './pages/admin/Dashboard/Dashboard';
+import ManageStudents from './pages/admin/student/Index';
+import ManageAccounts from './pages/admin/account/Index';
+import ManageTeachers from './pages/admin/teacher/Index';
+import ManageJlptExams from './pages/admin/jlptExam/Index';
+import ManageCourses from './pages/admin/course/Index';
+import ManageClassrooms from './pages/admin/classroom/Index';
+import ManageLevels from './pages/admin/level/Index';
+import CreateStudentPage from "./pages/admin/student/Form";
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -35,6 +46,30 @@ export default function App() {
           <Route path="/exam-start" element={<ExamPage />} />
           
           <Route path="/student-dashboard" element={<StudentDashboard />} />     
+
+          
+          {/* Cụm route dành cho Admin */}
+          <Route path="/admin" element={<AdminLayout />}>
+            {/* Tự động chuyển /admin đến /admin/dashboard */}
+            <Route index element={<Navigate to="/admin/dashboard" />} />
+            <Route path="dashboard" element={<Dashboard />} />
+
+            <Route path="students" element={<ManageStudents />} />
+            <Route path="students/new" element={<CreateStudentPage />} />
+
+            <Route path="accounts" element={<ManageAccounts />} />
+
+            <Route path="teachers" element={<ManageTeachers />} />
+
+            <Route path="jlpt-exams" element={<ManageJlptExams />} />
+
+            <Route path="courses" element={<ManageCourses />} />
+ 
+            <Route path="classrooms" element={< ManageClassrooms/>} />
+
+            <Route path="levels" element={< ManageLevels/>} />
+            <Route path="settings" element={<div>Trang Cài đặt</div>} />
+          </Route>
 
           {/* (Tùy chọn) Thêm một route để xử lý các trang không tồn tại */}
           <Route path="*" element={<div>404 - Trang không tìm thấy</div>} />
