@@ -19,6 +19,8 @@ import Dashboard from './pages/admin/Dashboard/Dashboard';
 import ManageStudents from './pages/admin/student/Index';
 import ManageAccounts from './pages/admin/account/Index';
 import ManageTeachers from './pages/admin/teacher/Index';
+import ManageJlptExams from './pages/admin/jlptExam/Index';
+import ManageCourses from './pages/admin/course/Index';
 import CreateStudentPage from "./pages/admin/student/Form";
 
 export default function App() {
@@ -56,6 +58,10 @@ export default function App() {
             <Route path="accounts" element={<ManageAccounts />} />
 
             <Route path="teachers" element={<ManageTeachers />} />
+
+            <Route path="jlpt-exams" element={<ManageJlptExams />} />
+
+            <Route path="courses" element={<ManageCourses />} />
 
             <Route path="courses" element={<div>Trang quản lý khóa học</div>} />
             <Route path="settings" element={<div>Trang Cài đặt</div>} />

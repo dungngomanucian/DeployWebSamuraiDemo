@@ -6,4 +6,6 @@ urlpatterns = [
     path('student/', include('admin.manageStudent.urls')),
     path('account/',include('admin.manageAccount.urls')),
     path('teacher/',include('admin.manageTeacher.urls')),
+    path('jlpt-exam/',include('admin.manageJlptExam.urls')),
+    path('course/',include('admin.manageCourse.urls')),
 ]

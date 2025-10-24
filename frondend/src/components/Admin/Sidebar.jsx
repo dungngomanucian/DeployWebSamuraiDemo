@@ -19,7 +19,7 @@ const menuItems = [
   { to: "/admin/courses", icon: "pi pi-book", label: "Quản lý khóa học" },
   { to: "/admin/classes", icon: "pi pi-building", label: "Quản lý lớp học" },
   { to: "/admin/levels", icon: "pi pi-sliders-h", label: "Quản lý level học" },
-  { to: "/admin/exams", icon: "pi pi-file-edit", label: "Quản lý đề thi" },
+  { to: "/admin/jlpt-exams", icon: "pi pi-file-edit", label: "Quản lý đề thi" },
   { type: 'divider' },
   { to: "/admin/settings", icon: "pi pi-cog", label: "Cài đặt" },
 ];
