@@ -517,7 +517,7 @@ export default function ExamPage() {
             {/* Title and level */}
             <div className="mt-4 flex items-center justify-center">
               <div className="text-center">
-                  <h1 className="text-3xl md:text-4xl font-extrabold text-[#3563E9] leading-tight">
+                  <h1 style={{ fontFamily: 'UD Digi Kyokasho N-B' }} className="text-3xl md:text-4xl font-extrabold text-[#3563E9] leading-tight">
                     {/* {examData.exam.level.title} */}
                     言語知識 {activeSection}
                   </h1>
