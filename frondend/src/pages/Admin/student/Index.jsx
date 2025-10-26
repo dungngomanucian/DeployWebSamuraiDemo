@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format } from 'date-fns';  
 
 // Layouts và Components
 import IndexLayout from '../../../layouts/IndexLayout';
@@ -119,6 +119,15 @@ function Index() {
     console.log(`Xóa học viên ID: ${id}`);
   };
 
+  const customStudentActions = useMemo(() => [
+    { 
+      label: "Xem chi tiết", 
+      icon: "pi pi-eye", // Dùng PrimeIcons
+      onClick: handleEdit, 
+      className: "text-neutral hover:bg-neutral hover:text-neutral-content" 
+    },
+  ], [navigate]);
+
   return (
     <IndexLayout
       title="Quản lý học viên"
@@ -163,6 +172,7 @@ function Index() {
             data={filteredData}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            customActions={customStudentActions}
             currentPage={currentPage}
             pageSize={pageSize}
             sortConfig={sortConfig}

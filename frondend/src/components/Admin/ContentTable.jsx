@@ -3,6 +3,7 @@ import SortableHeader from './SortableHeader';
 import ActionButtons from './ActionButtons';
 
 export default function ContentTable({ 
+  actions,
   columns, 
   data, 
   onEdit, 
@@ -10,7 +11,8 @@ export default function ContentTable({
   currentPage, 
   pageSize,
   sortConfig,
-  onSort 
+  onSort,
+  customActions   
 }) {
   if (!data || data.length === 0) {
     return (
@@ -33,7 +35,7 @@ export default function ContentTable({
                 />
               </th>
             ))}
-            <th>Hành động</th>
+            <th className="w-50 text-center"></th>
           </tr>
         </thead>
         <tbody>
@@ -45,11 +47,15 @@ export default function ContentTable({
                   {col.format ? col.format(row[col.accessor]) : row[col.accessor]}
                 </td>
               ))}
-              <td>
-                <ActionButtons
-                  onEdit={() => onEdit(row.id)}
-                  onDelete={() => onDelete(row.id)}
-                />
+              <td className="w-28"> 
+                <div className="flex justify-center"> 
+                   <ActionButtons 
+                     recordId={row.id} 
+                     onEdit={onEdit}       // Truyền onEdit
+                     onDelete={onDelete}   // Truyền onDelete
+                     customActions={customActions} // Truyền customActions
+                   />
+                </div>
               </td>
             </tr>
           ))}

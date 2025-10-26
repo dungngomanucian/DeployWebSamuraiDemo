@@ -6,9 +6,7 @@ import Sidebar from '../components/admin/Sidebar';
 import ThemeToggleButton from '../components/admin/ThemeToggleButton'; // Đường dẫn có thể khác
 
 // CSS PrimeReact (Nên chuyển ra main.jsx)
-import "primereact/resources/themes/lara-light-indigo/theme.css"; 
-import "primereact/resources/primereact.min.css";
-import "primeicons/primeicons.css";
+
 
 // Định nghĩa tên theme
 const LIGHT_THEME = 'winter'; 
