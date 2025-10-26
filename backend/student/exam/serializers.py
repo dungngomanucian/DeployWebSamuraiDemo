@@ -35,6 +35,7 @@ class QuestionTypeSerializer(serializers.Serializer):
     exam_section_id = serializers.CharField()
     question_guides_id = serializers.CharField()
     task_instructions = serializers.CharField(required=False, allow_null=True)
+    duration = serializers.CharField(required=False, allow_null=True)
     image_path = serializers.CharField(required=False, allow_null=True)
     question_guides = QuestionGuideSerializer(required=False)
 
@@ -63,7 +64,7 @@ class QuestionSerializer(serializers.Serializer):
     id = serializers.CharField()
     exam_section_id = serializers.CharField()
     question_type_id = serializers.CharField()
-    question_passages_id = serializers.CharField()
+    question_passages_id = serializers.CharField(required=False, allow_null=True)
     score = serializers.IntegerField(required=False, allow_null=True)
     position = serializers.IntegerField(required=False, allow_null=True)
     explaination = serializers.CharField(required=False, allow_null=True)
@@ -72,7 +73,7 @@ class QuestionSerializer(serializers.Serializer):
     passage = serializers.CharField(required=False, allow_null=True)
     question_audio = serializers.CharField(required=False, allow_null=True)
     question_image = serializers.CharField(required=False, allow_null=True)
-    question_passages = QuestionPassageSerializer(many=True, required=False)
+    jlpt_question_passages = QuestionPassageSerializer(required=False, allow_null=True)
     answers = AnswerSerializer(many=True, required=False)
 
 

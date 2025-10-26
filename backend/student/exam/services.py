@@ -114,16 +114,37 @@ class ExamService:
     def get_questions(question_type_id: str) -> Dict:
         """Get all questions of a question type"""
         try:
-            response = supabase.table('jlpt_questions')\
-                .select('*, question_passages:jlpt_question_passages(id, content, underline_text)')\
+            # First get questions
+            questions_response = supabase.table('jlpt_questions')\
+                .select('*')\
                 .eq('question_type_id', question_type_id)\
                 .is_('deleted_at', 'null')\
                 .order('position')\
                 .execute()
             
+            # Get all passages for this question type
+            passages_response = supabase.table('jlpt_question_passages')\
+                .select('*')\
+                .eq('question_type_id', question_type_id)\
+                .execute()
+            
+            # Create a map of passages by id for quick lookup
+            passages_map = {p['id']: p for p in passages_response.data}
+            
+            # Combine questions with their specific passage
+            questions_with_passages = []
+            for question in questions_response.data:
+                # Get the specific passage for this question using question_passages_id
+                passage_id = question.get('question_passages_id')
+                if passage_id and passage_id in passages_map:
+                    question['jlpt_question_passages'] = [passages_map[passage_id]]
+                else:
+                    question['jlpt_question_passages'] = None
+                questions_with_passages.append(question)
+            
             return {
                 'success': True,
-                'data': response.data
+                'data': questions_with_passages
             }
         except Exception as e:
             return {

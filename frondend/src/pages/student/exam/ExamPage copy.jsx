@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "../../../components/Navbar";
 import Footer from "../../../components/Footer";
 import { getFullExamData } from "../../../api/examService";
-import toast, { Toaster } from "react-hot-toast";
 
 export default function ExamPage() {
   const navigate = useNavigate();
@@ -27,11 +26,7 @@ export default function ExamPage() {
   const [expandedTabWidths, setExpandedTabWidths] = useState({});
   const [showStickyProgress, setShowStickyProgress] = useState(false);
   const [hideHeader, setHideHeader] = useState(false);
-  const [currentQuestionPage, setCurrentQuestionPage] = useState(0); // For pagination
-  const [questionTimeRemaining, setQuestionTimeRemaining] = useState({}); // Time remaining for each question {questionId: seconds}
   const timerRef = useRef(null);
-  const questionTimerRef = useRef(null); // Separate ref for question timer
-  const toastShownRef = useRef({}); // Use ref to track toast shown to avoid stale closures
   const tabContainerRefs = useRef({}); // Refs for tab containers per section
 
 
@@ -52,7 +47,6 @@ export default function ExamPage() {
         navigate(-1);
         return;
       }
-
 
       setExamData(data);
       const totalSeconds = data.exam.total_duration * 60;
@@ -222,20 +216,12 @@ export default function ExamPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-
   // Format time display
   const formatTime = (seconds) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  };
-
-  // Format time display for question timer (MM:SS)
-  const formatQuestionTime = (seconds) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   };
 
   // Handle answer selection
@@ -410,84 +396,9 @@ export default function ExamPage() {
 
   const allQuestions = getAllQuestions();
   const filteredQuestions = getFilteredQuestions();
+  const currentQuestion = filteredQuestions[currentQuestionIndex];
   const sectionTabs = examData?.sections?.map((s) => s.type) || [];
   const questionTypeTabs = getQuestionTypeTabs();
-  
-  // Check if current question type should use pagination
-  const shouldUsePagination = filteredQuestions.length > 0 && 
-    groupedQuestions[activeQuestionType]?.type?.duration &&
-    (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
-  
-  // Fix: Use currentQuestionPage for pagination, currentQuestionIndex for regular navigation
-  const currentQuestion = shouldUsePagination ? 
-    filteredQuestions[currentQuestionPage] : 
-    filteredQuestions[currentQuestionIndex];
-
-  // Timer for individual questions with duration
-  useEffect(() => {
-    // Clear existing timer
-    if (questionTimerRef.current) {
-      clearInterval(questionTimerRef.current);
-      questionTimerRef.current = null;
-    }
-
-    // Check if current question type has duration and should use pagination
-    const currentQuestionType = groupedQuestions[activeQuestionType];
-    const duration = currentQuestionType?.type?.duration;
-    
-    if (!duration || filteredQuestions.length === 0) {
-      return;
-    }
-
-    const firstQuestion = filteredQuestions[0];
-    const hasDuration = duration;
-    const shouldUsePagination = (firstQuestion?.passage || firstQuestion?.jlpt_question_passages) && hasDuration;
-
-    if (shouldUsePagination && currentQuestion) {
-      // Only initialize timer if this question doesn't have a timer yet
-      if (!questionTimeRemaining[currentQuestion.id]) {
-        // Convert duration to seconds
-        const durationStr = duration.replace('00:', ''); // Remove hours if 00:
-        const [minutes, seconds] = durationStr.split(':').map(Number);
-        const totalSeconds = minutes * 60 + seconds;
-        
-        setQuestionTimeRemaining(prev => ({
-          ...prev,
-          [currentQuestion.id]: totalSeconds
-        }));
-      }
-
-      // Start countdown timer for current question only
-      questionTimerRef.current = setInterval(() => {
-        setQuestionTimeRemaining((prev) => {
-          const currentTime = prev[currentQuestion.id];
-          if (currentTime <= 1) {
-            clearInterval(questionTimerRef.current);
-            questionTimerRef.current = null;
-            // Only show toast if time just ran out and toast hasn't been shown yet
-            if (currentTime === 1 && !toastShownRef.current[currentQuestion.id]) {
-              toast('Bạn đã hết thời gian làm cho câu hỏi này. Bạn nên chuyển sang câu tiếp theo.');
-              toastShownRef.current[currentQuestion.id] = true;
-            }
-            return {
-              ...prev,
-              [currentQuestion.id]: 0
-            };
-          }
-          return {
-            ...prev,
-            [currentQuestion.id]: currentTime - 1
-          };
-        });
-      }, 1000);
-      
-      return () => {
-        // Don't clear timer when component unmounts, let it continue running
-        // Only clear when explicitly changing to a different question
-      };
-    }
-  }, [activeQuestionType, currentQuestionPage, currentQuestion?.id]); // Combined dependencies
-
   
   // Calculate progress bar color based on time remaining
   const getProgressBarColor = () => {
@@ -501,24 +412,12 @@ export default function ExamPage() {
 
   // Navigate to next question
   const handleNext = () => {
-    // If using pagination, handle pagination logic
-    if (shouldUsePagination) {
-      if (currentQuestionPage < filteredQuestions.length - 1) {
-        setCurrentQuestionPage(currentQuestionPage + 1);
-      } else {
-        // Move to next question type in same section
-        const currentTabIndex = questionTypeTabs.findIndex(tab => tab.id === activeQuestionType);
-        if (currentTabIndex < questionTypeTabs.length - 1) {
-          const nextTab = questionTypeTabs[currentTabIndex + 1];
-          setActiveQuestionType(nextTab.id);
-          setCurrentQuestionPage(0);
-        }
-      }
-      return;
-    }
-    
+    console.log('handleNext called', { currentQuestionIndex, filteredQuestionsLength: filteredQuestions.length });
     if (currentQuestionIndex < filteredQuestions.length - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
+      setCurrentQuestionIndex((prev) => {
+        console.log('Setting currentQuestionIndex to:', prev + 1);
+        return prev + 1;
+      });
     } else {
       // Move to next question type in same section
       const currentTabIndex = questionTypeTabs.findIndex(tab => tab.id === activeQuestionType);
@@ -532,23 +431,6 @@ export default function ExamPage() {
 
   // Navigate to previous question
   const handlePrevious = () => {
-    // If using pagination, handle pagination logic
-    if (shouldUsePagination) {
-      if (currentQuestionPage > 0) {
-        setCurrentQuestionPage(currentQuestionPage - 1);
-      } else {
-        // Move to previous question type in same section
-        const currentTabIndex = questionTypeTabs.findIndex(tab => tab.id === activeQuestionType);
-        if (currentTabIndex > 0) {
-          const prevTab = questionTypeTabs[currentTabIndex - 1];
-          setActiveQuestionType(prevTab.id);
-          const prevQuestions = groupedQuestions[prevTab.id]?.questions || [];
-          setCurrentQuestionPage(prevQuestions.length - 1);
-        }
-      }
-      return;
-    }
-    
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex((prev) => prev - 1);
     } else {
@@ -571,41 +453,19 @@ export default function ExamPage() {
     // Set first question type of the new section as active
     const newSection = examData.sections.find(s => s.type === sectionType);
     if (newSection && newSection.question_types.length > 0) {
-      // Find the question type that matches the current activeQuestionType in the new section
-      const matchingQuestionType = newSection.question_types.find(qt => qt.id === activeQuestionType);
-      
-      if (matchingQuestionType) {
-        // Keep the same question type if it exists in the new section
-        setActiveQuestionType(activeQuestionType);
-      } else {
-        // Use first question type of the new section
       setActiveQuestionType(newSection.question_types[0].id);
-      }
-      
-      setCurrentQuestionPage(0); // Reset pagination when switching sections
-      toastShownRef.current = {}; // Reset ref when switching sections
     }
   };
 
   // Handle question type tab click
   const handleQuestionTypeChange = (questionTypeId) => {
     setActiveQuestionType(questionTypeId);
-    setCurrentQuestionPage(0); // Reset pagination when switching question types
     setCurrentQuestionIndex(0); // Reset to first question of this type
-    toastShownRef.current = {}; // Reset ref when switching question types
-  };
-
-  // Handle pagination change
-  const handlePageChange = (newPage) => {
-    setCurrentQuestionPage(newPage);
   };
 
   // Submit exam
   const handleSubmitExam = () => {
     clearInterval(timerRef.current);
-    if (questionTimer) {
-      clearInterval(questionTimer);
-    }
     // TODO: Calculate score and save results
     alert("Đã nộp bài!");
     navigate("/exam-result", { state: { examId, answers: studentAnswers } });
@@ -632,7 +492,7 @@ export default function ExamPage() {
       <div 
         className={`transition-transform duration-300 ${hideHeader ? '-translate-y-full' : 'translate-y-0'}`}
       >
-      <Navbar />
+        <Navbar />
       </div>
 
       {/* Sticky Progress Bar - Shows when scrolling */}
@@ -793,18 +653,6 @@ export default function ExamPage() {
                           {/* Tab text */}
                            <button
                              onClick={() => {
-                               // Find which section this question type belongs to
-                               const targetSection = examData.sections.find(section => 
-                                 section.question_types.some(qt => qt.id === tab.id)
-                               );
-                               
-                               // If the question type belongs to a different section, switch to that section first
-                               if (targetSection && targetSection.type !== activeSection) {
-                                 handleSectionChange(targetSection.type);
-                                 // After section change, the question type will be set automatically
-                                 return;
-                               }
-                               
                                // Toggle expand/collapse per section
                                setExpandedQuestionType(prev => ({
                                  ...prev,
@@ -843,35 +691,13 @@ export default function ExamPage() {
                                       ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
                                       : studentAnswers[question.id]
                                   ) : false;
-                                  // Check if this question type uses pagination (same logic as handleNext)
-                                  const tabQuestions = groupedQuestions[tab.id]?.questions || [];
-                                  const shouldUsePagination = tabQuestions.length > 0 && 
-                                    groupedQuestions[tab.id]?.type?.duration &&
-                                    (tabQuestions[0].passage || tabQuestions[0].jlpt_question_passages);
-                                  const isCurrent = tab.id === activeQuestionType && (
-                                    shouldUsePagination ? index === currentQuestionPage : index === currentQuestionIndex
-                                  );
+                                  const isCurrent = tab.id === activeQuestionType && index === currentQuestionIndex;
                                   
                                   return (
                                     <button
                                       key={index}
                                       onClick={() => {
-                                        // Only change question type if different
-                                        if (tab.id !== activeQuestionType) {
                                         handleQuestionTypeChange(tab.id);
-                                        }
-                                        
-                                        // Check if this question type uses pagination (same logic as handleNext)
-                                        const tabQuestions = groupedQuestions[tab.id]?.questions || [];
-                                        const shouldUsePagination = tabQuestions.length > 0 && 
-                                          groupedQuestions[tab.id]?.type?.duration &&
-                                          (tabQuestions[0].passage || tabQuestions[0].jlpt_question_passages);
-                                        
-                                        if (shouldUsePagination) {
-                                          // For reading comprehension: switch to the corresponding page
-                                          setCurrentQuestionPage(index);
-                                        } else {
-                                          // For normal questions: scroll to the specific question
                                         setCurrentQuestionIndex(index);
                                         
                                         // Auto scroll to the specific question
@@ -884,7 +710,6 @@ export default function ExamPage() {
                                             });
                                           }
                                         }, 100);
-                                        }
                                       }}
                                       className={`w-10 h-10 text-sm font-semibold rounded transition-all ${
                                         isCurrent
@@ -913,14 +738,17 @@ export default function ExamPage() {
           {/* Questions Container */}
           <div id="questions-container" className="bg-white rounded-2xl shadow-md px-6 md:px-8 py-8">
             {/* Question Header */}
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 mb-4">
               <div className="px-4 py-2 rounded-xl bg-[#FFD24D] text-[#1E1E1E] font-bold text-lg whitespace-nowrap">
+
                 {(() => {
                   // Find the current active question type tab
                   const currentTab = questionTypeTabs.find(tab => tab.id === activeQuestionType);
                   return currentTab?.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || `問題 ${currentQuestionIndex + 1}`;
                 })()} 
+                {/* <span className="text-xs text-gray-500 ml-2">
+                  (Debug: {currentQuestionIndex}/{filteredQuestions.length})
+                </span>  */}
               </div>
               {currentQuestion?.taskInstructions && (
                 <p 
@@ -947,463 +775,21 @@ export default function ExamPage() {
                   {currentQuestion.taskInstructions.replace(/^問題\s*[０-９0-9]+\s*[：:]\s*/, '')}
                 </p>
               )}
-              </div>
             </div>
 
-             {/* Duration display for reading passages - below yellow box */}
-             {(() => {
-               const currentQuestionType = groupedQuestions[activeQuestionType];
-               const duration = currentQuestionType?.type?.duration;
-               const hasDuration = currentQuestionType?.type?.duration;
-               const shouldUsePagination = filteredQuestions.length > 0 && 
-                 hasDuration &&
-                 (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
-               
-               if (duration && filteredQuestions.length > 0) {
-                 if (shouldUsePagination) {
-                   const currentQuestionTime = questionTimeRemaining[currentQuestion?.id] || 0;
-                   // Always show timer for paginated questions (including when time is up)
-                   return (
-                     <div className="mb-3 ml-4 -mt-2">
-                       <span className={`text-xl font-bold ${currentQuestionTime === 0 ? 'text-red-500' : (currentQuestionTime <= 30 ? 'text-red-500' : 'text-[#874FFF]')}`}>
-                         {formatQuestionTime(currentQuestionTime)}
-                       </span>
-                     </div>
-                   );
-                 } else {
-                   // Show static duration for non-paginated questions
-                   const durationStr = duration.replace('00:', ''); // Remove hours if 00:
-                   return (
-                     <div className="mb-3 ml-4 -mt-2">
-                       <span className="text-xl font-bold text-[#874FFF]">{durationStr}</span>
-                     </div>
-                   );
-                 }
-               }
-               return null;
-             })()}
-
-            {/* Display questions - paginated for reading comprehension types */}
-            {(() => {
-              // Use the shouldUsePagination variable defined above
-              
-              
-              if (shouldUsePagination) {
-                // Show only current question for pagination
-                const safePageIndex = Math.min(currentQuestionPage, filteredQuestions.length - 1);
-                const currentQuestion = filteredQuestions[safePageIndex];
-                
-                if (!currentQuestion) {
-                  return <div className="text-center py-8 text-gray-500">Không tìm thấy câu hỏi</div>;
-                }
-                
-                return (
-                  <div key={currentQuestion.id} id={`question-${currentQuestion.id}`} className="scroll-mt-30">
-                    {/* Display passage from jlpt_questions table */}
-                    {currentQuestion.passage && (
-                      <div className="mb-6 p-6 bg-gray-50 rounded-lg">
-                        <div className="text-lg leading-relaxed text-gray-800">
-                          {(() => {
-                            const passage = currentQuestion.passage;
-                            const parts = [];
-                            let currentIndex = 0;
-                            
-                            // Find all <frame_start>...<frame_end> blocks
-                            const frameRegex = /<frame_start>(.*?)<frame_end>/gs;
-                            let match;
-                            
-                            while ((match = frameRegex.exec(passage)) !== null) {
-                              // Add text before frame_start
-                              if (match.index > currentIndex) {
-                                const beforeText = passage.slice(currentIndex, match.index);
-                                parts.push({
-                                  type: 'text',
-                                  content: beforeText.split('<enter>').map((part, index, arr) => (
-                                    <span key={index}>
-                                      {part}
-                                      {index < arr.length - 1 && <br />}
-                                    </span>
-                                  ))
-                                });
-                              }
-                              
-                              // Add frame content
-                              const frameContent = match[1];
-                              parts.push({
-                                type: 'frame',
-                                content: frameContent.split('<enter>').map((part, index, arr) => {
-                                  // Check if line contains <right> tag
-                                  if (part.includes('<right>')) {
-                                    const rightContent = part.replace('<right>', '');
-                                    return (
-                                      <div key={index} className="text-right">
-                                        {rightContent}
-                                        {index < arr.length - 1 && <br />}
-                                      </div>
-                                    );
-                                  } else {
-                                    return (
-                                      <span key={index}>
-                                        {part}
-                                        {index < arr.length - 1 && <br />}
-                                      </span>
-                                    );
-                                  }
-                                })
-                              });
-                              
-                              currentIndex = match.index + match[0].length;
-                            }
-                            
-                            // Add remaining text after last frame
-                            if (currentIndex < passage.length) {
-                              const remainingText = passage.slice(currentIndex);
-                              parts.push({
-                                type: 'text',
-                                content: remainingText.split('<enter>').map((part, index, arr) => (
-                                  <span key={index}>
-                                    {part}
-                                    {index < arr.length - 1 && <br />}
-                                  </span>
-                                ))
-                              });
-                            }
-                            
-                            // If no frames found, process entire passage as text
-                            if (parts.length === 0) {
-                              parts.push({
-                                type: 'text',
-                                content: passage.split('<enter>').map((part, index, arr) => (
-                                  <span key={index}>
-                                    {part}
-                                    {index < arr.length - 1 && <br />}
-                                  </span>
-                                ))
-                              });
-                            }
-                            
-                            return parts.map((part, index) => {
-                              if (part.type === 'frame') {
-                                return (
-                                  <div key={index} className={`mt-4 border-2 border-black p-4 rounded-lg ${
-                                    (questionTimeRemaining[currentQuestion?.id] !== undefined && questionTimeRemaining[currentQuestion?.id] <= 0) ? 'bg-red-100' : 'bg-white'
-                                  }`}>
-                                    <div className="text-lg leading-relaxed text-gray-800">
-                                      {part.content}
-                                    </div>
-                                  </div>
-                                );
-                              } else {
-                                return (
-                                  <div key={index}>
-                                    {part.content}
-                                  </div>
-                                );
-                              }
-                            });
-                          })()}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Display passage from jlpt_question_passages table with black border */}
-                    {currentQuestion.jlpt_question_passages && currentQuestion.jlpt_question_passages.length > 0 && (
-                      <div className="mb-6">
-                        {/* Reading passage with black border */}
-                        <div className={`border-2 border-black p-6 rounded-lg ${
-                          (questionTimeRemaining[currentQuestion?.id] !== undefined && questionTimeRemaining[currentQuestion?.id] <= 0) ? 'bg-red-100' : 'bg-white'
-                        }`}>
-                          <div className="text-lg leading-relaxed text-gray-800">
-                            {currentQuestion.jlpt_question_passages.map((passage, passageIndex) => (
-                              <div key={passageIndex}>
-                                {passage.content && (
-                                  <div className="whitespace-pre-line">
-                                    {passage.content.split('<enter>').map((part, index, arr) => (
-                                      <span key={index}>
-                                        {part}
-                                        {index < arr.length - 1 && <br />}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                                {passage.underline_text && (
-                                  <div className="mt-4">
-                                    <span className="underline decoration-2 underline-offset-4 font-medium">
-                                      {passage.underline_text.split('<enter>').map((part, index, arr) => (
-                                        <span key={index}>
-                                          {part}
-                                          {index < arr.length - 1 && <br />}
-                                        </span>
-                                      ))}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Question Text with leading square index */}
-                    <div className="mb-8">
-                      <div className="flex items-start gap-3">
-                        <div className="w-9 h-9 border-2 border-gray-300 rounded-md flex items-center justify-center text-base font-semibold text-gray-700 select-none">
-                          {currentQuestion.position}
-                        </div>
-                        <div className="text-xl font-normal text-[#0B1320] leading-relaxed">
-                          {currentQuestion.underline_text ? (
-                            <>
-                              {currentQuestion.question_text.split(currentQuestion.underline_text)[0].split('<enter>').map((part, index) => (
-                                <span key={index}>
-                                  {part}
-                                  {index < currentQuestion.question_text.split(currentQuestion.underline_text)[0].split('<enter>').length - 1 && <br />}
-                                </span>
-                              ))}
-                              <span className="underline decoration-2 underline-offset-4">
-                                {currentQuestion.underline_text.split('<enter>').map((part, index) => (
-                                  <span key={index}>
-                                    {part}
-                                    {index < currentQuestion.underline_text.split('<enter>').length - 1 && <br />}
-                                  </span>
-                                ))}
-                              </span>
-                              {currentQuestion.question_text.split(currentQuestion.underline_text)[1].split('<enter>').map((part, index) => (
-                                <span key={index}>
-                                  {part}
-                                  {index < currentQuestion.question_text.split(currentQuestion.underline_text)[1].split('<enter>').length - 1 && <br />}
-                                </span>
-                              ))}
-                            </>
-                          ) : (
-                            (currentQuestion?.question_text ?? '')
-                              .split('<enter>')
-                              .map((part, index, arr) => (
-                                <span key={index}>
-                                  {part}
-                                  {index < arr.length - 1 && <br />}
-                                </span>
-                              ))
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Answer Options */}
-                    <div className="space-y-2">
-                      {currentQuestion.answers && currentQuestion.answers.length > 0 ? (
-                        // Normalize answers: unique by show_order, sorted asc
-                        (() => {
-                              const byOrder = new Map();
-                              currentQuestion.answers.forEach((a) => {
-                                const key = String(a.show_order);
-                                if (!byOrder.has(key)) byOrder.set(key, a);
-                              });
-                              return Array.from(byOrder.values()).sort(
-                                (a, b) => Number(a.show_order) - Number(b.show_order)
-                              );
-                            })().filter((answer) => {
-                              // For QT007, only show answers that are not in the tray
-                              if (currentQuestion.questionTypeId === "QT007") {
-                                const selectedAnswers = answerOrder[currentQuestion.id] || [];
-                                return !selectedAnswers.includes(answer.id);
-                              }
-                              return true;
-                            }).map((answer) => {
-                              const isSelected = isAnswerSelected(currentQuestion.id, answer.id, currentQuestion.questionTypeId);
-                              const orderNumber = getAnswerOrder(currentQuestion.id, answer.id);
-                              
-                              return (
-                                <label
-                                  key={answer.id}
-                                  className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all ${
-                                    isSelected
-                                      ? "border-[#874FFF] bg-purple-50"
-                                      : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50"
-                                  }`}
-                                >
-                                  {/* custom radio */}
-                                  <input
-                                    type="radio"
-                                    name={`question-${currentQuestion.id}`}
-                                    value={answer.id}
-                                    checked={isSelected}
-                                    onChange={() => handleAnswerSelect(currentQuestion.id, answer.id, currentQuestion.questionTypeId)}
-                                    className="hidden"
-                                  />
-                                  <span
-                                    className={`flex items-center justify-center w-5 h-5 rounded-full border-2 flex-shrink-0 ${
-                                      isSelected ? "border-[#874FFF]" : "border-gray-400"
-                                    }`}
-                                  >
-                                    <span
-                                      className={`w-3 h-3 rounded-full ${
-                                        isSelected ? "bg-[#874FFF]" : "bg-transparent"
-                                      }`}
-                                    />
-                                  </span>
-                                  <span className="ml-3 text-base font-medium text-gray-800">
-                                    {formatAnswerText(answer.answer_text, currentQuestion.question_text, currentQuestion.questionTypeId)}
-                                  </span>
-                                </label>
-                              );
-                        })
-                      ) : (
-                        <p className="text-gray-500">Không có đáp án</p>
-                      )}
-                    </div>
-
-                  </div>
-                );
-              } else {
-                // Show all questions for non-pagination types
-                return filteredQuestions.map((question, questionIndex) => (
+            {/* Display all questions of current type */}
+            {filteredQuestions.map((question, questionIndex) => (
               <div 
                 key={question.id} 
                 id={`question-${question.id}`}
                 className={`${questionIndex > 0 ? 'mt-8' : ''} scroll-mt-30`}
               >
-                {/* Display passage from jlpt_questions table */}
+                {/* Passage (if exists) */}
                 {question.passage && (
                   <div className="mb-6 p-6 bg-gray-50 rounded-lg">
-                    <div className="text-lg leading-relaxed text-gray-800">
-                      {(() => {
-                        const passage = question.passage;
-                        const parts = [];
-                        let currentIndex = 0;
-                        
-                        // Find all <frame_start>...<frame_end> blocks
-                        const frameRegex = /<frame_start>(.*?)<frame_end>/gs;
-                        let match;
-                        
-                        while ((match = frameRegex.exec(passage)) !== null) {
-                          // Add text before frame_start
-                          if (match.index > currentIndex) {
-                            const beforeText = passage.slice(currentIndex, match.index);
-                            parts.push({
-                              type: 'text',
-                              content: beforeText.split('<enter>').map((part, index, arr) => (
-                                <span key={index}>
-                                  {part}
-                                  {index < arr.length - 1 && <br />}
-                                </span>
-                              ))
-                            });
-                          }
-                          
-                          // Add frame content
-                          const frameContent = match[1];
-                          parts.push({
-                            type: 'frame',
-                            content: frameContent.split('<enter>').map((part, index, arr) => {
-                              // Check if line contains <right> tag
-                              if (part.includes('<right>')) {
-                                const rightContent = part.replace('<right>', '');
-                                return (
-                                  <div key={index} className="text-right">
-                                    {rightContent}
-                                    {index < arr.length - 1 && <br />}
-                                  </div>
-                                );
-                              } else {
-                                return (
-                                  <span key={index}>
-                                    {part}
-                                    {index < arr.length - 1 && <br />}
-                                  </span>
-                                );
-                              }
-                            })
-                          });
-                          
-                          currentIndex = match.index + match[0].length;
-                        }
-                        
-                        // Add remaining text after last frame
-                        if (currentIndex < passage.length) {
-                          const remainingText = passage.slice(currentIndex);
-                          parts.push({
-                            type: 'text',
-                            content: remainingText.split('<enter>').map((part, index, arr) => (
-                              <span key={index}>
-                                {part}
-                                {index < arr.length - 1 && <br />}
-                              </span>
-                            ))
-                          });
-                        }
-                        
-                        // If no frames found, process entire passage as text
-                        if (parts.length === 0) {
-                          parts.push({
-                            type: 'text',
-                            content: passage.split('<enter>').map((part, index, arr) => (
-                              <span key={index}>
-                                {part}
-                                {index < arr.length - 1 && <br />}
-                              </span>
-                            ))
-                          });
-                        }
-                        
-                        return parts.map((part, index) => {
-                          if (part.type === 'frame') {
-                            return (
-                              <div key={index} className="mt-4 border-2 border-black p-4 bg-white rounded-lg">
-                                <div className="text-lg leading-relaxed text-gray-800">
-                                  {part.content}
-                                </div>
-                              </div>
-                            );
-                          } else {
-                            return (
-                              <div key={index}>
-                                {part.content}
-                              </div>
-                            );
-                          }
-                        });
-                      })()}
-                    </div>
-                  </div>
-                )}
-
-                {/* Display passage from jlpt_question_passages table with black border */}
-                {question.jlpt_question_passages && question.jlpt_question_passages.length > 0 && (
-                  <div className="mb-6">
-                    {/* Reading passage with black border */}
-                    <div className={`border-2 border-black p-6 rounded-lg ${
-                      (questionTimeRemaining[question?.id] !== undefined && questionTimeRemaining[question?.id] <= 0) ? 'bg-red-100' : 'bg-white'
-                    }`}>
-                      <div className="text-lg leading-relaxed text-gray-800">
-                        {question.jlpt_question_passages.map((passage, passageIndex) => (
-                          <div key={passageIndex}>
-                            {passage.content && (
-                              <div className="whitespace-pre-line">
-                                {passage.content.split('<enter>').map((part, index, arr) => (
-                                  <span key={index}>
-                                    {part}
-                                    {index < arr.length - 1 && <br />}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                            {passage.underline_text && (
-                              <div className="mt-4">
-                                <span className="underline decoration-2 underline-offset-4 font-medium">
-                                  {passage.underline_text.split('<enter>').map((part, index, arr) => (
-                                    <span key={index}>
-                                      {part}
-                                      {index < arr.length - 1 && <br />}
-                                    </span>
-                                  ))}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <p className="text-lg leading-relaxed text-gray-800">
+                      {question.passage}
+                    </p>
                   </div>
                 )}
 
@@ -1573,24 +959,16 @@ export default function ExamPage() {
                   )}
                 </div>
               </div>
-            ));
-              }
-            })()}
+            ))}
           </div>
 
           {/* Navigation Buttons */}
           <div className="mt-8 flex items-center justify-between">
             <button
               onClick={handlePrevious}
-              disabled={shouldUsePagination ? 
-                (currentQuestionPage === 0 && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) === 0) :
-                (currentQuestionIndex === 0 && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) === 0)
-              }
+              disabled={currentQuestionIndex === 0 && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) === 0}
               className={`px-8 py-3 rounded-lg font-semibold text-lg transition-all ${
-                (shouldUsePagination ? 
-                  (currentQuestionPage === 0 && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) === 0) :
-                  (currentQuestionIndex === 0 && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) === 0)
-                )
+                currentQuestionIndex === 0 && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) === 0
                   ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                   : "bg-white border-2 border-[#5427B4] text-[#5427B4] hover:bg-[#5427B4] hover:text-white"
               }`}
@@ -1606,12 +984,8 @@ export default function ExamPage() {
                 NỘP BÀI
               </button>
 
-              {(shouldUsePagination ? 
-                (currentQuestionPage < filteredQuestions.length - 1 || 
-                 questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < questionTypeTabs.length - 1) :
-                (currentQuestionIndex < filteredQuestions.length - 1 || 
-                 questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < questionTypeTabs.length - 1)
-              ) ? (
+              {(currentQuestionIndex < filteredQuestions.length - 1 || 
+                questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < questionTypeTabs.length - 1) ? (
                 <button
                   onClick={handleNext}
                   className="px-8 py-3 rounded-lg bg-[#874FFF] text-white font-semibold text-lg hover:bg-[#7a46ea] transition-all border-2 border-[#5427B4]"
@@ -1633,23 +1007,6 @@ export default function ExamPage() {
       </main>
 
       <Footer />
-      
-      {/* Toast notifications */}
-      <Toaster 
-        position="top-right"
-        toastOptions={{
-          duration: 6000, // Tăng thời gian hiển thị lên 6 giây
-          style: {
-            background: '#ef4444', // Màu đỏ (Tailwind's red-500)
-            color: '#fff', // Chữ trắng để dễ đọc
-            borderRadius: '8px',
-            padding: '12px 24px', // Tăng padding để toast rộng hơn
-            fontSize: '14px',
-            fontWeight: '500',
-            minWidth: '300px', // Đảm bảo độ rộng tối thiểu
-          },
-        }}
-      />
     </div>
   );
 }
