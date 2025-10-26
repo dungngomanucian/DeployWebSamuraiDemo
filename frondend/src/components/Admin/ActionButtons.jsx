@@ -63,7 +63,7 @@ function ActionButtons({ recordId, onEdit, onDelete, customActions = [] }) {
     }));
 
     // Kết hợp các hành động (custom trước, default sau, hoặc ngược lại tùy ý)
-    return [...customMenuItems, ...defaultActions]; 
+    return [...defaultActions, ...customMenuItems ]; 
 
   }, [recordId, onEdit, onDelete, customActions]); // Dependencies
 
