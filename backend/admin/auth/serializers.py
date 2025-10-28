@@ -1,6 +1,7 @@
 # auth_admin/serializers.py
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
+from rest_framework_simplejwt.settings import api_settings
 from .services import AuthAdminService # Import service sẽ tạo ở bước sau
 # (Optional) Import hàm check_password nếu dùng hash của Django
 # from django.contrib.auth.hashers import check_password 
@@ -12,17 +13,29 @@ class AdminTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
     # (Optional) Có thể thêm các trường tùy chỉnh nếu cần gửi thêm thông tin
     # username_field = 'email' # SimpleJWT mặc định dùng username, có thể đổi
-
+    username_field = 'email'
+    
     @classmethod
     def get_token(cls, user):
         """
         Override để thêm thông tin tùy chỉnh (role) vào payload token.
         'user' ở đây là dictionary chứa thông tin admin trả về từ service.
         """
-        token = super().get_token(user) # Gọi hàm gốc để lấy payload cơ bản (user_id)
+        # Lấy user_id từ dictionary 'user' thay vì user.id
+        # SimpleJWT dùng setting USER_ID_FIELD để biết tên key ID, mặc định là 'id'
+        user_id = user.get(api_settings.USER_ID_FIELD) 
+        if not user_id:
+             # Xử lý nếu dict user không có key 'id' (hoặc key được config)
+             raise serializers.ValidationError("Admin data dictionary is missing the ID field.")
+             
+        # Tạo token payload cơ bản (chứa jti, token_type, exp, user_id)
+        # Thay vì gọi super().get_token(user) vốn mong đợi object
+        from rest_framework_simplejwt.tokens import RefreshToken
+        token = RefreshToken() # Tạo RefreshToken rỗng
+        token[api_settings.USER_ID_CLAIM] = user_id # Gán user_id vào claim chuẩn
 
         # Thêm các trường tùy chỉnh vào payload
-        token['role'] = 'admin' # Thêm vai trò admin
+        token['role'] = 'admin' 
         token['email'] = user.get('email')
 
         return token

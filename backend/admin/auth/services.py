@@ -1,7 +1,7 @@
 # auth_admin/services.py
 from config.supabase_client import supabase # Import supabase instance
 from typing import Dict, Optional, Any
-
+import bcrypt
 # (Rất quan trọng) Import hàm kiểm tra password hash
 # Nếu bạn dùng hệ thống hash của Django:
 # from django.contrib.auth.hashers import check_password
@@ -53,10 +53,10 @@ class AuthAdminService:
             # is_password_valid = check_password(password, stored_password_hash)
 
             # Ví dụ nếu dùng bcrypt:
-            # is_password_valid = bcrypt.checkpw(password.encode('utf-8'), stored_password_hash.encode('utf-8'))
+            is_password_valid = bcrypt.checkpw(password.encode('utf-8'), stored_password_hash.encode('utf-8'))
             
             # Tạm thời dùng so sánh chuỗi (CHỈ DÙNG ĐỂ TEST, RẤT KHÔNG AN TOÀN)
-            is_password_valid = (password == stored_password_hash) 
+            # is_password_valid = (password == stored_password_hash) 
             print(f"AuthAdminService: Password check for {email}. Valid: {is_password_valid}")
             # --- HẾT PHẦN KIỂM TRA PASSWORD ---
 

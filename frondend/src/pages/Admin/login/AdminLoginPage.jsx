@@ -17,10 +17,10 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
-
+    console.log('Tài khoản admin gửi lên:',{ email, password });
     try {
       const { data, error: apiError } = await adminLogin(email, password);
-      console.log('Tài khoản admin gửi lên:',data);
+      
       if (apiError) {
         throw new Error(apiError.detail || apiError.non_field_errors?.join(', ') || apiError || 'Đăng nhập thất bại.');
       }
