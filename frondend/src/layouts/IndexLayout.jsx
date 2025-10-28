@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import SearchBar from '../components/admin/SearchBar';
-import AddNewButton from '../components/admin/AddNewButton';
+import SearchBar from '../components/Admin/SearchBar';
+import AddNewButton from '../components/Admin/AddNewButton';
 
 /**
  * Layout chung cho các trang hiển thị danh sách.

@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react'; // <<<<<<< THÊM useEffect
 import { Outlet } from 'react-router-dom';
 import { HiBars3 } from "react-icons/hi2";
-import Sidebar from '../components/admin/Sidebar';
-import ThemeToggleButton from '../components/admin/ThemeToggleButton'; // Đường dẫn có thể khác
+import Sidebar from '../components/Admin/Sidebar';
+import ThemeToggleButton from '../components/Admin/ThemeToggleButton'; // Đường dẫn có thể khác
 
 // CSS PrimeReact (Nên chuyển ra main.jsx)
 import "primereact/resources/themes/lara-light-indigo/theme.css"; 

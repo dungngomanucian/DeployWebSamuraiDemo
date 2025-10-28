@@ -14,6 +14,8 @@ import ExamIntro from "./pages/student/exam/ExamIntro";
 import ExamPage from "./pages/student/exam/ExamPage";
 import StudentDashboard from "./pages/student/home/StudentDashboard";
 
+import ProtectedAdminRoute from './components/admin/ProtectedAdminRoute';
+import AdminLoginPage from './pages/admin/login/AdminLoginPage';
 import AdminLayout from './layouts/AdminLayout';
 import Dashboard from './pages/admin/Dashboard/Dashboard';
 import ManageStudents from './pages/admin/student/Index';
@@ -47,28 +49,30 @@ export default function App() {
           
           <Route path="/student-dashboard" element={<StudentDashboard />} />     
 
-          
-          {/* Cụm route dành cho Admin */}
-          <Route path="/admin" element={<AdminLayout />}>
-            {/* Tự động chuyển /admin đến /admin/dashboard */}
-            <Route index element={<Navigate to="/admin/dashboard" />} />
-            <Route path="dashboard" element={<Dashboard />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} /> {/* <-- 2. Thêm route login admin */}
+            {/* Cụm route dành cho Admin */}
+          <Route element={<ProtectedAdminRoute />}>
+            <Route path="/admin" element={<AdminLayout />}>
+              {/* Tự động chuyển /admin đến /admin/dashboard */}
+              <Route index element={<Navigate to="/admin/dashboard" />} />
+              <Route path="dashboard" element={<Dashboard />} />
 
-            <Route path="students" element={<ManageStudents />} />
-            <Route path="students/new" element={<CreateStudentPage />} />
+              <Route path="students" element={<ManageStudents />} />
+              <Route path="students/new" element={<CreateStudentPage />} />
 
-            <Route path="accounts" element={<ManageAccounts />} />
+              <Route path="accounts" element={<ManageAccounts />} />
 
-            <Route path="teachers" element={<ManageTeachers />} />
+              <Route path="teachers" element={<ManageTeachers />} />
 
-            <Route path="jlpt-exams" element={<ManageJlptExams />} />
+              <Route path="jlpt-exams" element={<ManageJlptExams />} />
 
-            <Route path="courses" element={<ManageCourses />} />
- 
-            <Route path="classrooms" element={< ManageClassrooms/>} />
+              <Route path="courses" element={<ManageCourses />} />
+  
+              <Route path="classrooms" element={< ManageClassrooms/>} />
 
-            <Route path="levels" element={< ManageLevels/>} />
-            <Route path="settings" element={<div>Trang Cài đặt</div>} />
+              <Route path="levels" element={< ManageLevels/>} />
+              <Route path="settings" element={<div>Trang Cài đặt</div>} />
+            </Route>
           </Route>
 
           {/* (Tùy chọn) Thêm một route để xử lý các trang không tồn tại */}

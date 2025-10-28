@@ -23,7 +23,7 @@ class AdminTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         # Thêm các trường tùy chỉnh vào payload
         token['role'] = 'admin' # Thêm vai trò admin
-        # Thêm các thông tin khác nếu cần, ví dụ: token['email'] = user.get('email')
+        token['email'] = user.get('email')
 
         return token
 
