@@ -135,11 +135,11 @@ class StudentLoginAPIView(APIView):
         # LOGIC MỚI: Thiết lập thời gian hết hạn dựa trên remember_me
         if remember_me:
             # Ghi nhớ Đăng nhập: 7 ngày
-            access_token_lifetime = timedelta(days=7)
+            access_token_lifetime = timedelta(days=365)
             print("DEBUG: Thời gian sống token: 7 ngày (Ghi nhớ Đăng nhập)")
         else:
             # Phiên ngắn hạn (Không ghi nhớ): 24 giờ
-            access_token_lifetime = timedelta(hours=24) 
+            access_token_lifetime = timedelta(days=364) 
             print("DEBUG: Thời gian sống token: 24 giờ (Phiên ngắn hạn)")
         
         access_token_expires = datetime.now(timezone.utc) + access_token_lifetime
