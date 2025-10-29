@@ -11,7 +11,13 @@ export default function ExamListPage() {
   const [examPapers, setExamPapers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [levels, setLevels] = useState([]);
-  
+  useEffect(() => {
+          const token = localStorage.getItem('auth_token');
+          if (!token) {
+              // Nếu có token, chuyển hướng về trang chủ
+              navigate('/login');
+          }
+      }, [navigate]);
   // Load levels
   useEffect(() => {
     const loadLevels = async () => {

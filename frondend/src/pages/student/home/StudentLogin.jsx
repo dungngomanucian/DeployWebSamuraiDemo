@@ -295,7 +295,7 @@ const StudentLogin = () => {
                 
                 // Chuyển hướng sau khi hiển thị toast thành công (ví dụ sau 1 giây)
                 setTimeout(() => {
-                    navigate('/'); 
+                    navigate('/student-dashboard'); 
                 }, 1000);
             }
             
