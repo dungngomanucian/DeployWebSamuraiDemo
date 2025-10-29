@@ -31,16 +31,20 @@
 
 @font-face {
   font-family: 'Inter';
-  src: url('/fonts/Inter-VariableFont_opsz,wght.ttf') format('truetype');
-  font-weight: normal;
+  src: url('/fonts/Inter-VariableFont_opsz,wght.ttf') format('woff2-variations'),
+       url('/fonts/Inter-VariableFont_opsz,wght.ttf') format('truetype');
+  font-weight: 100 900;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
   font-family: 'Nunito';
-  src: url('/fonts/Nunito-VariableFont_wght.ttf') format('truetype');
-  font-weight: normal;
+  src: url('/fonts/Nunito-VariableFont_wght.ttf') format('woff2-variations'),
+       url('/fonts/Nunito-VariableFont_wght.ttf') format('truetype');
+  font-weight: 200 1000; /* dải weight hỗ trợ */
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
@@ -51,5 +55,5 @@
 }
 
 body {
-  font-family: 'UD Digi Kyokasho N-B', 'Noto Sans JP', sans-serif;
+  font-family: 'UD Digi Kyokasho N-B', 'Inter', 'Noto Sans JP', sans-serif;
 }
