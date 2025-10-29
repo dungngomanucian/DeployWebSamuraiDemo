@@ -1,75 +1,148 @@
-import React, { useState } from "react";
-import { Link, NavLink, useLocation, useNavigate } from "react-router-dom"; // 1. Import các component cần thiết
+import React, { useState, useEffect } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import logo from "../assets/logo.png";
+// SỬA LỖI: Sử dụng Default Import (hoặc Named Import tùy phiên bản)
+// Trong môi trường hiện đại, thường sử dụng Named Import nếu thư viện hỗ trợ
+// Nếu lỗi, hãy thử lại: import jwtDecode from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode'; 
+import { User, LogOut } from "lucide-react"; 
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  // 2. Dùng hook useLocation để lấy pathname một cách "React-friendly"
   const { pathname } = useLocation();
+  const navigate = useNavigate(); // Sử dụng hook điều hướng
+
+  // 1. State để lưu trạng thái đăng nhập và thông tin user
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userName, setUserName] = useState(null);
 
   const closeMobileMenu = () => setIsMenuOpen(false);
 
-  const navigate = useNavigate();
+  // Hàm giải mã và lấy thông tin user từ token
+  const getAuthStatus = () => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      try {
+        // Sử dụng jwtDecode
+        const decoded = jwtDecode(token);
+        let name = decoded.user_name ? decoded.user_name  :decoded.email.split('@')[0];
+        setIsLoggedIn(true);
+        setUserName(name); 
+      } catch (error) {
+        // Token hết hạn hoặc không hợp lệ
+        console.warn("Token không hợp lệ hoặc hết hạn. Đang đăng xuất tự động.", error);
+        handleLogout(); 
+      }
+    } else {
+      setIsLoggedIn(false);
+      setUserName(null);
+    }
+  };
+  // 2. Hàm xử lý Đăng xuất
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    setIsLoggedIn(false);
+    setUserName(null);
+    closeMobileMenu();
+    // Điều hướng về trang chủ hoặc trang đăng nhập
+    navigate('/login'); 
+  };
+  // 3. useEffect để kiểm tra trạng thái đăng nhập khi component được mount
+  useEffect(() => {
+    getAuthStatus();
+    // Thêm listener để cập nhật trạng thái nếu token thay đổi ở tab khác
+    window.addEventListener('storage', getAuthStatus); 
+    return () => {
+        window.removeEventListener('storage', getAuthStatus);
+    };
+  }, []);
+  // Hàm tùy chỉnh cho NavLink
+  const getNavLinkClass = ({ isActive }) => 
+    `cursor-pointer transition-all hover:text-[#4338CA] ${isActive ? 'text-[#4F46E5] font-semibold' : 'text-[#111827]'}`;
+  // Hàm tùy chỉnh cho Link (dùng cho mobile menu)
+  const getMobileNavLinkClass = (path) => 
+    `block py-2 ${pathname === path ? 'text-[#4F46E5] font-semibold' : 'text-[#111827] hover:text-[#4F46E5]'}`;
+
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-100 w-full sticky top-0 z-50">
+    <header className="bg-white shadow-sm border-b border-gray-100 w-full sticky top-0 z-50" style={{fontFamily: "Inter"}}>
       <div className="w-full flex items-center justify-between px-4 sm:px-6 lg:px-8 xl:px-24 py-4">
+        
         {/* Logo bên trái */}
         <Link to="/" className="flex items-center" onClick={closeMobileMenu}>
-          <img
-            src={logo}
-            alt="Samurai Japanese"
-            className="h-[50px] sm:h-[60px] w-auto object-contain"
-          />
+            {/* ... Logo image ... */}
+            <img
+                src={logo}
+                alt="Samurai Japanese"
+                className="h-[50px] sm:h-[60px] w-auto object-contain"
+            />
         </Link>
 
         {/* Menu desktop - ẩn trên mobile */}
         <nav className="hidden md:flex flex-1 justify-center">
           <ul className="flex items-center gap-6 lg:gap-10 text-sm lg:text-base font-medium">
-            <li>
-              {/* 3. Thay <a> bằng <NavLink> để có active style */}
-              <NavLink 
-                to="/" 
-                className={({ isActive }) => 
-                  `cursor-pointer transition-all hover:text-[#4338CA] ${isActive ? 'text-[#4F46E5] font-semibold' : 'text-[#111827]'}`
-                }
-              >
-                Trang chủ
-              </NavLink>
-            </li>
-            <li>
-              <a className="text-[#111827] hover:text-[#4F46E5] cursor-pointer transition-all">
-                Học bài
-              </a>
-            </li>
-            
+            <li><NavLink to="/" className={getNavLinkClass}>Trang chủ</NavLink></li>
+            <li><a className="text-[#111827] hover:text-[#4F46E5] cursor-pointer transition-all">Học bài</a></li>
+            {/* ... (Luyện đề) ... */}
             <li className="relative group">
               <span className={`${pathname.startsWith('/practice') || pathname.startsWith('/mock-exam') || pathname.startsWith('/exam-') ? 'text-[#4F46E5] font-semibold' : 'text-[#111827]'} hover:text-[#4F46E5] cursor-pointer transition-all inline-block px-2 py-1`}>
                 Luyện đề
               </span>
               <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity duration-150 absolute left-1/2 -translate-x-1/2 top-full pt-2 z-50">
                 <div className="bg-white border rounded-lg shadow-xl py-2 w-48 whitespace-nowrap">
-                  {/* 4. Thay <a> bằng <Link> cho các mục trong dropdown */}
                   <Link to="/practice-jlpt" className={`block px-4 py-2 text-base font-medium hover:bg-gray-100 ${pathname === '/practice-jlpt' ? 'text-[#4F46E5]' : 'text-[#111827]'}`}>Luyện thi JLPT</Link>
                   <Link to="/practice-eju" className={`block px-4 py-2 text-base font-medium hover:bg-gray-100 ${pathname === '/practice-eju' ? 'text-[#4F46E5]' : 'text-[#111827]'}`}>Luyện thi EJU</Link>
                 </div>
               </div>
             </li>
             
-            <li>
-              <a className="text-[#111827] hover:text-[#4F46E5] cursor-pointer transition-all"  href="/student-dashboard" >
-                Hồ sơ học viên
-              </a>
-            </li>
+            {/* Hồ sơ học viên (Hiển thị có điều kiện) */}
+            {isLoggedIn && (
+              <li>
+                <NavLink 
+                  to="/student-dashboard" 
+                  className={getNavLinkClass}
+                >
+                  Hồ sơ học viên
+                </NavLink>
+              </li>
+            )}
+
           </ul>
         </nav>
 
-        {/* Nút đăng nhập - ẩn trên mobile */}
-        <button className="hidden sm:block bg-[#4F46E5] hover:bg-[#4338CA] text-white px-4 lg:px-8 py-2.5 rounded-lg font-medium transition-all text-sm lg:text-base"
-          onClick={() => navigate('/login')}
-        >
-          Đăng nhập
-        </button>
+        {/* 4. Vùng hiển thị ĐĂNG NHẬP / AVATAR (DESKTOP) */}
+        <div className="hidden sm:flex items-center space-x-4">
+          {isLoggedIn ? (
+            // TRẠNG THÁI 1: ĐÃ ĐĂNG NHẬP (Avatar/Username - Ảnh 2)
+            <div className="flex items-center space-x-2 relative group cursor-pointer">
+                {/* Avatar icon */}
+                <User size={28} className="text-gray-600 border border-gray-300 rounded-full p-1" />
+                <span className="font-semibold text-gray-800 text-base">{userName}</span>
+                
+                {/* Dropdown Menu (Logout) */}
+                <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity duration-150 absolute right-0 top-full pt-2 z-50">
+                    <div className="bg-white border rounded-lg shadow-xl py-2 w-40 whitespace-nowrap">
+                        <Link to="/Dashboard" className="flex items-center px-4 py-2 text-base font-medium text-[#111827] hover:bg-gray-100">
+                           <User size={18} className="mr-2"/> Hồ sơ
+                        </Link>
+                        {/* Nút Đăng xuất trong Dropdown */}
+                        <button onClick={handleLogout} className="w-full flex items-center px-4 py-2 text-base font-medium text-red-600 hover:bg-red-50 border-t mt-1 pt-1">
+                           <LogOut size={18} className="mr-2"/> Đăng xuất
+                        </button>
+                    </div>
+                </div>
+            </div>
+          ) : (
+            // TRẠNG THÁI 2: CHƯA ĐĂNG NHẬP (Nút Đăng nhập - Ảnh 1)
+            <Link 
+              to="/login" 
+              className="bg-[#4F46E5] hover:bg-[#4338CA] text-white px-4 lg:px-8 py-2.5 rounded-lg font-medium transition-all text-sm lg:text-base"
+            >
+              Đăng nhập
+            </Link>
+          )}
+        </div>
 
         {/* Mobile menu button */}
         <button 
@@ -86,18 +159,36 @@ export default function Navbar() {
       {isMenuOpen && (
         <div className="md:hidden bg-white border-t border-gray-200">
           <div className="px-4 py-4 space-y-4">
-            {/* 5. Thay thế tất cả <a> bằng <NavLink> trong mobile menu */}
-            <NavLink to="/" onClick={closeMobileMenu} className={({ isActive }) => `block py-2 ${isActive ? 'text-[#4F46E5] font-semibold' : 'text-[#111827] hover:text-[#4F46E5]'}`}>Trang chủ</NavLink>
+            <NavLink to="/" onClick={closeMobileMenu} className={getMobileNavLinkClass('/')}>Trang chủ</NavLink>
             <a onClick={closeMobileMenu} className="block text-[#111827] hover:text-[#4F46E5] py-2">Học bài</a>
             <div className="py-2">
               <div className={`text-xs mb-1 ${pathname.startsWith('/practice') || pathname.startsWith('/mock-exam') || pathname.startsWith('/exam-') ? 'text-[#4F46E5] font-semibold' : 'text-gray-500'}`}>Luyện đề</div>
               <Link to="/practice-jlpt" onClick={closeMobileMenu} className="block text-[#111827] hover:text-[#4F46E5] py-2">Luyện thi JLPT</Link>
               <Link to="/practice-eju" onClick={closeMobileMenu} className="block text-[#111827] hover:text-[#4F46E5] py-2">Luyện thi EJU</Link>
             </div>
-            <a onClick={closeMobileMenu} className="block text-[#111827] hover:text-[#4F46E5] py-2">Hồ sơ học viên</a>
-            <button className="w-full bg-[#4F46E5] hover:bg-[#4338CA] text-white px-4 py-2.5 rounded-lg font-medium transition-all">
-              Đăng nhập
-            </button>
+            
+            {/* Mobile: Hồ sơ và Đăng xuất */}
+            {isLoggedIn && (
+              <NavLink to="/Dashboard" onClick={closeMobileMenu} className={getMobileNavLinkClass('/Dashboard')}>Hồ sơ học viên</NavLink>
+            )}
+
+            {/* Mobile: Nút Đăng nhập/Đăng xuất */}
+            {isLoggedIn ? (
+              <button 
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-lg font-medium transition-all"
+              >
+                <LogOut size={20} className="mr-2"/> Đăng xuất ({userName})
+              </button>
+            ) : (
+              <Link 
+                to="/login"
+                onClick={closeMobileMenu} 
+                className="w-full block text-center bg-[#4F46E5] hover:bg-[#4338CA] text-white px-4 py-2.5 rounded-lg font-medium transition-all"
+              >
+                Đăng nhập
+              </Link>
+            )}
           </div>
         </div>
       )}

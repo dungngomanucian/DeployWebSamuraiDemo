@@ -1,6 +1,11 @@
 """
 API Views for Exam functionality
 """
+import jwt
+import os
+from config.supabase_client import supabase
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "b)-hy#9mu$@)@ahd5z+mp-t-4jsmkdq&gd#-@1+3g&4ss4e%_v")
+
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -10,8 +15,11 @@ from .serializers import (
     ExamSerializer, 
     FullExamDataSerializer,
     ExamResultSerializer,
-    StudentAnswerSerializer
+    StudentAnswerSerializer,
+    ExamSubmissionSerializer
+
 )
+
 
 
 @api_view(['GET'])
@@ -55,6 +63,77 @@ def get_full_exam_data(request, exam_id):
     if result['success']:
         # Return raw data without serialization to preserve nested structure
         return Response(result['data'], status=status.HTTP_200_OK)
+    return Response({'error': result['error']}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# Xu ly luu bai thi
+
+@api_view(['POST'])
+# Bỏ @permission_classes([IsAuthenticated])
+def submit_exam(request, exam_id):
+    """
+    Nhận bài nộp của học sinh, tính điểm, và lưu kết quả.
+    """
+    # 1. Lấy student_id từ token (đã được decode)
+    # Sử dụng logic giải mã token bằng tay (custom auth).
+    
+    # === BƯỚC A: XÁC THỰC TOKEN BẰNG TAY (Copy TestSessionAPIView) ===
+    auth_header = request.headers.get('Authorization', None)
+    
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return Response({"error": "Thiếu token xác thực."}, status=status.HTTP_401_UNAUTHORIZED)
+    
+    jwt_token = auth_header.split(' ')[1]
+    
+    try:
+        # Giải mã JWT
+        payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=["HS256"])
+        account_id = payload.get('id')
+
+        if not account_id:
+            return Response({"error": "Token không hợp lệ (thiếu ID)."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # === Dùng account_id để lấy student.id ===
+        student_res = supabase.table('students')\
+            .select('id')\
+            .eq('account_id', account_id)\
+            .single()\
+            .execute()
+
+        if not student_res.data:
+            return Response({"error": "Không tìm thấy hồ sơ học sinh cho tài khoản này."}, status=status.HTTP_404_NOT_FOUND)
+
+        student_id = student_res.data['id']
+    # =================================================
+
+    except jwt.ExpiredSignatureError:
+        return Response({"error": "Token đã hết hạn."}, status=status.HTTP_401_UNAUTHORIZED)
+    except jwt.InvalidTokenError:
+        return Response({"error": "Token không hợp lệ."}, status=status.HTTP_401_UNAUTHORIZED)
+    except Exception as e:
+        return Response({"error": f"Lỗi không xác định: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    # === KẾT THÚC BƯỚC XÁC THỰC ===
+    
+    # 2. Validate dữ liệu gửi lên (duration, answers)
+    serializer = ExamSubmissionSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+    validated_data = serializer.validated_data
+    
+    # 3. Gọi service để xử lý
+    result = ExamService.submit_full_exam(
+        student_id=student_id,
+        exam_id=exam_id,
+        duration=validated_data['duration'],
+        answers_list=validated_data['answers']
+    )
+    
+    if result['success']:
+        # Trả về kết quả (gồm id, điểm, ...)
+        serializer = ExamResultSerializer(result['data'])
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
     return Response({'error': result['error']}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

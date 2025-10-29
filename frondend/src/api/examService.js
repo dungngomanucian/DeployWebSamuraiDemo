@@ -82,3 +82,17 @@ export const getExamHistory = async (studentId) => {
 export const getExamStatistics = async (studentId) => {
   return apiRequest(`${EXAM_BASE_ENDPOINT}/statistics/${studentId}/`);
 };
+
+
+// === (new submit version)===
+/**
+ * Nộp bài thi
+ * @param {string} examId - ID của bài thi
+ * @param {object} submissionData - Dữ liệu nộp bài { duration: 123, answers: [...] }
+ */
+export const submitExam = async (examId, submissionData) => {
+  return apiRequest(`${EXAM_BASE_ENDPOINT}/exams/${examId}/submit/`, {
+    method: 'POST',
+    body: JSON.stringify(submissionData),
+  });
+};
