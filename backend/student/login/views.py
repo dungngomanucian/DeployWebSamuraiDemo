@@ -38,7 +38,6 @@ class RedisSessionManager:
         
         # 1. Nếu vượt quá giới hạn, loại bỏ session cũ nhất (FIFO)
         if len(session_list) >= self.MAX_DEVICES:
-            # removed_jti = session_list.pop(0) 
             # Bỏ print
             session_list.pop(0) 
 
@@ -64,8 +63,13 @@ class StudentLoginAPIView(APIView):
 
         email = serializer.validated_data['email']
         password = serializer.validated_data['password']
+        # Lấy trạng thái Ghi nhớ Đăng nhập (Mặc định là False nếu không có)
+        remember_me = serializer.validated_data.get('rememberMe', False) 
+        
         print(f"DEBUG: Email đang đăng nhập: {email}")
         print(f"DEBUG: Mật khẩu (KHÔNG NÊN IN TRONG MÔI TRƯỜNG PRODUCTION!): {password}")
+        print(f"DEBUG: Ghi nhớ Đăng nhập: {remember_me}") 
+        
         user_data = None
         
         try:
@@ -99,7 +103,7 @@ class StudentLoginAPIView(APIView):
             if not stored_password_hash:
                  # Trường hợp tài khoản tồn tại nhưng không có mật khẩu
                  return Response({"error": "Lỗi cấu hình tài khoản."}, 
-                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                                 status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
             # Sử dụng hàm check_password: so sánh mật khẩu thô và hash đã lưu
             # Trả về True nếu khớp, False nếu không khớp
@@ -116,13 +120,10 @@ class StudentLoginAPIView(APIView):
         # Bắt các lỗi API (mạng, cấu hình...)
         except Exception as e:
             # Supabase thường ném lỗi nếu email/mật khẩu sai hoặc người dùng không tồn tại
-            # Chúng ta sẽ kiểm tra chuỗi lỗi hoặc mã lỗi nếu có thể, nhưng để đơn giản, bắt lỗi chung 401.
-            # print(f"Lỗi kết nối hoặc API Supabase: {e}") 
-            # Kiểm tra lỗi chi tiết để đưa ra 401 nếu là lỗi xác thực
             error_message = str(e)
             if 'Invalid login credentials' in error_message or 'not confirmed' in error_message:
                  return Response({"error": "Email hoặc mật khẩu không chính xác."}, 
-                                status=status.HTTP_401_UNAUTHORIZED)
+                                 status=status.HTTP_401_UNAUTHORIZED)
             
             return Response({"error": "Lỗi hệ thống: Không thể kết nối dịch vụ xác thực."}, 
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -130,7 +131,17 @@ class StudentLoginAPIView(APIView):
         # --- 3. TẠO JWT VÀ QUẢN LÝ PHIÊN (SESSION) ---
         
         jti = str(uuid.uuid4()) # ID phiên duy nhất
-        access_token_lifetime = timedelta(hours=1)
+        
+        # LOGIC MỚI: Thiết lập thời gian hết hạn dựa trên remember_me
+        if remember_me:
+            # Ghi nhớ Đăng nhập: 7 ngày
+            access_token_lifetime = timedelta(days=7)
+            print("DEBUG: Thời gian sống token: 7 ngày (Ghi nhớ Đăng nhập)")
+        else:
+            # Phiên ngắn hạn (Không ghi nhớ): 24 giờ
+            access_token_lifetime = timedelta(hours=24) 
+            print("DEBUG: Thời gian sống token: 24 giờ (Phiên ngắn hạn)")
+        
         access_token_expires = datetime.now(timezone.utc) + access_token_lifetime
 
         payload = {

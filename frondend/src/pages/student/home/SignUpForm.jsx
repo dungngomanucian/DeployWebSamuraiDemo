@@ -1,7 +1,7 @@
-// SAMURAI_JAPANESE_APP - Frontend Registration Form
-// Đã cập nhật để tích hợp quy trình Xác thực Email qua API Backend
-
 import React, { useState, useCallback } from 'react';
+// >>> IMPORT HÀM SERVICE
+// Lưu ý: Các hàm service này cần được cài đặt trong môi trường của bạn
+import { startRegistrationVerification, verifyRegistrationCode } from '../../../api/RegisterService'; 
 // Cần cài đặt và import từ thư viện icon của bạn:
 import { 
     UserIcon, 
@@ -13,9 +13,6 @@ import {
     XMarkIcon,
     ArrowPathIcon, // Dùng cho nút gửi lại mã
 } from '@heroicons/react/24/outline'; 
-
-// URL của Backend API
-const API_BASE_URL = 'http://localhost:3001/api';
 
 // Định nghĩa giả lập cho Link
 const Link = ({ to, children, className, 'aria-label': ariaLabel }) => (
@@ -43,11 +40,9 @@ const SuccessModal = ({ message, onClose }) => {
     );
 };
 
-// --- Component Modal Xác thực Mã Code (ĐÃ CHUYỂN SANG 4 NÚT BẤM) ---
+// --- Component Modal Xác thực Mã Code (4 NÚT BẤM) ---
 const VerificationModal = ({ email, codes, onVerify, onResend, onCancel, isVerifying, isResending, externalError, clearExternalError }) => {
-    // Không còn state cho inputCode và localError
     
-    // Sử dụng externalError cho các lỗi từ API (mã sai, hết hạn)
     const displayError = externalError;
 
     // Hàm xử lý khi người dùng nhấp vào một mã
@@ -106,7 +101,7 @@ const VerificationModal = ({ email, codes, onVerify, onResend, onCancel, isVerif
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Đang xác thực mã code...
+                        Đang xác thực mã code và tạo tài khoản...
                     </div>
                 )}
 
@@ -120,11 +115,11 @@ const VerificationModal = ({ email, codes, onVerify, onResend, onCancel, isVerif
                     >
                         {isResending ? (
                              <div className="flex items-center justify-center">
-                                <svg className="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                <span>Đang gửi lại...</span>
+                                 <svg className="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                 </svg>
+                                 <span>Đang gửi lại...</span>
                              </div>
                         ) : (
                             <>
@@ -139,9 +134,8 @@ const VerificationModal = ({ email, codes, onVerify, onResend, onCancel, isVerif
     );
 };
 
-// --- Component InputField tùy chỉnh ---
-// (Giữ nguyên component InputField của bạn)
-const InputField = ({ label, placeholder, icon: Icon, type = 'text', name, value, onChange }) => {
+// --- Component InputField tùy chỉnh (Cập nhật để hiển thị lỗi) ---
+const InputField = ({ label, placeholder, icon: Icon, type = 'text', name, value, onChange, error }) => { // <--- Added 'error' prop
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const inputType = (type === 'password' && isPasswordVisible) ? 'text' : type;
 
@@ -150,7 +144,7 @@ const InputField = ({ label, placeholder, icon: Icon, type = 'text', name, value
         let targetName = e.target.name;
 
         if (type === 'tel') {
-            newValue = newValue.replace(/\D/g, '');
+            newValue = newValue.replace(/\D/g, ''); // Chỉ cho phép nhập số cho trường điện thoại
         }
 
         const filteredEvent = {
@@ -166,7 +160,7 @@ const InputField = ({ label, placeholder, icon: Icon, type = 'text', name, value
     };
 
     return (
-        <div className="w-full mb-6 group">
+        <div className="w-full mb-4 group"> {/* Giảm mb-6 xuống mb-4 để chừa không gian cho lỗi */}
             <label className="text-sm font-medium text-gray-600 block mb-1">
                 {label}
             </label>
@@ -181,8 +175,9 @@ const InputField = ({ label, placeholder, icon: Icon, type = 'text', name, value
                         w-full py-3 px-0 border-t-0 border-l-0 border-r-0 border-b-2
                         focus:outline-none focus:border-indigo-600 rounded-none bg-transparent
                         text-base pl-10 transition duration-200 placeholder:text-gray-400
+                        ${error ? 'border-red-500' : 'border-gray-200'}
                     `}
-                    style={{ boxShadow: 'none', borderColor: '#e5e7eb' }} 
+                    style={{ boxShadow: 'none' }} // Xóa borderColor cũ, dùng class Tailwind
                     aria-label={label}
                     autoComplete={name === 'password' || name === 'confirmPassword' ? 'new-password' : name}
                 />
@@ -207,13 +202,56 @@ const InputField = ({ label, placeholder, icon: Icon, type = 'text', name, value
                     </button>
                 )}
             </div>
+            {/* THẺ SPAN HIỂN THỊ LỖI CỤ THỂ CHO TỪNG TRƯỜNG */}
+            {error && (
+                <span className="mt-1 text-sm text-red-500 font-medium block">
+                    {error}
+                </span>
+            )}
         </div>
     );
 };
 
+// --- VALIDATION FUNCTION ---
+const validateForm = (data) => {
+    const errors = {};
+    
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
+    
+    const phoneRegex = /^0\d{9}$/;
 
-// --- Component Chính: App (Đổi tên thành RegistrationForm) ---
-const RegistrationForm = () => {
+    if (!data.name.trim()) {
+        errors.name = "Vui lòng nhập tên của bạn.";
+    }
+
+    if (!data.email.trim()) {
+        errors.email = "Vui lòng nhập địa chỉ email.";
+    } else if (!emailRegex.test(data.email)) {
+        errors.email = "Địa chỉ email không hợp lệ.";
+    }
+
+    if (!data.phone || !phoneRegex.test(data.phone)) {
+        errors.phone = "Số điện thoại phải nhập đủ 10 chữ số số 0 đầu tiên.";
+    }
+
+    if (!data.password) {
+         errors.password = "Vui lòng nhập mật khẩu.";
+    } else if (data.password.length < 8) {
+        errors.password = "Mật khẩu phải có ít nhất 8 ký tự.";
+    }
+
+    if (!data.confirmPassword) {
+        errors.confirmPassword = "Vui lòng nhập lại mật khẩu.";
+    } else if (data.password !== data.confirmPassword) {
+        errors.confirmPassword = "Mật khẩu xác nhận không khớp.";
+    }
+    
+    return errors;
+};
+
+
+// --- Component Chính: RegistrationForm ---
+const SignUpForm = () => {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
@@ -222,7 +260,11 @@ const RegistrationForm = () => {
         confirmPassword: '',
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [errorMessage, setErrorMessage] = useState('');
+    // Lưu lỗi chung (thường là lỗi API)
+    const [errorMessage, setErrorMessage] = useState(''); 
+    // LƯU LỖI VALIDATE CỤ THỂ CHO TỪNG TRƯỜNG
+    const [formErrors, setFormErrors] = useState({}); 
+    
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     
     // TRẠNG THÁI MỚI CHO XÁC THỰC
@@ -231,91 +273,106 @@ const RegistrationForm = () => {
     const [verificationCodes, setVerificationCodes] = useState([]);
     const [isVerifyingCode, setIsVerifyingCode] = useState(false);
     const [isResendingCode, setIsResendingCode] = useState(false);
+    
+    // Lưu tạm thời toàn bộ form data sau bước 1 để dùng cho bước 2
+    const [pendingFormData, setPendingFormData] = useState({});
 
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-        // Khi người dùng nhập lại vào form chính, xóa lỗi
+        
+        // Khi người dùng nhập lại vào form, xóa lỗi chung và lỗi cụ thể của trường đó
         setErrorMessage(''); 
+        if (formErrors[name]) {
+            setFormErrors(prev => ({ ...prev, [name]: '' }));
+        }
     };
 
     // --- Xử lý ĐĂNG KÝ (Bắt đầu Xác thực) ---
     const handleRegister = useCallback(async (e, shouldResend = false) => {
         e.preventDefault();
         setErrorMessage('');
+        setFormErrors({}); // Xóa lỗi form cũ
         
-        if (!shouldResend && formData.password !== formData.confirmPassword) {
-            setErrorMessage("Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại.");
-            return;
-        }
-
-        if (!formData.email || !formData.password || !formData.name) {
-             setErrorMessage("Vui lòng điền đầy đủ thông tin.");
-             return;
+        // 1. CHẠY VALIDATION CLIENT-SIDE
+        if (!shouldResend) {
+            const errors = validateForm(formData);
+            
+            if (Object.keys(errors).length > 0) {
+                setFormErrors(errors);
+                // Hiển thị lỗi chung (API Errors mới dùng errorMessage)
+                setErrorMessage("Vui lòng điền đầy đủ thông tin");
+                return;
+            }
         }
         
+        // 2. CHUẨN BỊ DỮ LIỆU VÀ GỌI API
         const setter = shouldResend ? setIsResendingCode : setIsSubmitting;
         setter(true);
+        
+        const submissionData = shouldResend ? pendingFormData : formData;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/register-start-verification`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData),
-            });
+            const { data, error } = await startRegistrationVerification(submissionData);
 
-            const data = await response.json();
-
-            if (data.success) {
+            if (error) {
+                // Thất bại: Hiển thị lỗi từ apiService (Đây là nơi errorMessage phát huy tác dụng chính)
+                setErrorMessage(error || "Đã xảy ra lỗi trong quá trình khởi tạo xác thực.");
+            } else if (data.success) {
                 // Thành công: Chuyển sang bước xác thực
-                setVerificationEmail(formData.email);
+                setVerificationEmail(submissionData.email);
                 setVerificationCodes(data.codes); // Lưu 4 mã code để hiển thị
+                setPendingFormData(submissionData); // LƯU DỮ LIỆU ĐỂ DÙNG TRONG BƯỚC XÁC THỰC
                 setIsVerificationStep(true);
 
                 if (shouldResend) {
-                    setErrorMessage('Đã gửi lại mã xác thực. Vui lòng kiểm tra email.');
+                    setErrorMessage('Đã gửi lại mã xác thực. Vui lòng kiểm tra email.'); 
                 }
             } else {
-                // Thất bại: Hiển thị lỗi API trả về
+                // Thất bại: Nếu server trả về success: false
                 setErrorMessage(data.message || "Đã xảy ra lỗi trong quá trình khởi tạo xác thực.");
             }
-        } catch (error) {
-            console.error('Lỗi khi gọi API khởi tạo xác thực:', error);
+        } catch (apiError) {
+            console.error('Lỗi khi gọi API khởi tạo xác thực:', apiError);
             setErrorMessage("Không thể kết nối đến máy chủ. Vui lòng thử lại sau.");
         } finally {
             setter(false);
         }
-    }, [formData]);
+    }, [formData, pendingFormData]);
 
     // --- Xử lý XÁC THỰC Mã Code ---
     const handleVerify = async (code) => {
         setIsVerifyingCode(true);
         setErrorMessage(''); // Xóa lỗi cũ trên VerificationModal
+        
+        // Tạo payload gửi toàn bộ dữ liệu form (đã lưu tạm) và mã xác thực
+        const verificationPayload = {
+            ...pendingFormData,
+            code: code,
+        };
 
         try {
-            const response = await fetch(`${API_BASE_URL}/verify-code`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: verificationEmail, code }),
-            });
+            const { data, error } = await verifyRegistrationCode(verificationPayload);
 
-            const data = await response.json();
-
-            if (data.success) {
+            if (error) {
+                // Mã xác thực sai hoặc lỗi tạo tài khoản (từ apiService)
+                setErrorMessage(error || "Xác thực thất bại hoặc có lỗi xảy ra khi tạo tài khoản.");
+            } else if (data.success) {
                 // Hoàn tất đăng ký thành công!
                 setIsVerificationStep(false);
                 setShowSuccessModal(true);
-                // Reset form
+                // Reset form và dữ liệu tạm
                 setFormData({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
+                setPendingFormData({});
                 setVerificationEmail('');
                 setVerificationCodes([]);
             } else {
-                // Mã xác thực sai hoặc hết hạn -> DÙNG setErrorMessage ĐỂ HIỂN THỊ TRÊN MODAL
-                setErrorMessage(data.message || "Mã xác thực không hợp lệ.");
+                // Thất bại: Nếu server trả về success: false
+                setErrorMessage(data.message || "Xác thực thất bại hoặc có lỗi xảy ra khi tạo tài khoản.");
             }
-        } catch (error) {
-            console.error('Lỗi khi gọi API xác thực:', error);
+        } catch (apiError) {
+            console.error('Lỗi khi gọi API xác thực và đăng ký:', apiError);
             setErrorMessage("Không thể kết nối đến máy chủ. Vui lòng thử lại sau.");
         } finally {
             setIsVerifyingCode(false);
@@ -329,13 +386,16 @@ const RegistrationForm = () => {
 
     // --- Xử lý Gửi lại Mã ---
     const handleResend = (e) => {
-        // Gọi lại handleRegister nhưng với cờ shouldResend = true
-        handleRegister(e, true);
+        e?.preventDefault(); 
+
+        const fakeEvent = { preventDefault: () => {} };
+        // Dùng formData đã lưu tạm trong pendingFormData để gửi lại yêu cầu xác thực
+        handleRegister(fakeEvent, true); 
     };
 
     // --- Hiển thị giao diện ---
     
-    // Nếu đang ở bước xác thực, hiển thị modal thay vì form đăng ký
+    // 1. Hiển thị Modal Xác thực
     if (isVerificationStep) {
         return (
             <VerificationModal 
@@ -343,7 +403,12 @@ const RegistrationForm = () => {
                 codes={verificationCodes}
                 onVerify={handleVerify}
                 onResend={handleResend}
-                onCancel={() => setIsVerificationStep(false)}
+                onCancel={() => {
+                    // Khi hủy bỏ, trở về form đăng ký và xóa dữ liệu tạm thời
+                    setIsVerificationStep(false);
+                    setPendingFormData({});
+                    setErrorMessage('');
+                }}
                 isVerifying={isVerifyingCode}
                 isResending={isResendingCode}
                 externalError={errorMessage} // Pass errorMessage từ form chính vào modal
@@ -352,7 +417,7 @@ const RegistrationForm = () => {
         );
     }
     
-    // Nếu không, hiển thị form đăng ký
+    // 2. Hiển thị Form Đăng ký
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans antialiased">
             {/* Success Modal */}
@@ -395,38 +460,42 @@ const RegistrationForm = () => {
                 <form onSubmit={handleRegister} className="space-y-2">
                     <InputField
                         label="Tên của bạn"
-                        placeholder="Ví dụ: Chu Thủy Vân"
+                        placeholder=" Samurai"
                         icon={UserIcon}
                         name="name"
                         value={formData.name}
                         onChange={handleChange}
+                        error={formErrors.name} 
                     />
                     <InputField
                         label="Địa chỉ Email"
-                        placeholder="Ví dụ: hotro@email.com"
+                        placeholder=" Samurai@gmail.com"
                         icon={EnvelopeIcon}
                         type="email"
                         name="email"
                         value={formData.email}
                         onChange={handleChange}
+                        error={formErrors.email} 
                     />
                     <InputField
                         label="Số điện thoại"
-                        placeholder="Chỉ nhập số, Ví dụ: 0912345678"
+                        placeholder="0912349264"
                         icon={PhoneIcon}
                         type="tel"
                         name="phone"
                         value={formData.phone}
                         onChange={handleChange}
+                        error={formErrors.phone} 
                     />
                     <InputField
                         label="Mật khẩu"
-                        placeholder="Ít nhất 6 ký tự"
+                        placeholder="Ít nhất 8 ký tự"
                         icon={LockClosedIcon}
                         type="password"
                         name="password"
                         value={formData.password}
                         onChange={handleChange}
+                        error={formErrors.password} 
                     />
                     <InputField
                         label="Nhập lại mật khẩu"
@@ -436,9 +505,10 @@ const RegistrationForm = () => {
                         name="confirmPassword"
                         value={formData.confirmPassword}
                         onChange={handleChange}
+                        error={formErrors.confirmPassword} 
                     />
                     
-                    {/* Hiển thị lỗi */}
+                    {/* Hiển thị lỗi chung (Chủ yếu dùng cho lỗi API hoặc thông báo tổng quát) */}
                     {errorMessage && (
                         <div className="text-red-500 text-sm font-medium mt-4 p-2 bg-red-50 rounded-lg border border-red-200">
                             {errorMessage}
@@ -470,7 +540,7 @@ const RegistrationForm = () => {
                                     Đang xử lý...
                                 </div>
                             ) : (
-                                "Đăng ký (Xác thực Email)"
+                                "Đăng ký"
                             )}
                         </button>
                     </div>
@@ -490,4 +560,4 @@ const RegistrationForm = () => {
     );
 };
 
-export default RegistrationForm;
+export default SignUpForm;

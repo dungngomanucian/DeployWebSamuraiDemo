@@ -6,10 +6,10 @@ from .views import StudentLoginAPIView, TestSessionAPIView
 app_name = 'accounts'
 
 urlpatterns = [
-    # Đường dẫn sẽ là: /api/login/
+    # Đường dẫn sẽ là: /api/v1/student/auth/login/
     path('userlogin/', StudentLoginAPIView.as_view(), name='student-login'),
     
-    # Đường dẫn sẽ là: /api/test-session/
+    # Đường dẫn sẽ là: /api/v1/student/auth/login/test-session/
     path('test-session/', TestSessionAPIView.as_view(), name='test-session'),
 ]
 

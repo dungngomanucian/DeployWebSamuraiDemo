@@ -1,25 +1,104 @@
-// src/pages/auth/StudentLogin.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom'; 
-import logo from '../../../assets/logo.png' 
-
-// >>> IMPORT SERVICE API MỚI
-import { userlogin } from "../../../api/authService";
+// >>> API THẬT: ĐÃ BỎ COMMENT, SỬ DỤNG HÀM userlogin TỪ ĐÂY
+import { userlogin } from "../../../api/authService"; 
 
 // Import icons
-import { Mail, Lock, X, Eye, EyeOff, CheckSquare, CheckCircle, Loader2, AlertTriangle } from 'lucide-react'; 
+import { Mail, Lock, X, Eye, EyeOff, CheckSquare, CheckCircle, Loader2, AlertTriangle, Info } from 'lucide-react'; 
+import logo from '../../../assets/logo.png' 
 
-// >>> DÒNG CẤU HÌNH API CŨ ĐÃ BỊ XÓA (để dùng apiConfig)
-// const API_BASE_URL = 'http://127.0.0.1:8000/api/login/'; 
+// >>> ĐỊNH NGHĨA SERVICE DÙNG API THẬT
+const loginService = userlogin;
+
+// >>> ĐỊNH NGHĨA REGEX CHO EMAIL
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 
-// --- [InputField Component: GIỮ NGUYÊN] ---
-const InputField = ({ label, placeholder, icon : Icon , type = 'text', name, value, onChange }) => {
+// --- [Toast Component] ---
+const Toast = ({ id, message, type, onClose }) => {
+    const iconMap = {
+        success: { icon: CheckCircle, class: 'bg-green-500', title: 'Thành công' },
+        error: { icon: AlertTriangle, class: 'bg-red-500', title: 'Thất bại' },
+        warning: { icon: Info, class: 'bg-yellow-500', title: 'Cảnh báo' },
+    };
+    const { icon: Icon, class: bgColorClass, title } = iconMap[type] || iconMap.info;
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            onClose(id);
+        }, 5000); // Tự động đóng sau 5 giây
+
+        return () => clearTimeout(timer);
+    }, [id, onClose]);
+
+    return (
+        <div 
+            className={`
+                flex items-start p-4 mb-3 w-full max-w-sm 
+                rounded-lg shadow-xl text-white 
+                transform transition-all duration-300 ease-out
+                ${bgColorClass}
+                animate-toast-in
+            `}
+            role="alert"
+        >
+            <Icon size={24} className="flex-shrink-0 mt-0.5" />
+            <div className="ml-3 text-sm font-medium flex-grow">
+                <p className="font-bold">{title}</p>
+                <p>{message}</p>
+            </div>
+            <button 
+                onClick={() => onClose(id)} 
+                className="ml-auto -mx-1.5 -my-1.5 p-1.5 rounded-lg text-white hover:bg-opacity-80 transition"
+                aria-label="Đóng thông báo"
+            >
+                <X size={20} />
+            </button>
+        </div>
+    );
+};
+
+// --- [ToastContainer Component] ---
+const ToastContainer = ({ toasts, removeToast }) => {
+    return (
+        <>
+            <style>{`
+                /* Custom Keyframes cho Toast Animation */
+                @keyframes slideInRight {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                .animate-toast-in {
+                    animation: slideInRight 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+                }
+            `}</style>
+            <div className="fixed top-5 right-5 z-50 pointer-events-none space-y-3">
+                {toasts.map(toast => (
+                    <div key={toast.id} className="pointer-events-auto">
+                        <Toast 
+                            id={toast.id} 
+                            message={toast.message} 
+                            type={toast.type} 
+                            onClose={removeToast} 
+                        />
+                    </div>
+                ))}
+            </div>
+        </>
+    );
+};
+
+
+// --- [InputField Component: ĐÃ CHỈNH SỬA ĐỂ HIỂN THỊ LỖI STRING] ---
+// isInvalid có thể là boolean (cho lỗi mặc định) hoặc string (cho lỗi cụ thể)
+const InputField = ({ label, placeholder, icon : Icon , type = 'text', name, value, onChange, isRequired, isInvalid }) => {
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const inputType = (type === 'password' && isPasswordVisible) ? 'text' : type;
+    const _unused = Icon;
+
 
     const handleInputChange = (e) => {
-        const { name, value, type, checked } = e.target;
+        const { name, value, type } = e.target;
         let newValue = value;
         
         if (type === 'tel') {
@@ -38,10 +117,24 @@ const InputField = ({ label, placeholder, icon : Icon , type = 'text', name, val
         onChange(filteredEvent);
     };
 
+    // Kiểm tra xem có lỗi không (isInvalid có thể là true hoặc một chuỗi lỗi)
+    const hasError = isInvalid && (typeof isInvalid === 'boolean' || typeof isInvalid === 'string');
+
+    const inputClasses = `
+        w-full py-3 pr-4 pl-10 
+        border-t-0 border-l-0 border-r-0 border-b-2 
+        ${hasError ? 'border-red-500 focus:border-red-600' : 'border-gray-300 focus:border-indigo-600'}
+        rounded-none 
+        focus:outline-none 
+        text-lg transition duration-300 ease-in-out
+        placeholder:text-gray-400 bg-transparent
+    `;
+    const iconClass = `absolute left-0 top-1/2 transform -translate-y-1/2 transition duration-300 ${hasError ? 'text-red-500' : 'text-gray-400 group-focus-within:text-indigo-600'}`;
+
     return (
         <div className="w-full mb-8 group">
             <label className="text-base font-medium text-gray-700 block mb-2">
-                {label}
+                {label} {isRequired && <span className="text-red-500">*</span>}
             </label>
             <div className="relative">
                 <input
@@ -50,18 +143,16 @@ const InputField = ({ label, placeholder, icon : Icon , type = 'text', name, val
                     placeholder={placeholder}
                     value={value}
                     onChange={handleInputChange}
-                    className={`
-                        w-full py-3 pr-4 pl-10 
-                        border-t-0 border-l-0 border-r-0 border-b-2 border-gray-300 rounded-none 
-                        focus:outline-none focus:border-indigo-600 
-                        text-lg transition duration-300 ease-in-out
-                        placeholder:text-gray-400 bg-transparent
-                    `}
+                    className={inputClasses}
                     style={{ boxShadow: 'none' }}
                     aria-label={label}
+                    aria-required={isRequired}
+                    
+
+                    
                 />
                 
-                <span className="absolute left-0 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition duration-300">
+                <span className={iconClass}>
                     <Icon size={20} />
                 </span>
 
@@ -71,47 +162,23 @@ const InputField = ({ label, placeholder, icon : Icon , type = 'text', name, val
                         className="absolute right-0 top-1/2 transform -translate-y-1/2 text-gray-400 p-1 hover:text-indigo-600 transition duration-150"
                         onClick={() => setIsPasswordVisible(!isPasswordVisible)}
                         aria-label={isPasswordVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                        
                     >
                         {isPasswordVisible ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
                 )}
             </div>
+            {/* HIỂN THỊ LỖI BẰNG THẺ SPAN */}
+            {hasError && (
+                <span className="text-red-500 text-sm mt-1 block">
+                    {/* Nếu lỗi là chuỗi, hiển thị chuỗi lỗi; nếu là true, hiển thị lỗi mặc định */}
+                    {typeof isInvalid === 'string' ? isInvalid : 'Trường này không được để trống.'}
+                </span>
+            )}
         </div>
     );
 };
 
-
-// --- [CustomModal Component: GIỮ NGUYÊN] ---
-const CustomModal = ({ message, onClose, isSuccess = true, navigateForSuccess }) => {
-    const Icon = isSuccess ? CheckCircle : AlertTriangle;
-    const colorClass = isSuccess ? 'text-green-500 bg-green-500 hover:bg-green-600' : 'text-red-500 bg-red-500 hover:bg-red-600';
-    const title = isSuccess ? 'Thành công!' : 'Thất bại!';
-
-    const handleClose = () => {
-        onClose();
-        if (isSuccess && navigateForSuccess) {
-            navigateForSuccess();
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm transition-opacity duration-300 animate-fade-in">
-            <div className="bg-white p-8 rounded-xl shadow-2xl max-w-sm w-full transform scale-95 transition-all duration-300 animate-scale-up">
-                <div className="flex flex-col items-center">
-                    <Icon size={64} className={`${colorClass.split(' ')[0]} mb-4 animate-bounce-in`} />
-                    <h3 className="text-2xl font-bold text-gray-800 mb-2">{title}</h3>
-                    <p className="text-gray-600 text-center mb-6">{message}</p>
-                    <button
-                        onClick={handleClose} 
-                        className={`w-full py-3 text-lg font-semibold text-white rounded-lg transition duration-200 shadow-md transform hover:scale-[1.02] ${colorClass.split(' ').slice(1).join(' ')}`}
-                    >
-                        Đã hiểu
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
 
 // Component chính StudentLogin
 const StudentLogin = () => {
@@ -123,13 +190,32 @@ const StudentLogin = () => {
         rememberMe: false, 
     });
     
-    const [modalState, setModalState] = useState({
-        show: false,
-        message: '',
-        isSuccess: true,
-    });
-
+    // errors lưu trữ thông báo lỗi (string) hoặc boolean (true/false)
+    const [errors, setErrors] = useState({});
     const [isLoading, setIsLoading] = useState(false);
+    const [toasts, setToasts] = useState([]);
+
+    // --- 1. KIỂM TRA JWT VÀ CHUYỂN HƯỚNG KHI LOAD TRANG ---
+    useEffect(() => {
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+            // Nếu có token, chuyển hướng về trang chủ
+            navigate('/');
+        }
+    }, [navigate]);
+    // ------------------------------------------------------
+
+
+    // --- Toast Management ---
+    const addToast = useCallback((message, type = 'info') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+    }, []);
+
+    const removeToast = useCallback((id) => {
+        setToasts(prev => prev.filter(toast => toast.id !== id));
+    }, []);
+    // -------------------------
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -137,100 +223,95 @@ const StudentLogin = () => {
             ...prev, 
             [name]: type === 'checkbox' ? checked : value 
         }));
+        // Xóa lỗi khi người dùng bắt đầu nhập
+        if (errors[name]) {
+            setErrors(prev => ({ ...prev, [name]: undefined }));
+        }
+    };
+
+    const validateForm = () => {
+        const newErrors = {};
+        let isValid = true;
+
+        // 2. KIỂM TRA ĐỊNH DẠNG EMAIL
+        if (!formData.email.trim()) {
+            // Lỗi rỗng
+            newErrors.email = 'Email không được để trống.';
+            isValid = false;
+        } else if (!EMAIL_REGEX.test(formData.email.trim())) { 
+            // Lỗi định dạng Email
+            newErrors.email = 'Định dạng Email không hợp lệ. Vui lòng kiểm tra lại.'; 
+            isValid = false;
+        }
+        
+        // Kiểm tra mật khẩu rỗng (sử dụng boolean true)
+        if (!formData.password.trim()) {
+            newErrors.password = true;
+            isValid = false;
+        }
+
+        setErrors(newErrors);
+        return isValid;
     };
 
     const handleLogin = async (e) => {
         e.preventDefault();
         if (isLoading) return;
 
+        // 1. Kiểm tra validation
+        if (!validateForm()) {
+            addToast("Vui lòng kiểm tra lại Email và Mật khẩu.", "warning");
+            return;
+        }
+
         setIsLoading(true);
-        setModalState({ show: false, message: '', isSuccess: true });
         
         try {
-            // >>> GỌI HÀM SERVICE API MỚI
-            const { data, error } = await userlogin(
+            // 2. GỌI HÀM SERVICE API THẬT
+            const { data, error } = await loginService(
                 formData.email, 
                 formData.password, 
                 formData.rememberMe
             );
 
             if (error) {
-                // Đăng nhập thất bại (Lỗi HTTP hoặc Lỗi mạng)
-                const errorMessage = error.includes("HTTP Error") || error.includes("Timeout") 
-                    ? "Lỗi kết nối máy chủ. Vui lòng kiểm tra địa chỉ API." 
-                    : error; // Hiển thị lỗi chi tiết từ backend
+                // Đăng nhập thất bại
+                const errorMessage = error.includes("HTTP") || error.includes("Timeout") 
+                    ? "Lỗi kết nối máy chủ. Vui lòng kiểm tra địa chỉ API hoặc kết nối mạng." 
+                    : error; // Hiển thị lỗi chi tiết
 
-                setModalState({
-                    show: true,
-                    message: errorMessage,
-                    isSuccess: false,
-                });
+                addToast(errorMessage, "error");
                 
             } else {
                 // Đăng nhập thành công
-                const token = data.token; // Giả định server trả về { token: '...' }
+                const token = data.token; 
                 
                 // >>> LƯU TRỮ JWT
                 if (token) {
                     localStorage.setItem('auth_token', token); 
                 }
 
-                setModalState({
-                    show: true,
-                    message: `Bạn đã đăng nhập thành công!`,
-                    isSuccess: true,
-                });
+                addToast(`Chào mừng trở lại! Đăng nhập thành công.`, "success");
+                
+                // Chuyển hướng sau khi hiển thị toast thành công (ví dụ sau 1 giây)
+                setTimeout(() => {
+                    navigate('/'); 
+                }, 1000);
             }
             
         } catch (runtimeError) {
             console.error("Lỗi ngoài luồng (Network/Parsing):", runtimeError);
-            setModalState({
-                show: true,
-                message: "Lỗi không xác định khi đăng nhập. Vui lòng thử lại.",
-                isSuccess: false,
-            });
+            addToast("Lỗi không xác định khi đăng nhập. Vui lòng thử lại.", "error");
         } finally {
             setIsLoading(false);
         }
     };
-    
-    const handleCloseModal = () => {
-        setModalState({ show: false, message: '', isSuccess: true });
-    };
-
-    const navigateDashboard = () => {
-        navigate('/');
-    };
 
     return (
         <>
-            {/* Thêm custom CSS animation cho Modal */}
-            <style>
-                {/* ... (Giữ nguyên CSS) ... */}
-                {`
-                    @keyframes fadeIn {
-                      from { opacity: 0; }
-                      to { opacity: 1; }
-                    }
-                    @keyframes scaleUp {
-                      from { transform: scale(0.9); opacity: 0; }
-                      to { transform: scale(1); opacity: 1; }
-                    }
-                    .animate-fade-in {
-                      animation: fadeIn 0.3s ease-out forwards;
-                    }
-                    .animate-scale-up {
-                      animation: scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-                    }
-                    .shadow-3xl {
-                      box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-                    }
-                    .hover\\:shadow-4xl:hover {
-                      box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.25);
-                    }
-                `}
-            </style>
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+            <ToastContainer toasts={toasts} removeToast={removeToast} />
+
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans">
                 
                 <div className="w-full max-w-md bg-white p-8 md:p-10 rounded-2xl shadow-3xl border border-gray-200 transition duration-500 relative transform hover:shadow-4xl">
                     
@@ -243,8 +324,6 @@ const StudentLogin = () => {
                     </Link>
 
                     <div className="mb-10"> 
-                        
-                        
                         <img 
                             src={logo} 
                             alt="Samurai Japanese App Logo" 
@@ -273,7 +352,7 @@ const StudentLogin = () => {
 
 
                     {/* Form nhập liệu */}
-                    <form onSubmit={handleLogin} className="space-y-4"> 
+                    <form onSubmit={handleLogin} className="space-y-4" noValidate> 
                         {/* Input 1: Email */}
                         <InputField
                             label="Nhập Email của bạn" 
@@ -283,6 +362,9 @@ const StudentLogin = () => {
                             name="email"
                             value={formData.email}
                             onChange={handleChange}
+                            isRequired={true}
+                            // errors.email là string (lỗi định dạng/rỗng) hoặc undefined
+                            isInvalid={errors.email}
                         />
                         {/* Input 2: Mật khẩu */}
                         <InputField
@@ -293,6 +375,9 @@ const StudentLogin = () => {
                             name="password"
                             value={formData.password}
                             onChange={handleChange}
+                            isRequired={true}
+                            // errors.password là boolean true/false
+                            isInvalid={errors.password}
                         />
                         
                         {/* Ghi nhớ đăng nhập và Quên mật khẩu */}
@@ -341,7 +426,7 @@ const StudentLogin = () => {
                                 {isLoading ? (
                                     <>
                                         <Loader2 size={24} className="animate-spin mr-3" />
-                                        <span>Đang tải...</span>
+                                        <span>Đang xử lý...</span>
                                     </>
                                 ) : (
                                     'Đăng nhập'
@@ -352,18 +437,10 @@ const StudentLogin = () => {
                     
                 </div>
                 
-                {/* Hiển thị Modal thông báo */}
-                {modalState.show && (
-                    <CustomModal 
-                        message={modalState.message}
-                        isSuccess={modalState.isSuccess}
-                        onClose={handleCloseModal} 
-                        navigateForSuccess={navigateDashboard} 
-                    />
-                )}
             </div>
         </>
     );
 };
+
 
 export default StudentLogin;
