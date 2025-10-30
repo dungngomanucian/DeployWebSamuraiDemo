@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { adminLogin } from '../../../api/admin/authAdminService'; 
-import { useAdminAuth } from '../../../context/AdminAuthContext'; // <-- Import hook
+import { useAdminAuth } from '../../../context/AdminAuthContext'; 
 import logo from '../../../assets/logo.png'; 
 
 export default function AdminLoginPage() {
   const navigate = useNavigate();
-  const { login } = useAdminAuth(); // <-- Lấy hàm login từ context
+  const { login } = useAdminAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,31 +16,35 @@ export default function AdminLoginPage() {
     
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError(''); // Xoá lỗi cũ
     console.log('Tài khoản admin gửi lên:',{ email, password });
     try {
       const { data, error: apiError } = await adminLogin(email, password);
       
       if (apiError) {
-        throw new Error(apiError.detail || apiError.non_field_errors?.join(', ') || apiError || 'Đăng nhập thất bại.');
+        // Nếu API trả về lỗi (sai pass, sai email)
+        setError(apiError.detail || 'Sai mật khẩu hoặc email');
+        return; // Dừng hàm
       }
 
       if (data && data.access && data.refresh) {
-        // Lưu token vào localStorage VÀ cập nhật context
-        login(data.access, data.refresh); // <-- Gọi hàm login từ context
-
+        // Thành công
+        login(data.access, data.refresh); 
         navigate('/admin/dashboard'); 
       } else {
-        throw new Error('Không nhận được token từ server.');
+        // Không có data mà cũng không báo lỗi (ít xảy ra)
+        setError('Không nhận được token từ server.');
       }
 
     } catch (err) {
+      // Lỗi mạng hoặc lỗi code
       setError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
       console.error('Admin login error:', err);
     } finally {
-      setLoading(false);
+      setLoading(false); // Luôn tắt loading
     }
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-base-200">
@@ -51,46 +55,54 @@ export default function AdminLoginPage() {
         <div className="card-body">
           <h2 className="card-title justify-center text-2xl mb-4">Admin Login</h2>
           
+          {/* --- SỬA LỖI CĂN CHỈNH TẠI ĐÂY --- */}
           {error && (
             <div className="alert alert-error shadow-lg mb-4">
-              <div>
-                <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                <span>{error}</span>
-              </div>
+              {/* Đã xoá thẻ <div> thừa bọc ngoài SVG và span */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <span>{error}</span>
             </div>
           )}
+          {/* --- KẾT THÚC SỬA --- */}
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="space-y-4"> 
+            
+            {/* Hàng Email */}
             <div className="form-control">
-              <label className="label">
+              <label className="label" htmlFor="email-input">
                 <span className="label-text">Email</span>
               </label>
               <input
+                id="email-input"
                 type="email"
                 placeholder="email@example.com"
-                className="input input-bordered"
+                className="input input-bordered w-full"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
               />
             </div>
-            <div className="form-control mt-4">
-              <label className="label">
+
+            {/* Hàng Password */}
+            <div className="form-control">
+              <label className="label" htmlFor="password-input">
                 <span className="label-text">Password</span>
               </label>
               <input
+                id="password-input"
                 type="password"
                 placeholder="********"
-                className="input input-bordered"
+                className="input input-bordered w-full"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={loading}
               />
-              {/* Optional: Add forgot password link here */}
             </div>
-            <div className="form-control mt-6">
+            
+            {/* Nút căn giữa */}
+            <div className="mt-6 flex justify-center"> 
               <button
                 type="submit"
                 className={`btn btn-primary ${loading ? 'loading' : ''}`}
@@ -100,6 +112,7 @@ export default function AdminLoginPage() {
               </button>
             </div>
           </form>
+
         </div>
       </div>
     </div>
