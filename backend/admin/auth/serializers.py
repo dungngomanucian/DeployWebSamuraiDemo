@@ -59,7 +59,7 @@ class AdminTokenObtainPairSerializer(TokenObtainPairSerializer):
         admin_user = AuthAdminService.authenticate_admin(email=identifier, password=password) 
 
         if not admin_user:
-            raise serializers.ValidationError('No active admin found with the given credentials.')
+            raise serializers.ValidationError('Sai mật khẩu hoặc email')
 
         # --- Quan trọng: Chuẩn bị dữ liệu cho get_token ---
         # Hàm get_token() mặc định cần một object hoặc dict có key 'id' (hoặc key được cấu hình)

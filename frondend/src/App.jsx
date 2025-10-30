@@ -54,7 +54,7 @@ export default function App() {
           <Route element={<ProtectedAdminRoute />}>
             <Route path="/admin" element={<AdminLayout />}>
               {/* Tự động chuyển /admin đến /admin/dashboard */}
-              <Route index element={<Navigate to="/admin/dashboard" />} />
+              
               <Route path="dashboard" element={<Dashboard />} />
 
               <Route path="students" element={<ManageStudents />} />

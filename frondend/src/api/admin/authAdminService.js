@@ -31,19 +31,19 @@ export const adminLogin = async (email, password) => {
  * cân nhắc dùng instance axios cơ bản thay vì axiosAdmin nếu có vấn đề.
  */
 export const adminRefreshToken = async (refreshToken) => {
-   try {
-     // Tạm thời vẫn dùng axiosAdmin, nhưng cần theo dõi lỗi vòng lặp
-     const response = await axiosAdmin.post(`${AUTH_ADMIN_BASE_ENDPOINT}/token/refresh/`, { 
-       refresh: refreshToken 
-     });
-     // Chỉ cần trả về access token mới
-     return { data: response.data, error: null }; 
-   } catch (error) {
-     console.error(`API Lỗi [adminRefreshToken]:`, error.response?.data || error.message);
-     return { data: null, error: error.response?.data?.detail || error.message || 'Làm mới token thất bại' };
-   }
+  //  try {
+  //    // Tạm thời vẫn dùng axiosAdmin, nhưng cần theo dõi lỗi vòng lặp
+  //    const response = await axiosAdmin.post(`${AUTH_ADMIN_BASE_ENDPOINT}/token/refresh/`, { 
+  //      refresh: refreshToken 
+  //    });
+  //    // Chỉ cần trả về access token mới
+  //    return { data: response.data, error: null }; 
+  //  } catch (error) {
+  //    console.error(`API Lỗi [adminRefreshToken]:`, error.response?.data || error.message);
+  //    return { data: null, error: error.response?.data?.detail || error.message || 'Làm mới token thất bại' };
+  //  }
 
-   /* --- Cách an toàn hơn để tránh vòng lặp interceptor ---
+   
    try {
      // Dùng axios cơ bản, không qua interceptor
      const response = await axios.post(`${API_BASE_URL}${AUTH_ADMIN_BASE_ENDPOINT}/token/refresh/`, { 
@@ -56,5 +56,5 @@ export const adminRefreshToken = async (refreshToken) => {
      console.error(`API Lỗi [adminRefreshToken]:`, error.response?.data || error.message);
      return { data: null, error: error.response?.data?.detail || error.message || 'Làm mới token thất bại' };
    }
-   --- Hết cách an toàn hơn --- */
+
 };
