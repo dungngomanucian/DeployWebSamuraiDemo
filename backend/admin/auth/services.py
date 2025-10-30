@@ -1,14 +1,14 @@
 # auth_admin/services.py
 from config.supabase_client import supabase # Import supabase instance
 from typing import Dict, Optional, Any
-import bcrypt
-# (Rất quan trọng) Import hàm kiểm tra password hash
-# Nếu bạn dùng hệ thống hash của Django:
-# from django.contrib.auth.hashers import check_password
-# Nếu bạn dùng thư viện khác (ví dụ bcrypt):
-# import bcrypt
+# (QUAN TRỌNG) Import Argon2
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError # Lỗi khi xác thực sai
 
 ADMIN_TABLE = 'admins' # Tên bảng admin
+
+# Tạo một instance của PasswordHasher để sử dụng lại
+ph = PasswordHasher()
 
 class AuthAdminService:
     """Service layer for handling admin authentication"""
@@ -47,22 +47,31 @@ class AuthAdminService:
                  print(f"AuthAdminService: No password found for admin {email}")
                  return None # Lỗi: admin không có password trong DB?
 
-            # --- PHẦN KIỂM TRA PASSWORD ---
-            # IMPORTANT: Thay thế bằng cách kiểm tra hash thực tế của bạn
-            # Ví dụ nếu dùng Django hasher:
-            # is_password_valid = check_password(password, stored_password_hash)
-
-            # Ví dụ nếu dùng bcrypt:
-            is_password_valid = bcrypt.checkpw(password.encode('utf-8'), stored_password_hash.encode('utf-8'))
+            # --- PHẦN KIỂM TRA PASSWORD (SỬ DỤNG ARGON2) ---
+            is_password_valid = False # Đặt mặc định là không hợp lệ
+            try:
+                # ph.verify() nhận vào hash (string) và password (string)
+                # Nếu khớp: hàm chạy thành công
+                # Nếu không khớp: ném ra lỗi VerifyMismatchError
+                ph.verify(stored_password_hash, password)
+                
+                # Nếu không có lỗi, mật khẩu là đúng
+                is_password_valid = True 
+                
+            except VerifyMismatchError:
+                # Lỗi này có nghĩa là password KHÔNG khớp
+                is_password_valid = False
+            except Exception as e:
+                # Bắt các lỗi Argon2 khác (ví dụ: hash không hợp lệ)
+                print(f"AuthAdminService: Argon2 verification error for {email}: {e}")
+                is_password_valid = False
             
-            # Tạm thời dùng so sánh chuỗi (CHỈ DÙNG ĐỂ TEST, RẤT KHÔNG AN TOÀN)
-            # is_password_valid = (password == stored_password_hash) 
             print(f"AuthAdminService: Password check for {email}. Valid: {is_password_valid}")
             # --- HẾT PHẦN KIỂM TRA PASSWORD ---
 
             if is_password_valid:
-                # Xác thực thành công, trả về thông tin admin (có thể bỏ password hash đi)
-                # admin_data.pop('password', None) # Bỏ password trước khi trả về
+                # Xác thực thành công, trả về thông tin admin
+                admin_data.pop('password', None) 
                 return admin_data
             else:
                 # Sai password
@@ -70,4 +79,4 @@ class AuthAdminService:
 
         except Exception as e:
             print(f"AuthAdminService: Error during authentication for {email}: {e}")
-            return None # Trả về None nếu có lỗi xảy ra
+            return None # Trả về None nếu có lỗi chung xảy ra
