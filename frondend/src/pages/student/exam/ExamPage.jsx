@@ -505,7 +505,43 @@ export default function ExamPage() {
   const progressPercentage = totalTime > 0 ? ((totalTime - timeRemaining) / totalTime) * 100 : 0;
 
   // (question buttons are rendered via shared component QuestionButtons)
-
+  const renderPassageQuestionPopover = (q) => {
+    return (
+      <div className="absolute z-50 left-0 top-0 translate-y-9">
+        <div className="shadow-lg rounded bg-white max-w-[85vw] w-[240px]">
+          <div className="grid grid-cols-1">
+            {(() => {
+              const byOrder = new Map();
+              (q.answers || []).forEach((a) => {
+                const key = String(a.show_order);
+                if (!byOrder.has(key)) byOrder.set(key, a);
+              });
+              const normalizedAnswers = Array.from(byOrder.values()).sort(
+                (a, b) => Number(a.show_order) - Number(b.show_order)
+              );
+              return normalizedAnswers.map((ans) => {
+                const selected = isAnswerSelected(q.id, ans.id, q.question_type_id);
+                return (
+                  <button
+                    key={ans.id}
+                    type="button"
+                    onClick={() => handleAnswerSelect(q.id, ans.id, q.question_type_id)}
+                    className={`text-left w-full px-3 py-2.5 transition-colors ${selected ? 'bg-[#DDE5FF]' : 'bg-white hover:bg-gray-50'}`}
+                  >
+                    <div className="flex items-start text-gray-900 leading-6">
+                      <span className="whitespace-pre-wrap break-words">
+                        {formatAnswerText(ans?.answer_text || ans?.content || '', q?.question_text || '', q?.questionTypeId || q?.question_type_id)}
+                      </span>
+                    </div>
+                  </button>
+                );
+              });
+            })()}
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   // Handle section tab click
   const handleSectionChange = (sectionType, questionTypeId = null) => {
