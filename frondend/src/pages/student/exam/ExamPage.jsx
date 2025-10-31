@@ -5,6 +5,8 @@ import Footer from "../../../components/Footer";
 import { getFullExamData, submitExam } from "../../../api/examService";
 import ExamCertificateOverlay from "../../../components/JLPTCertificateOverlay";
 import toast, { Toaster } from "react-hot-toast";
+import QuestionButtons from "../../../components/Exam/QuestionButtons";
+import TimeUpModal from "../../../components/Exam/TimeUpModal";
 import { Bold } from "lucide-react";
 
 export default function ExamPage() {
@@ -35,10 +37,13 @@ export default function ExamPage() {
   const questionTimerRef = useRef(null); // Separate ref for question timer
   const toastShownRef = useRef({}); // Use ref to track toast shown to avoid stale closures
   const tabContainerRefs = useRef({}); // Refs for tab containers per section
+  const userSelectedSectionRef = useRef(false); // Track if user has manually selected a section
+  const activeSectionRef = useRef(null); // Ref to track activeSection to prevent unwanted resets
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCertificate, setShowCertificate] = useState(false);
   const [finalResultData, setFinalResultData] = useState(null);
+  const [showReadingTimeUpModal, setShowReadingTimeUpModal] = useState(false);
 
   // Load exam data
   useEffect(() => {
@@ -60,7 +65,11 @@ export default function ExamPage() {
 
 
       setExamData(data);
-      const totalSeconds = data.exam.total_duration * 60;
+      // Calculate total exam time from the first two jlpt_exam_sections durations (minutes)
+      const totalMinutesFromSections = Array.isArray(data?.sections)
+        ? data.sections.slice(0, 2).reduce((sum, section) => sum + (Number(section?.duration) || 0), 0)
+        : 0;
+      const totalSeconds = totalMinutesFromSections * 60;
       setTimeRemaining(totalSeconds);
       setTotalTime(totalSeconds);
       
@@ -94,10 +103,12 @@ export default function ExamPage() {
       
       setGroupedQuestions(grouped);
       
-      // Set active section and question type to first ones
-      if (data.sections && data.sections.length > 0) {
-        setActiveSection(data.sections[0].type);
-        const firstQuestionType = data.sections[0].question_types[0];
+      // Set active section and question type to first ones (only if user hasn't selected one yet)
+      if (data.sections && data.sections.length > 0 && !userSelectedSectionRef.current) {
+        const firstSectionType = data.sections[0].type;
+        setActiveSection(firstSectionType);
+        activeSectionRef.current = firstSectionType;
+        const firstQuestionType = data.sections[0].question_types?.[0];
         if (firstQuestionType) {
           setActiveQuestionType(firstQuestionType.id);
         }
@@ -109,7 +120,7 @@ export default function ExamPage() {
     loadExamData();
   }, [examId, navigate]);
 
-  // Timer countdown
+  // Timer countdown (global - first two sections)
   useEffect(() => {
     if (!examData || timeRemaining <= 0) return;
 
@@ -117,7 +128,8 @@ export default function ExamPage() {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
           clearInterval(timerRef.current);
-          handleSubmitExam();
+          // Show modal when global time is up (instead of auto-submitting)
+          setShowReadingTimeUpModal(true);
           return 0;
         }
         return prev - 1;
@@ -128,27 +140,27 @@ export default function ExamPage() {
   }, [examData, timeRemaining]);
 
   // Calculate bar widths when expanded tab changes
-    useEffect(() => {
-      const expandedTabs = Object.values(expandedQuestionType).filter(Boolean);
-      if (expandedTabs.length > 0) {
-        setTimeout(() => {
-          expandedTabs.forEach(qtId => {
-            const container = document.getElementById(`question-buttons-${qtId}`);
-            if (container) {
-              const buttons = container.querySelectorAll('button');
-              if (buttons.length > 0) {
-                const firstButton = buttons[0];
-                const lastButton = buttons[buttons.length - 1];
-                const firstRect = firstButton.getBoundingClientRect();
-                const lastRect = lastButton.getBoundingClientRect();
-                const width = lastRect.right - firstRect.left;
-                setBarWidths(prev => ({ ...prev, [qtId]: width }));
-              }
+  useEffect(() => {
+    const expandedTabs = Object.values(expandedQuestionType).filter(Boolean);
+    if (expandedTabs.length > 0) {
+      setTimeout(() => {
+        expandedTabs.forEach(qtId => {
+          const container = document.getElementById(`question-buttons-${qtId}`);
+          if (container) {
+            const buttons = container.querySelectorAll('button');
+            if (buttons.length > 0) {
+              const firstButton = buttons[0];
+              const lastButton = buttons[buttons.length - 1];
+              const firstRect = firstButton.getBoundingClientRect();
+              const lastRect = lastButton.getBoundingClientRect();
+              const width = lastRect.right - firstRect.left;
+              setBarWidths(prev => ({ ...prev, [qtId]: width }));
             }
-          });
-        }, 0);
-      }
-    }, [expandedQuestionType, groupedQuestions]);
+          }
+        });
+      }, 0);
+    }
+  }, [expandedQuestionType, groupedQuestions]);
 
   // Calculate initial bar widths for all tabs
   useEffect(() => {
@@ -228,19 +240,12 @@ export default function ExamPage() {
   }, []);
 
 
-  // Format time display
-  const formatTime = (seconds) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  };
-
-  // Format time display for question timer (MM:SS)
-  const formatQuestionTime = (seconds) => {
+  // Format time display as MM:SS; optionally pad minutes to two digits
+  const formatTime = (seconds, padMinutes = false) => {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    const m = padMinutes ? String(minutes).padStart(2, "0") : String(minutes);
+    return `${m}:${String(secs).padStart(2, "0")}`;
   };
 
   // Track expanded inline questions from <question> placeholders within passages
@@ -356,9 +361,9 @@ export default function ExamPage() {
                   parts.push(text.slice(lastIndex, match.index));
                 }
                 parts.push(
-                  <span key={`${keyBase}-ul-${match.index}`} className="underline decoration-2 underline-offset-4">
+                  <Underline key={`${keyBase}-ul-${match.index}`} weight={2}>
                     {match[1]}
-                  </span>
+                  </Underline>
                 );
                 lastIndex = match.index + match[0].length;
               }
@@ -417,33 +422,33 @@ export default function ExamPage() {
                         <div className="absolute z-50 left-0 top-0 translate-y-9">
                           <div className="shadow-lg rounded bg-white max-w-[85vw] w-[240px]">
                             <div className="grid grid-cols-1">
-                            {(() => {
-                              const byOrder = new Map();
-                              (q.answers || []).forEach((a) => {
-                                const key = String(a.show_order);
-                                if (!byOrder.has(key)) byOrder.set(key, a);
-                              });
-                              const normalizedAnswers = Array.from(byOrder.values()).sort(
-                                (a, b) => Number(a.show_order) - Number(b.show_order)
-                              );
-                              return normalizedAnswers.map((ans) => {
-                              const selected = isAnswerSelected(q.id, ans.id, q.question_type_id);
-                              return (
-                                <button
-                                  key={ans.id}
-                                  type="button"
-                                  onClick={() => handleAnswerSelect(q.id, ans.id, q.question_type_id)}
-                                  className={`text-left w-full px-3 py-2.5 transition-colors ${selected ? 'bg-[#DDE5FF]' : 'bg-white hover:bg-gray-50'}`}
-                                >
-                                  <div className="flex items-start text-gray-900 leading-6">
-                                    <span className="whitespace-pre-wrap break-words">
-                                      {formatAnswerText(ans?.answer_text || ans?.content || '', q?.question_text || '', q?.questionTypeId || q?.question_type_id)}
-                                    </span>
-                                  </div>
-                                </button>
-                              );
-                            });
-                            })()}
+                              {(() => {
+                                const byOrder = new Map();
+                                (q.answers || []).forEach((a) => {
+                                  const key = String(a.show_order);
+                                  if (!byOrder.has(key)) byOrder.set(key, a);
+                                });
+                                const normalizedAnswers = Array.from(byOrder.values()).sort(
+                                  (a, b) => Number(a.show_order) - Number(b.show_order)
+                                );
+                                return normalizedAnswers.map((ans) => {
+                                  const selected = isAnswerSelected(q.id, ans.id, q.question_type_id);
+                                  return (
+                                    <button
+                                      key={ans.id}
+                                      type="button"
+                                      onClick={() => handleAnswerSelect(q.id, ans.id, q.question_type_id)}
+                                      className={`text-left w-full px-3 py-2.5 transition-colors ${selected ? 'bg-[#DDE5FF]' : 'bg-white hover:bg-gray-50'}`}
+                                    >
+                                      <div className="flex items-start text-gray-900 leading-6">
+                                        <span className="whitespace-pre-wrap break-words">
+                                          {formatAnswerText(ans?.answer_text || ans?.content || '', q?.question_text || '', q?.questionTypeId || q?.question_type_id)}
+                                        </span>
+                                      </div>
+                                    </button>
+                                  );
+                                });
+                              })()}
                             </div>
                           </div>
                         </div>
@@ -653,9 +658,9 @@ export default function ExamPage() {
       return (
           <>
             {parts[0]}
-            <span className="underline decoration-1 underline-offset-5 decoration-black">
+            <Underline weight={1} offset={5} colorClass="decoration-black">
               {commonText}
-            </span>
+            </Underline>
             {parts[1]}
           </>
       );
@@ -703,7 +708,8 @@ export default function ExamPage() {
             id: qt.id,
             name: qt.name || qt.id,
             taskInstructions: qt.task_instructions,
-            questionCount: qt.questions.length
+            questionCount: qt.questions.length,
+            question_guides: qt.question_guides
           });
         });
       }
@@ -735,16 +741,15 @@ export default function ExamPage() {
     }
 
     // Check if current question type has duration and should use pagination
-    const currentQuestionType = groupedQuestions[activeQuestionType];
-    const duration = currentQuestionType?.type?.duration;
+  const currentQuestionType = groupedQuestions[activeQuestionType];
+  const duration = currentQuestionType?.type?.duration;
     
     if (!duration || filteredQuestions.length === 0) {
       return;
     }
 
-    const firstQuestion = filteredQuestions[0];
-    const hasDuration = duration;
-    const shouldUsePagination = (firstQuestion?.passage || firstQuestion?.jlpt_question_passages) && hasDuration;
+  const firstQuestion = filteredQuestions[0];
+  const shouldUsePagination = Boolean(duration) && (firstQuestion?.passage || firstQuestion?.jlpt_question_passages);
 
     if (shouldUsePagination && currentQuestion) {
       // Only initialize timer if this question doesn't have a timer yet
@@ -792,97 +797,82 @@ export default function ExamPage() {
   }, [activeQuestionType, currentQuestionPage, currentQuestion?.id]); // Combined dependencies
 
   
-  // Calculate progress bar color based on time remaining
-  const getProgressBarColor = () => {
+  // Calculate progress bar color and text color based on time remaining
+  const getProgressBarStyles = () => {
     const minutesRemaining = timeRemaining / 60;
-    if (minutesRemaining <= 30) return 'bg-red-500';
-    return 'bg-green-500';
+    
+    if (minutesRemaining <= 15) {
+      return {
+        backgroundColor: '#F24822',
+        textColor: '#FFFFFF',
+        iconColor: '#FFFFFF'
+      };
+    } else if (minutesRemaining <= 30) {
+      return {
+        backgroundColor: '#FFC943',
+        textColor: '#986D00',
+        iconColor: '#986D00'
+      };
+    } else {
+      return {
+        backgroundColor: '#66D575',
+        textColor: '#00620D',
+        iconColor: '#006C0F'
+      };
+    }
   };
   
   // Calculate progress percentage
   const progressPercentage = totalTime > 0 ? ((totalTime - timeRemaining) / totalTime) * 100 : 0;
 
-  // Navigate to next question
-  const handleNext = () => {
-    // If using pagination, handle pagination logic
-    if (shouldUsePagination) {
-      if (currentQuestionPage < filteredQuestions.length - 1) {
-        setCurrentQuestionPage(currentQuestionPage + 1);
-      } else {
-        // Move to next question type in same section
-        const currentTabIndex = questionTypeTabs.findIndex(tab => tab.id === activeQuestionType);
-        if (currentTabIndex < questionTypeTabs.length - 1) {
-          const nextTab = questionTypeTabs[currentTabIndex + 1];
-          setActiveQuestionType(nextTab.id);
-          setCurrentQuestionPage(0);
-        }
-      }
-      return;
-    }
-    
-    if (currentQuestionIndex < filteredQuestions.length - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
-    } else {
-      // Move to next question type in same section
-      const currentTabIndex = questionTypeTabs.findIndex(tab => tab.id === activeQuestionType);
-      if (currentTabIndex < questionTypeTabs.length - 1) {
-        const nextTab = questionTypeTabs[currentTabIndex + 1];
-        setActiveQuestionType(nextTab.id);
-        setCurrentQuestionIndex(0);
-      }
-    }
-  };
+  // (question buttons are rendered via shared component QuestionButtons)
 
-  // Navigate to previous question
-  const handlePrevious = () => {
-    // If using pagination, handle pagination logic
-    if (shouldUsePagination) {
-      if (currentQuestionPage > 0) {
-        setCurrentQuestionPage(currentQuestionPage - 1);
-      } else {
-        // Move to previous question type in same section
-        const currentTabIndex = questionTypeTabs.findIndex(tab => tab.id === activeQuestionType);
-        if (currentTabIndex > 0) {
-          const prevTab = questionTypeTabs[currentTabIndex - 1];
-          setActiveQuestionType(prevTab.id);
-          const prevQuestions = groupedQuestions[prevTab.id]?.questions || [];
-          setCurrentQuestionPage(prevQuestions.length - 1);
-        }
-      }
-      return;
-    }
-    
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex((prev) => prev - 1);
-    } else {
-      // Move to previous question type in same section
-      const currentTabIndex = questionTypeTabs.findIndex(tab => tab.id === activeQuestionType);
-      if (currentTabIndex > 0) {
-        const prevTab = questionTypeTabs[currentTabIndex - 1];
-        setActiveQuestionType(prevTab.id);
-        const prevQuestions = groupedQuestions[prevTab.id]?.questions || [];
-        setCurrentQuestionIndex(prevQuestions.length - 1);
-      }
-    }
-  };
   
   // Handle section tab click
-  const handleSectionChange = (sectionType) => {
+  const handleSectionChange = (sectionType, questionTypeId = null) => {
+    if (!examData) return; // Guard: don't change section if exam data isn't loaded yet
+    
+    // Mark that user has manually selected a section
+    userSelectedSectionRef.current = true;
+    activeSectionRef.current = sectionType;
+    
     setActiveSection(sectionType);
     setCurrentQuestionIndex(0); // Reset to first question of this section
     
     // Set first question type of the new section as active
     const newSection = examData.sections.find(s => s.type === sectionType);
     if (newSection && newSection.question_types.length > 0) {
-      // Find the question type that matches the current activeQuestionType in the new section
-      const matchingQuestionType = newSection.question_types.find(qt => qt.id === activeQuestionType);
-      
-      if (matchingQuestionType) {
-        // Keep the same question type if it exists in the new section
-        setActiveQuestionType(activeQuestionType);
+      // If a specific questionTypeId is provided, use it (if it exists in the new section)
+      if (questionTypeId) {
+        const targetQuestionType = newSection.question_types.find(qt => qt.id === questionTypeId);
+        if (targetQuestionType) {
+          setActiveQuestionType(questionTypeId);
+          // Also set expanded state for this question type in the new section
+          setExpandedQuestionType(prev => ({
+            ...prev,
+            [sectionType]: prev[sectionType] === questionTypeId ? null : questionTypeId
+          }));
+        } else {
+          // Fallback to first question type if provided questionTypeId doesn't exist
+          const firstQuestionTypeId = newSection.question_types[0].id;
+          setActiveQuestionType(firstQuestionTypeId);
+          setExpandedQuestionType(prev => ({
+            ...prev,
+            [sectionType]: firstQuestionTypeId
+          }));
+        }
       } else {
-        // Use first question type of the new section
-      setActiveQuestionType(newSection.question_types[0].id);
+        // Find the question type that matches the current activeQuestionType in the new section
+        const matchingQuestionType = newSection.question_types.find(qt => qt.id === activeQuestionType);
+        
+        if (matchingQuestionType) {
+          // Keep the same question type if it exists in the new section
+          setActiveQuestionType(activeQuestionType);
+        } else {
+          // Use first question type of the new section
+          const firstQuestionTypeId = newSection.question_types[0].id;
+          setActiveQuestionType(firstQuestionTypeId);
+        }
       }
       
       setCurrentQuestionPage(0); // Reset pagination when switching sections
@@ -890,12 +880,162 @@ export default function ExamPage() {
     }
   };
 
+  // Reusable progress bar with timer
+  const TimerProgressBar = ({ progressPercentageValue }) => {
+    const barStyles = getProgressBarStyles();
+    return (
+      <div className="w-[240px] relative">
+        <div className="w-full h-5 rounded-full bg-gray-200 overflow-hidden relative">
+          <div
+            className="h-5 transition-all duration-1000 relative"
+            style={{ width: `${100 - progressPercentageValue}%`, backgroundColor: barStyles.backgroundColor }}
+          >
+            <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 pointer-events-none">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill={barStyles.iconColor} xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M10 1.667a8.333 8.333 0 1 0 0 16.666A8.333 8.333 0 0 0 10 1.667z"/>
+                <path fillRule="evenodd" clipRule="evenodd" fill="#ffffff" d="M10.625 5.5a.625.625 0 1 0-1.25 0v4.208c0 .166.066.325.184.442l2.5 2.5a.625.625 0 1 0 .884-.884l-2.318-2.318V5.5z"/>
+              </svg>
+              <span className="text-sm font-semibold" style={{ color: barStyles.textColor, fontFamily: "Nunito" }}>
+                {formatTime(timeRemaining)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Parse and render framed passage (<frame_start> ... <frame_end>) once
+  const renderFramedPassageBlocks = (passageText, isTimeUp) => {
+    if (!passageText) return null;
+
+    const parts = [];
+    let currentIndex = 0;
+    const frameRegex = /<frame_start>(.*?)<frame_end>/gs;
+    let match;
+
+    while ((match = frameRegex.exec(passageText)) !== null) {
+      if (match.index > currentIndex) {
+        const beforeText = passageText.slice(currentIndex, match.index);
+        parts.push({
+          type: 'text',
+          content: beforeText.split('<enter>').map((part, index, arr) => (
+            <span key={index}>
+              {part}
+              {index < arr.length - 1 && <br />}
+            </span>
+          )),
+        });
+      }
+
+      const frameContent = match[1];
+      parts.push({
+        type: 'frame',
+        content: frameContent.split('<enter>').map((part, index, arr) => {
+          if (part.includes('<right>')) {
+            const rightContent = part.replace('<right>', '');
+            return (
+              <div key={index} className="text-right">
+                {rightContent}
+                {index < arr.length - 1 && <br />}
+              </div>
+            );
+          }
+          return (
+            <span key={index}>
+              {part}
+              {index < arr.length - 1 && <br />}
+            </span>
+          );
+        }),
+      });
+      currentIndex = match.index + match[0].length;
+    }
+
+    if (currentIndex < passageText.length) {
+      const remainingText = passageText.slice(currentIndex);
+      parts.push({
+        type: 'text',
+        content: remainingText.split('<enter>').map((part, index, arr) => (
+          <span key={index}>
+            {part}
+            {index < arr.length - 1 && <br />}
+          </span>
+        )),
+      });
+    }
+
+    if (parts.length === 0) {
+      parts.push({
+        type: 'text',
+        content: passageText.split('<enter>').map((part, index, arr) => (
+          <span key={index}>
+            {part}
+            {index < arr.length - 1 && <br />}
+          </span>
+        )),
+      });
+    }
+
+    return parts.map((part, index) => {
+      if (part.type === 'frame') {
+        return (
+          <div key={index} className={`mt-4 border-2 border-black p-4 rounded-lg ${isTimeUp ? 'bg-red-100' : 'bg-white'}`}>
+            <div className="text-lg md:text-xl leading-relaxed text-gray-800">
+              {part.content}
+            </div>
+          </div>
+        );
+      }
+      return <div key={index}>{part.content}</div>;
+    });
+  };
+
+  // Border box wrapper for jlpt_question_passages blocks
+  const PassageBorderBox = ({ isTimeUp, children }) => (
+    <div className={`border-2 border-black p-6 rounded-lg ${isTimeUp ? 'bg-red-100' : 'bg-white'}`}>
+      <div className="text-lg md:text-xl leading-relaxed text-gray-800">
+        {children}
+      </div>
+    </div>
+  );
+
+  // Underline helper to standardize underline styles
+  const Underline = ({ children, weight = 1, offset = 4, colorClass = '' }) => {
+    const weightClass = weight === 2 ? 'decoration-2' : 'decoration-1';
+    const offsetClass = offset === 5 ? 'underline-offset-5' : 'underline-offset-4';
+    return (
+      <span className={`underline ${weightClass} ${offsetClass} ${colorClass}`.trim()}>
+        {children}
+      </span>
+    );
+  };
   // Handle question type tab click
   const handleQuestionTypeChange = (questionTypeId) => {
-    setActiveQuestionType(questionTypeId);
-    setCurrentQuestionPage(0); // Reset pagination when switching question types
-    setCurrentQuestionIndex(0); // Reset to first question of this type
-    toastShownRef.current = {}; // Reset ref when switching question types
+    if (!examData) return;
+    
+    // Find which section this question type belongs to
+    const targetSection = examData.sections.find(section => 
+      section.question_types.some(qt => qt.id === questionTypeId)
+    );
+    
+    // If the question type belongs to a different section, switch to that section first
+    if (targetSection && targetSection.type !== activeSection) {
+      // Mark that user has manually selected (via question type)
+      userSelectedSectionRef.current = true;
+      activeSectionRef.current = targetSection.type;
+      handleSectionChange(targetSection.type, questionTypeId);
+      return;
+    }
+    
+    // Otherwise, just change the question type
+    // Ensure we're still in the correct section - double check
+    if (targetSection && targetSection.type === activeSection) {
+      setActiveQuestionType(questionTypeId);
+      setCurrentQuestionPage(0); // Reset pagination when switching question types
+      setCurrentQuestionIndex(0); // Reset to first question of this type
+      toastShownRef.current = {}; // Reset ref when switching question types
+    }
   };
 
   // Handle pagination change
@@ -1007,43 +1147,19 @@ export default function ExamPage() {
       {showStickyProgress && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-lg border-b border-gray-200 px-6 py-3" style={{fontFamily: "Nunito"}}>
           <div className="max-w-7xl mx-auto">
-            {/* Top row: Time, Progress Bar, Submit */}
-            <div className="flex items-center justify-between mb-3">
-            {/* Time Remaining */}
-            <div className="flex items-center gap-4">
-              <div className="text-lg font-bold text-[#874FFF]">
-                <span style={{ color: '#585858' }}>残りの時間:</span> {formatTime(timeRemaining)}
-              </div>
-            </div>
+            {/* Top row: Progress Bar with Timer, Section Tabs, Submit */}
+            <div className="flex items-center justify-between gap-4 mb-4">
+            {/* Progress Bar with Timer */}
+            <TimerProgressBar progressPercentageValue={progressPercentage} />
 
-            {/* Progress Bar */}
-            <div className="flex-1 max-w-md mx-6">
-              <div className="w-full h-3 rounded-full bg-gray-200 overflow-hidden">
-                <div
-                  className={`h-3 transition-all duration-1000 ${getProgressBarColor()}`}
-                  style={{ width: `${100 - progressPercentage}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              onClick={handleSubmitExam}
-                disabled={isSubmitting}
-              className="px-4 py-2 rounded-lg border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all text-sm"
-            >
-                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-            </button>
-          </div>
-
-            {/* Section Tabs */}
-            <div className="flex items-center justify-center gap-2 mb-3">
+            {/* Section Tabs - Same height as progress bar and submit button */}
+            <div className="flex items-center justify-center gap-2 flex-1">
               {sectionTabs.map((tab, idx) => (
                 <button
                   style={{fontFamily: "UD Digi Kyokasho N-R"}}
                   key={`${tab}-${idx}`}
                   onClick={() => handleSectionChange(tab)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all cursor-pointer ${
+                  className={`h-8 px-3 rounded-lg text-sm font-medium border transition-all cursor-pointer flex items-center ${
                     tab === activeSection
                       ? "bg-[#4169E1] text-white border-[#4169E1]"
                       : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
@@ -1052,11 +1168,21 @@ export default function ExamPage() {
                   {tab}
                 </button>
               ))}
-        </div>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              onClick={handleSubmitExam}
+                disabled={isSubmitting}
+              className="px-4 h-8 rounded-lg border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all text-sm flex items-center"
+            >
+                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
+            </button>
+          </div>
 
             {/* Question Type Progress Bar */}
             {questionTypeTabs.length > 0 && (
-              <div>
+              <div className="mt-4">
                 <div 
                   ref={(el) => tabContainerRefs.current[activeSection] = el}
                   className={`flex gap-4 ${!expandedQuestionType[activeSection] ? 'grid' : ''}`}
@@ -1114,7 +1240,9 @@ export default function ExamPage() {
                                );
                                
                                if (targetSection && targetSection.type !== activeSection) {
-                                 handleSectionChange(targetSection.type);
+                                 // Pass the question type ID when changing section
+                                 // handleSectionChange will handle setting both activeSection and activeQuestionType
+                                 handleSectionChange(targetSection.type, tab.id);
                                  return;
                                }
                                
@@ -1134,7 +1262,24 @@ export default function ExamPage() {
                             }`}
                             style={{fontFamily: "Inter"}}
                           >
-                            <span style={{fontWeight: "bold"}}>{tab.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || tab.name}</span> {answeredCount}/{tab.questionCount}
+                             <span
+                               title={(tab?.question_guides?.name || tab.taskInstructions || tab.name) || ''}
+                               className={`${
+                                 currentSectionExpanded 
+                                   ? 'truncate' 
+                                   : ''
+                               } inline-block align-middle`}
+                               style={{
+                                 fontWeight: "bold",
+                                 maxWidth: currentSectionExpanded 
+                                   ? (isActive 
+                                       ? '280px' 
+                                       : `${Math.min((collapsedTabWidths[activeSection] || 150) * 0.9, 140)}px`)
+                                   : 'none'
+                               }}
+                             >
+                               {tab?.question_guides?.name || tab.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || tab.name}
+                             </span> {answeredCount}/{tab.questionCount}
                           </button>
                           
                           {/* Bottom bar (blue) and question buttons - shown when active */}
@@ -1144,68 +1289,19 @@ export default function ExamPage() {
                                 className="h-0.5 bg-[#4169E1] mt-2 mb-3"
                                 style={{ width: barWidths[tab.id] || '100%' }}
                               ></div>
-                              <div 
-                                id={`question-buttons-sticky-${tab.id}`}
-                                className="flex gap-2 overflow-x-auto"
-                              >
-                                {Array.from({ length: tab.questionCount }, (_, index) => {
-                                  const question = groupedQuestions[tab.id]?.questions[index];
-                                  const isAnswered = question ? (
-                                    question.questionTypeId === "QT007" 
-                                      ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
-                                      : studentAnswers[question.id]
-                                  ) : false;
-                                  const tabQuestions = groupedQuestions[tab.id]?.questions || [];
-                                  const shouldUsePagination = tabQuestions.length > 0 && 
-                                    groupedQuestions[tab.id]?.type?.duration &&
-                                    (tabQuestions[0].passage || tabQuestions[0].jlpt_question_passages);
-                                  const isCurrent = tab.id === activeQuestionType && (
-                                    shouldUsePagination ? index === currentQuestionPage : index === currentQuestionIndex
-                                  );
-                                  
-                                  return (
-                                    <button
-                                      key={index}
-                                      onClick={() => {
-                                        if (tab.id !== activeQuestionType) {
-                                        handleQuestionTypeChange(tab.id);
-                                        }
-                                        
-                                        const tabQuestions = groupedQuestions[tab.id]?.questions || [];
-                                        const shouldUsePagination = tabQuestions.length > 0 && 
-                                          groupedQuestions[tab.id]?.type?.duration &&
-                                          (tabQuestions[0].passage || tabQuestions[0].jlpt_question_passages);
-                                        
-                                        if (shouldUsePagination) {
-                                          setCurrentQuestionPage(index);
-                                        } else {
-                                        setCurrentQuestionIndex(index);
-                                        
-                                        setTimeout(() => {
-                                          const questionElement = document.getElementById(`question-${question.id}`);
-                                          if (questionElement) {
-                                            questionElement.scrollIntoView({ 
-                                              behavior: 'smooth', 
-                                              block: 'start' 
-                                            });
-                                          }
-                                        }, 100);
-                                        }
-                                      }}
-                                      className={`w-10 h-10 text-sm font-semibold rounded transition-all ${
-                                        isCurrent
-                                          ? "bg-[#4169E1] text-white"
-                                          : isAnswered
-                                          ? "bg-green-500 text-white"
-                                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                                      }`}
-                                      style={{fontFamily: "Inter"}}
-                                    >
-                                      {question?.position || index + 1}
-                                    </button>
-                                  );
-                                })}
-                              </div>
+                              <QuestionButtons
+                                tab={tab}
+                                groupedQuestions={groupedQuestions}
+                                activeQuestionType={activeQuestionType}
+                                currentQuestionIndex={currentQuestionIndex}
+                                currentQuestionPage={currentQuestionPage}
+                                studentAnswers={studentAnswers}
+                                answerOrder={answerOrder}
+                                handleQuestionTypeChange={handleQuestionTypeChange}
+                                setCurrentQuestionIndex={setCurrentQuestionIndex}
+                                setCurrentQuestionPage={setCurrentQuestionPage}
+                                containerId={`question-buttons-sticky-${tab.id}`}
+                              />
                             </>
                           )}
                         </div>
@@ -1240,7 +1336,7 @@ export default function ExamPage() {
                       style={{fontFamily: "UD Digi Kyokasho N-R"}}
                       key={`${tab}-${idx}`}
                       onClick={() => handleSectionChange(tab)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all cursor-pointer ${
                         tab === activeSection
                           ? "bg-[#4169E1] text-white border-[#4169E1]"
                           : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
@@ -1277,26 +1373,10 @@ export default function ExamPage() {
               </div>
             </div>
 
-            {/* Time Remaining - Below Title */}
+            {/* Progress Bar with Timer - Header (same as sticky style) */}
             {!showStickyProgress && (
-              <div className="mt-2 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-xl font-bold text-[#874FFF]">
-                    <span style={{ color: '#585858' }}>残りの時間 :</span> {formatTime(timeRemaining)}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Progress Bar - Below Time */}
-            {!showStickyProgress && (
-              <div className="mt-3 w-full">
-                <div className="w-full h-2.5 rounded-full bg-gray-200 overflow-hidden">
-                  <div
-                    className={`h-2.5 transition-all duration-1000 ${getProgressBarColor()}`}
-                    style={{ width: `${100 - progressPercentage}%` }}
-                  />
-                </div>
+              <div className="mt-4 flex justify-center">
+                <TimerProgressBar progressPercentageValue={progressPercentage} />
               </div>
             )}
 
@@ -1362,8 +1442,9 @@ export default function ExamPage() {
                                
                                // If the question type belongs to a different section, switch to that section first
                                if (targetSection && targetSection.type !== activeSection) {
-                                 handleSectionChange(targetSection.type);
-                                 // After section change, the question type will be set automatically
+                                 // Pass the question type ID when changing section
+                                 // handleSectionChange will handle setting both activeSection and activeQuestionType
+                                 handleSectionChange(targetSection.type, tab.id);
                                  return;
                                }
                                
@@ -1385,7 +1466,24 @@ export default function ExamPage() {
                             }`}
                             style={{fontFamily: "Inter"}}
                           >
-                            <span style={{fontWeight: "bold"}}>{tab.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || tab.name}</span> {answeredCount}/{tab.questionCount}
+                             <span
+                               title={(tab?.question_guides?.name || tab.taskInstructions || tab.name) || ''}
+                               className={`${
+                                 currentSectionExpanded 
+                                   ? 'truncate' 
+                                   : ''
+                               } inline-block align-middle`}
+                               style={{
+                                 fontWeight: "bold",
+                                 maxWidth: currentSectionExpanded 
+                                   ? (isActive 
+                                       ? '280px' 
+                                       : `${Math.min((collapsedTabWidths[activeSection] || 150) * 0.9, 140)}px`)
+                                   : 'none'
+                               }}
+                             >
+                               {tab?.question_guides?.name || tab.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || tab.name}
+                             </span> {answeredCount}/{tab.questionCount}
                           </button>
                           
                           {/* Bottom bar (blue) and question buttons - shown when active */}
@@ -1395,74 +1493,19 @@ export default function ExamPage() {
                                 className="h-0.5 bg-[#4169E1] mt-2 mb-3"
                                 style={{ width: barWidths[tab.id] || '100%' }}
                               ></div>
-                              <div 
-                                id={`question-buttons-${tab.id}`}
-                                className="flex gap-2 overflow-x-auto"
-                              >
-                                {Array.from({ length: tab.questionCount }, (_, index) => {
-                                  const question = groupedQuestions[tab.id]?.questions[index];
-                                  const isAnswered = question ? (
-                                    question.questionTypeId === "QT007" 
-                                      ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
-                                      : studentAnswers[question.id]
-                                  ) : false;
-                                  // Check if this question type uses pagination (same logic as handleNext)
-                                  const tabQuestions = groupedQuestions[tab.id]?.questions || [];
-                                  const shouldUsePagination = tabQuestions.length > 0 && 
-                                    groupedQuestions[tab.id]?.type?.duration &&
-                                    (tabQuestions[0].passage || tabQuestions[0].jlpt_question_passages);
-                                  const isCurrent = tab.id === activeQuestionType && (
-                                    shouldUsePagination ? index === currentQuestionPage : index === currentQuestionIndex
-                                  );
-                                  
-                                  return (
-                                    <button
-                                      key={index}
-                                      onClick={() => {
-                                        // Only change question type if different
-                                        if (tab.id !== activeQuestionType) {
-                                        handleQuestionTypeChange(tab.id);
-                                        }
-                                        
-                                        // Check if this question type uses pagination (same logic as handleNext)
-                                        const tabQuestions = groupedQuestions[tab.id]?.questions || [];
-                                        const shouldUsePagination = tabQuestions.length > 0 && 
-                                          groupedQuestions[tab.id]?.type?.duration &&
-                                          (tabQuestions[0].passage || tabQuestions[0].jlpt_question_passages);
-                                        
-                                        if (shouldUsePagination) {
-                                          // For reading comprehension: switch to the corresponding page
-                                          setCurrentQuestionPage(index);
-                                        } else {
-                                          // For normal questions: scroll to the specific question
-                                        setCurrentQuestionIndex(index);
-                                        
-                                        // Auto scroll to the specific question
-                                        setTimeout(() => {
-                                          const questionElement = document.getElementById(`question-${question.id}`);
-                                          if (questionElement) {
-                                            questionElement.scrollIntoView({ 
-                                              behavior: 'smooth', 
-                                              block: 'start' 
-                                            });
-                                          }
-                                        }, 100);
-                                        }
-                                      }}
-                                      className={`w-10 h-10 text-sm font-semibold rounded transition-all ${
-                                        isCurrent
-                                          ? "bg-[#4169E1] text-white"
-                                          : isAnswered
-                                          ? "bg-green-500 text-white"
-                                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                                      }`}
-                                      style={{fontFamily: "Inter"}}
-                                    >
-                                      {question?.position || index + 1}
-                                    </button>
-                                  );
-                                })}
-                              </div>
+                              <QuestionButtons
+                                tab={tab}
+                                groupedQuestions={groupedQuestions}
+                                activeQuestionType={activeQuestionType}
+                                currentQuestionIndex={currentQuestionIndex}
+                                currentQuestionPage={currentQuestionPage}
+                                studentAnswers={studentAnswers}
+                                answerOrder={answerOrder}
+                                handleQuestionTypeChange={handleQuestionTypeChange}
+                                setCurrentQuestionIndex={setCurrentQuestionIndex}
+                                setCurrentQuestionPage={setCurrentQuestionPage}
+                                containerId={`question-buttons-${tab.id}`}
+                              />
                             </>
                           )}
                         </div>
@@ -1516,12 +1559,11 @@ export default function ExamPage() {
 
              {/* Duration display for reading passages - below yellow box */}
              {(() => {
-               const currentQuestionType = groupedQuestions[activeQuestionType];
-               const duration = currentQuestionType?.type?.duration;
-               const hasDuration = currentQuestionType?.type?.duration;
-               const shouldUsePagination = filteredQuestions.length > 0 && 
-                 hasDuration &&
-                 (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
+              const currentQuestionType = groupedQuestions[activeQuestionType];
+              const duration = currentQuestionType?.type?.duration;
+              const shouldUsePagination = filteredQuestions.length > 0 && 
+                Boolean(duration) &&
+                (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
                
                if (duration && filteredQuestions.length > 0) {
                  if (shouldUsePagination) {
@@ -1529,8 +1571,8 @@ export default function ExamPage() {
                    // Always show timer for paginated questions (including when time is up)
                    return (
                      <div className="mb-3 ml-4 -mt-2">
-                       <span className={`text-xl font-bold ${currentQuestionTime === 0 ? 'text-red-500' : (currentQuestionTime <= 30 ? 'text-red-500' : 'text-[#874FFF]')}`}>
-                         {formatQuestionTime(currentQuestionTime)}
+                      <span className={`text-xl font-bold ${currentQuestionTime === 0 ? 'text-red-500' : (currentQuestionTime <= 30 ? 'text-red-500' : 'text-[#874FFF]')}`}>
+                        {formatTime(currentQuestionTime, true)}
                        </span>
                      </div>
                    );
@@ -1550,21 +1592,17 @@ export default function ExamPage() {
             {/* QT008: Display question type level passage from jlpt_question_passages */}
             {activeQuestionType === 'QT008' && groupedQuestions[activeQuestionType]?.type?.passages && groupedQuestions[activeQuestionType]?.type?.passages.length > 0 && (
               <div className="mb-6">
-                <div className={`border-2 border-black p-6 rounded-lg ${
-                  (filteredQuestions.length > 0 && questionTimeRemaining[filteredQuestions[0]?.id] !== undefined && questionTimeRemaining[filteredQuestions[0]?.id] <= 0) ? 'bg-red-100' : 'bg-white'
-                }`}>
-                  <div className="text-lg leading-relaxed text-gray-800">
-                    {groupedQuestions[activeQuestionType].type.passages.map((passage, passageIndex) => (
-                      <div key={passageIndex}>
-                        {passage.content && (
-                          <div className="whitespace-pre-line">
+                <PassageBorderBox isTimeUp={(filteredQuestions.length > 0 && questionTimeRemaining[filteredQuestions[0]?.id] !== undefined && questionTimeRemaining[filteredQuestions[0]?.id] <= 0)}>
+                  {groupedQuestions[activeQuestionType].type.passages.map((passage, passageIndex) => (
+                    <div key={passageIndex}>
+                      {passage.content && (
+                        <div className="whitespace-pre-line text-lg md:text-xl">
                           {renderPassageContent(passage.content, { questions: groupedQuestions[activeQuestionType]?.questions || [], questionTypeId: activeQuestionType })}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </PassageBorderBox>
               </div>
             )}
 
@@ -1583,110 +1621,15 @@ export default function ExamPage() {
                 }
                 
                 return (
-                  <div key={currentQuestion.id} id={`question-${currentQuestion.id}`} className="scroll-mt-30">
+                  <div key={currentQuestion.id} id={`question-${currentQuestion.id}`} className="scroll-mt-30" style={{ scrollMarginTop: '120px' }}>
                     {/* Display passage from jlpt_questions table */}
                     {currentQuestion.passage && (
                       <div className="mb-6 p-6 bg-gray-50 rounded-lg">
-                        <div className="text-lg leading-relaxed text-gray-800">
-                          {(() => {
-                            const passage = currentQuestion.passage;
-                            const parts = [];
-                            let currentIndex = 0;
-                            
-                            // Find all <frame_start>...<frame_end> blocks
-                            const frameRegex = /<frame_start>(.*?)<frame_end>/gs;
-                            let match;
-                            
-                            while ((match = frameRegex.exec(passage)) !== null) {
-                              // Add text before frame_start
-                              if (match.index > currentIndex) {
-                                const beforeText = passage.slice(currentIndex, match.index);
-                                parts.push({
-                                  type: 'text',
-                                  content: beforeText.split('<enter>').map((part, index, arr) => (
-                                    <span key={index}>
-                                      {part}
-                                      {index < arr.length - 1 && <br />}
-                                    </span>
-                                  ))
-                                });
-                              }
-                              
-                              // Add frame content
-                              const frameContent = match[1];
-                              parts.push({
-                                type: 'frame',
-                                content: frameContent.split('<enter>').map((part, index, arr) => {
-                                  // Check if line contains <right> tag
-                                  if (part.includes('<right>')) {
-                                    const rightContent = part.replace('<right>', '');
-                                    return (
-                                      <div key={index} className="text-right">
-                                        {rightContent}
-                                        {index < arr.length - 1 && <br />}
-                                      </div>
-                                    );
-                                  } else {
-                                    return (
-                                      <span key={index}>
-                                        {part}
-                                        {index < arr.length - 1 && <br />}
-                                      </span>
-                                    );
-                                  }
-                                })
-                              });
-                              
-                              currentIndex = match.index + match[0].length;
-                            }
-                            
-                            // Add remaining text after last frame
-                            if (currentIndex < passage.length) {
-                              const remainingText = passage.slice(currentIndex);
-                              parts.push({
-                                type: 'text',
-                                content: remainingText.split('<enter>').map((part, index, arr) => (
-                                  <span key={index}>
-                                    {part}
-                                    {index < arr.length - 1 && <br />}
-                                  </span>
-                                ))
-                              });
-                            }
-                            
-                            // If no frames found, process entire passage as text
-                            if (parts.length === 0) {
-                              parts.push({
-                                type: 'text',
-                                content: passage.split('<enter>').map((part, index, arr) => (
-                                  <span key={index}>
-                                    {part}
-                                    {index < arr.length - 1 && <br />}
-                                  </span>
-                                ))
-                              });
-                            }
-                            
-                            return parts.map((part, index) => {
-                              if (part.type === 'frame') {
-                                return (
-                                  <div key={index} className={`mt-4 border-2 border-black p-4 rounded-lg ${
-                                    (questionTimeRemaining[currentQuestion?.id] !== undefined && questionTimeRemaining[currentQuestion?.id] <= 0) ? 'bg-red-100' : 'bg-white'
-                                  }`}>
-                                    <div className="text-lg leading-relaxed text-gray-800">
-                                      {part.content}
-                                    </div>
-                                  </div>
-                                );
-                              } else {
-                                return (
-                                  <div key={index}>
-                                    {part.content}
-                                  </div>
-                                );
-                              }
-                            });
-                          })()}
+                        <div className="text-lg md:text-xl leading-relaxed text-gray-800">
+                          {renderFramedPassageBlocks(
+                            currentQuestion.passage,
+                            (questionTimeRemaining[currentQuestion?.id] !== undefined && questionTimeRemaining[currentQuestion?.id] <= 0)
+                          )}
                         </div>
                       </div>
                     )}
@@ -1694,22 +1637,17 @@ export default function ExamPage() {
                     {/* Display passage from jlpt_question_passages table with black border */}
                     {currentQuestion.jlpt_question_passages && currentQuestion.jlpt_question_passages.length > 0 && (
                       <div className="mb-6">
-                        {/* Reading passage with black border */}
-                        <div className={`border-2 border-black p-6 rounded-lg ${
-                          (questionTimeRemaining[currentQuestion?.id] !== undefined && questionTimeRemaining[currentQuestion?.id] <= 0) ? 'bg-red-100' : 'bg-white'
-                        }`}>
-                          <div className="text-lg leading-relaxed text-gray-800">
-                    {currentQuestion.jlpt_question_passages.map((passage, passageIndex) => (
-                              <div key={passageIndex}>
-                        {passage.content && (
-                          <div className="whitespace-pre-line">
-                            {renderPassageContent(passage.content, { questions: filteredQuestions, questionTypeId: activeQuestionType })}
-                          </div>
-                        )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                        <PassageBorderBox isTimeUp={(questionTimeRemaining[currentQuestion?.id] !== undefined && questionTimeRemaining[currentQuestion?.id] <= 0)}>
+                          {currentQuestion.jlpt_question_passages.map((passage, passageIndex) => (
+                            <div key={passageIndex}>
+                              {passage.content && (
+                                <div className="whitespace-pre-line text-lg md:text-xl">
+                                  {renderPassageContent(passage.content, { questions: filteredQuestions, questionTypeId: activeQuestionType })}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </PassageBorderBox>
                       </div>
                     )}
 
@@ -1719,7 +1657,7 @@ export default function ExamPage() {
                         <div className="w-9 h-9 border-2 border-gray-300 rounded-md flex items-center justify-center text-base font-semibold text-gray-700 select-none">
                           {currentQuestion.position}
                         </div>
-                        <div className="text-xl font-normal text-[#0B1320] leading-relaxed">
+                        <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
                           {currentQuestion.underline_text ? (
                             <>
                               {currentQuestion.question_text.split(currentQuestion.underline_text)[0].split('<enter>').map((part, index) => (
@@ -1728,14 +1666,14 @@ export default function ExamPage() {
                                   {index < currentQuestion.question_text.split(currentQuestion.underline_text)[0].split('<enter>').length - 1 && <br />}
                                 </span>
                               ))}
-                              <span className="underline decoration-2 underline-offset-4">
+                          <Underline weight={1}>
                                 {currentQuestion.underline_text.split('<enter>').map((part, index) => (
                                   <span key={index}>
                                     {part}
                                     {index < currentQuestion.underline_text.split('<enter>').length - 1 && <br />}
                                   </span>
                                 ))}
-                              </span>
+                          </Underline>
                               {currentQuestion.question_text.split(currentQuestion.underline_text)[1].split('<enter>').map((part, index) => (
                                 <span key={index}>
                                   {part}
@@ -1810,7 +1748,7 @@ export default function ExamPage() {
                                       }`}
                                     />
                                   </span>
-                                  <span className="ml-3 text-base font-medium text-gray-800">
+                                  <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                                     {formatAnswerText(answer.answer_text, currentQuestion.question_text, currentQuestion.questionTypeId)}
                                   </span>
                                 </label>
@@ -1830,108 +1768,16 @@ export default function ExamPage() {
                 key={question.id} 
                 id={`question-${question.id}`}
                 className={`${questionIndex > 0 ? 'mt-8' : ''} scroll-mt-30`}
+                style={{ scrollMarginTop: '180px' }}
               >
                 {/* Display passage from jlpt_questions table */}
                 {question.passage && (
                   <div className="mb-6 p-6 bg-gray-50 rounded-lg">
-                    <div className="text-lg leading-relaxed text-gray-800">
-                      {(() => {
-                        const passage = question.passage;
-                        const parts = [];
-                        let currentIndex = 0;
-                        
-                        // Find all <frame_start>...<frame_end> blocks
-                        const frameRegex = /<frame_start>(.*?)<frame_end>/gs;
-                        let match;
-                        
-                        while ((match = frameRegex.exec(passage)) !== null) {
-                          // Add text before frame_start
-                          if (match.index > currentIndex) {
-                            const beforeText = passage.slice(currentIndex, match.index);
-                            parts.push({
-                              type: 'text',
-                              content: beforeText.split('<enter>').map((part, index, arr) => (
-                                <span key={index}>
-                                  {part}
-                                  {index < arr.length - 1 && <br />}
-                                </span>
-                              ))
-                            });
-                          }
-                          
-                          // Add frame content
-                          const frameContent = match[1];
-                          parts.push({
-                            type: 'frame',
-                            content: frameContent.split('<enter>').map((part, index, arr) => {
-                              // Check if line contains <right> tag
-                              if (part.includes('<right>')) {
-                                const rightContent = part.replace('<right>', '');
-                                return (
-                                  <div key={index} className="text-right">
-                                    {rightContent}
-                                    {index < arr.length - 1 && <br />}
-                                  </div>
-                                );
-                              } else {
-                                return (
-                                  <span key={index}>
-                                    {part}
-                                    {index < arr.length - 1 && <br />}
-                                  </span>
-                                );
-                              }
-                            })
-                          });
-                          
-                          currentIndex = match.index + match[0].length;
-                        }
-                        
-                        // Add remaining text after last frame
-                        if (currentIndex < passage.length) {
-                          const remainingText = passage.slice(currentIndex);
-                          parts.push({
-                            type: 'text',
-                            content: remainingText.split('<enter>').map((part, index, arr) => (
-                              <span key={index}>
-                                {part}
-                                {index < arr.length - 1 && <br />}
-                              </span>
-                            ))
-                          });
-                        }
-                        
-                        // If no frames found, process entire passage as text
-                        if (parts.length === 0) {
-                          parts.push({
-                            type: 'text',
-                            content: passage.split('<enter>').map((part, index, arr) => (
-                              <span key={index}>
-                                {part}
-                                {index < arr.length - 1 && <br />}
-                              </span>
-                            ))
-                          });
-                        }
-                        
-                        return parts.map((part, index) => {
-                          if (part.type === 'frame') {
-                            return (
-                              <div key={index} className="mt-4 border-2 border-black p-4 bg-white rounded-lg">
-                                <div className="text-lg leading-relaxed text-gray-800">
-                                  {part.content}
-                                </div>
-                              </div>
-                            );
-                          } else {
-                            return (
-                              <div key={index}>
-                                {part.content}
-                              </div>
-                            );
-                          }
-                        });
-                      })()}
+                    <div className="text-lg md:text-xl leading-relaxed text-gray-800">
+                      {renderFramedPassageBlocks(
+                        question.passage,
+                        (questionTimeRemaining[question?.id] !== undefined && questionTimeRemaining[question?.id] <= 0)
+                      )}
                     </div>
                   </div>
                 )}
@@ -1939,22 +1785,17 @@ export default function ExamPage() {
                 {/* Display passage from jlpt_question_passages table with black border */}
                 {question.jlpt_question_passages && question.jlpt_question_passages.length > 0 && (
                   <div className="mb-6">
-                    {/* Reading passage with black border */}
-                    <div className={`border-2 border-black p-6 rounded-lg ${
-                      (questionTimeRemaining[question?.id] !== undefined && questionTimeRemaining[question?.id] <= 0) ? 'bg-red-100' : 'bg-white'
-                    }`}>
-                      <div className="text-lg leading-relaxed text-gray-800">
-                        {question.jlpt_question_passages.map((passage, passageIndex) => (
-                          <div key={passageIndex}>
-                            {passage.content && (
-                              <div className="whitespace-pre-line">
-                                {renderPassageContent(passage.content, { questions: groupedQuestions[activeQuestionType]?.questions || [], questionTypeId: activeQuestionType })}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <PassageBorderBox isTimeUp={(questionTimeRemaining[question?.id] !== undefined && questionTimeRemaining[question?.id] <= 0)}>
+                      {question.jlpt_question_passages.map((passage, passageIndex) => (
+                        <div key={passageIndex}>
+                          {passage.content && (
+                            <div className="whitespace-pre-line text-lg md:text-xl">
+                              {renderPassageContent(passage.content, { questions: groupedQuestions[activeQuestionType]?.questions || [], questionTypeId: activeQuestionType })}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </PassageBorderBox>
                   </div>
                 )}
 
@@ -1964,7 +1805,7 @@ export default function ExamPage() {
                     <div className="w-9 h-9 border-2 border-gray-300 rounded-md flex items-center justify-center text-base font-semibold text-gray-700 select-none">
                       {question.position}
                     </div>
-                    <div className="text-xl font-normal text-[#0B1320] leading-relaxed">
+                    <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
                       {question.underline_text ? (
                         <>
                           {question.question_text.split(question.underline_text)[0].split('<enter>').map((part, index) => (
@@ -1973,14 +1814,14 @@ export default function ExamPage() {
                               {index < question.question_text.split(question.underline_text)[0].split('<enter>').length - 1 && <br />}
                             </span>
                           ))}
-                          <span className="underline decoration-2 underline-offset-4">
+                          <Underline weight={1}>
                             {question.underline_text.split('<enter>').map((part, index) => (
                               <span key={index}>
                                 {part}
                                 {index < question.underline_text.split('<enter>').length - 1 && <br />}
                               </span>
                             ))}
-                          </span>
+                          </Underline>
                           {question.question_text.split(question.underline_text)[1].split('<enter>').map((part, index) => (
                             <span key={index}>
                               {part}
@@ -2025,7 +1866,7 @@ export default function ExamPage() {
                                 <span className="w-8 h-8 bg-[#874FFF] text-white rounded-full flex items-center justify-center font-bold text-sm">
                                   {index + 1}
                                 </span>
-                                <span className="text-gray-800 font-bold">
+                                <span className="text-gray-800 font-normal">
                                   {answer.show_order}. {answer.answer_text}
                                 </span>
                                 <span className="text-gray-400 text-sm">(Click để bỏ)</span>
@@ -2112,7 +1953,7 @@ export default function ExamPage() {
                                   />
                                 </span>
                               )}
-                              <span className="ml-3 text-base font-medium text-gray-800">
+                              <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                                 {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
                               </span>
                               {question.questionTypeId === "QT007" && (
@@ -2130,58 +1971,20 @@ export default function ExamPage() {
               }
             })()}
           </div>
-
-          {/* Navigation Buttons */}
-          <div className="mt-8 flex items-center justify-between" style={{fontFamily: "Nunito"}}>
-            <button
-              onClick={handlePrevious}
-              disabled={shouldUsePagination ? 
-                (currentQuestionPage === 0 && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) === 0) :
-                (currentQuestionIndex === 0 && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) === 0)
-              }
-              className={`px-8 py-3 rounded-lg font-semibold text-lg transition-all ${
-                (shouldUsePagination ? 
-                  (currentQuestionPage === 0 && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) === 0) :
-                  (currentQuestionIndex === 0 && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) === 0)
-                )
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-white border-2 border-[#5427B4] text-[#5427B4] hover:bg-[#5427B4] hover:text-white"
-              }`}
-            >
-              ← Quay lại
-            </button>
-
-            <div className="flex gap-4">
-
-              {(shouldUsePagination ? 
-                (currentQuestionPage < filteredQuestions.length - 1 || 
-                 questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < questionTypeTabs.length - 1) :
-                (currentQuestionIndex < filteredQuestions.length - 1 || 
-                 questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < questionTypeTabs.length - 1)
-              ) ? (
-                <button
-                  onClick={handleNext}
-                  className="px-8 py-3 rounded-lg bg-[#874FFF] text-white font-semibold text-lg hover:bg-[#7a46ea] transition-all border-2 border-[#5427B4]"
-                >
-                  Câu tiếp theo →
-                </button>
-              ) : (
-                <button
-                  onClick={handleSubmitExam}
-                  className="px-8 py-3 rounded-lg bg-green-600 text-white font-semibold text-lg hover:bg-green-700 transition-all"
-                >
-                  HOÀN THÀNH ✓
-                </button>
-              )}
-            </div>
-          </div>
-
         </div>
       </main>
 
       <Footer />
 
       {/* === COMPONENT OVERLAY === */}
+      <TimeUpModal
+        show={showReadingTimeUpModal}
+        onClose={() => setShowReadingTimeUpModal(false)}
+        onAction={() => {
+          setShowReadingTimeUpModal(false);
+          navigate('/listening-intro');
+        }}
+      />
       <ExamCertificateOverlay
         show={showCertificate}
         onHide={() => {
