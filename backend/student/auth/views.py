@@ -6,7 +6,6 @@ from django.conf import settings
 import json, secrets, hashlib
 from datetime import datetime, timezone, timedelta
 from rest_framework.decorators import api_view
-import bcrypt
 
 @api_view(['POST'])
 @csrf_exempt
