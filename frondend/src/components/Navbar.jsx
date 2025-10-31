@@ -123,7 +123,7 @@ export default function Navbar() {
                 {/* Dropdown Menu (Logout) */}
                 <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity duration-150 absolute right-0 top-full pt-2 z-50">
                     <div className="bg-white border rounded-lg shadow-xl py-2 w-40 whitespace-nowrap">
-                        <Link to="/Dashboard" className="flex items-center px-4 py-2 text-base font-medium text-[#111827] hover:bg-gray-100">
+                        <Link to="/student-dashboard" className="flex items-center px-4 py-2 text-base font-medium text-[#111827] hover:bg-gray-100">
                            <User size={18} className="mr-2"/> Hồ sơ
                         </Link>
                         {/* Nút Đăng xuất trong Dropdown */}
@@ -169,7 +169,7 @@ export default function Navbar() {
             
             {/* Mobile: Hồ sơ và Đăng xuất */}
             {isLoggedIn && (
-              <NavLink to="/Dashboard" onClick={closeMobileMenu} className={getMobileNavLinkClass('/Dashboard')}>Hồ sơ học viên</NavLink>
+              <NavLink to="/student-dashboard" onClick={closeMobileMenu} className={getMobileNavLinkClass('/student-dashboard')}>Hồ sơ học viên</NavLink>
             )}
 
             {/* Mobile: Nút Đăng nhập/Đăng xuất */}

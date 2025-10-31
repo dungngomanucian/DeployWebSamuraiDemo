@@ -11,9 +11,13 @@ urlpatterns = [
     
     # Auth functionality
     path('auth/', include('student.auth.urls')),
-    path('login/', include('student.login.urls')),
+
+    path('register/', include('student.register.urls')),
     
+    path('login/', include('student.login.urls')),
+
     path('dashboard/', include('student.dashboard.urls'))
+
 
 ]
 
