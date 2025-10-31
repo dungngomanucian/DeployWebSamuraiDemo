@@ -99,10 +99,9 @@ class ExamResultSerializer(serializers.Serializer):
     id = serializers.CharField()
     exam_id = serializers.CharField()
     student_id = serializers.CharField()
-    sum_score = serializers.IntegerField(required=False, allow_null=True)
+    sum_score = serializers.FloatField(required=False, allow_null=True)
     duration = serializers.IntegerField(required=False, allow_null=True)
     datetime = serializers.DateTimeField(required=False, allow_null=True)
-
 
 class StudentAnswerSerializer(serializers.Serializer):
     """Serializer for student answers"""
@@ -112,3 +111,19 @@ class StudentAnswerSerializer(serializers.Serializer):
     chosen_answer_id = serializers.CharField()
     exam_result_id = serializers.CharField()
     position = serializers.IntegerField()
+
+class SubmittedAnswerSerializer(serializers.Serializer):
+    """
+    Serializer cho 1 câu trả lời được nộp lên.
+    """
+    exam_question_id = serializers.CharField()
+    chosen_answer_id = serializers.CharField() 
+    position = serializers.IntegerField() # Dùng cho câu hỏi sắp xếp
+
+class ExamSubmissionSerializer(serializers.Serializer):
+    """
+    Serializer cho toàn bộ bài nộp, chứa thời gian và danh sách câu trả lời.
+    """
+    duration = serializers.IntegerField(min_value=0)
+    # allow_empty=False để đảm bảo học sinh phải nộp ít nhất 1 câu
+    answers = SubmittedAnswerSerializer(many=True, allow_empty=False)

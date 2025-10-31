@@ -199,7 +199,7 @@ const StudentLogin = () => {
     };
 
     const navigateDashboard = () => {
-        navigate('/Dashboard');
+        navigate('/');
     };
 
     return (

@@ -3,7 +3,7 @@ import logo from "../assets/logo.png";
 
 export default function Footer() {
   return (
-    <footer className="bg-white text-[#111827] py-16 px-6 md:px-12 lg:px-24 border-t border-gray-200">
+    <footer className="bg-white text-[#111827] py-16 px-6 md:px-12 lg:px-24 border-t border-gray-200" style={{fontFamily: "Nunito"}}>
       <div className="max-w-[1440px] mx-auto space-y-12">
         {/* === LƯỚI CHÍNH: Cột logo + 3 nhóm nội dung + HỆ SINH THÁI phía dưới === */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12 md:gap-16">
