@@ -11,6 +11,7 @@ import PracticeByType from "./pages/student/practice/PracticeByType";
 import PracticeLevelDetail from "./pages/student/practice/PracticeLevelDetail";
 import ExamListPage from "./pages/student/exam/ExamListPage";
 import ExamIntro from "./pages/student/exam/ExamIntro";
+import ListeningIntro from "./pages/student/exam/ListeningIntro";
 import ExamPage from "./pages/student/exam/ExamPage";
 import StudentDashboard from "./pages/student/home/StudentDashboard";
 
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/exam-list" element={<ExamListPage />} />
           <Route path="/exam-intro" element={<ExamIntro />} />
+          <Route path="/listening-intro" element={<ListeningIntro />} />
           <Route path="/exam-start" element={<ExamPage />} />
           
           <Route path="/student-dashboard" element={<StudentDashboard />} />     

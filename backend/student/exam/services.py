@@ -94,15 +94,50 @@ class ExamService:
     def get_question_types(section_id: str) -> Dict:
         """Get all question types of a section"""
         try:
-            response = supabase.table('jlpt_question_types')\
-                .select('*, question_guides:jlpt_question_guides(id, name)')\
+            # 1) Lấy các question_types theo section
+            qt_response = supabase.table('jlpt_question_types')\
+                .select('id, exam_section_id, question_guides_id, task_instructions, image_path, duration')\
                 .eq('exam_section_id', section_id)\
                 .order('id')\
                 .execute()
+
+            qts = qt_response.data or []
+
+            # 2) Thu thập tất cả question_guides_id và lấy tên từ bảng jlpt_question_guides
+            guide_ids = []
+            for qt in qts:
+                qg_id = qt.get('question_guides_id')
+                # Kiểm tra qg_id hợp lệ (không None, không null, không rỗng)
+                if qg_id is not None and qg_id != 'null' and str(qg_id).strip():
+                    guide_ids.append(str(qg_id).strip())
             
+            guides_map = {}
+            if guide_ids:
+                try:
+                    guides_res = supabase.table('jlpt_question_guides')\
+                        .select('id, name')\
+                        .in_('id', guide_ids)\
+                        .execute()
+                    for g in (guides_res.data or []):
+                        guides_map[g['id']] = g
+                except Exception as e:
+                    print(f"Error fetching question guides: {e}")
+
+            # 3) Gắn thêm trường question_guides vào từng question_type (để FE hiển thị tiếng Việt)
+            for qt in qts:
+                qg_id = qt.get('question_guides_id')
+                if qg_id is not None and qg_id != 'null' and str(qg_id).strip():
+                    guide = guides_map.get(str(qg_id).strip())
+                    if guide:
+                        qt['question_guides'] = {'id': guide['id'], 'name': guide.get('name')}
+                    else:
+                        qt['question_guides'] = None
+                else:
+                    qt['question_guides'] = None
+
             return {
                 'success': True,
-                'data': response.data
+                'data': qts
             }
         except Exception as e:
             return {

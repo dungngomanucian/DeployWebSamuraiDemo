@@ -85,7 +85,7 @@ export default function Navbar() {
             <li><a className="text-[#111827] hover:text-[#4F46E5] cursor-pointer transition-all">Học bài</a></li>
             {/* ... (Luyện đề) ... */}
             <li className="relative group">
-              <span className={`${pathname.startsWith('/practice') || pathname.startsWith('/mock-exam') || pathname.startsWith('/exam-') ? 'text-[#4F46E5] font-semibold' : 'text-[#111827]'} hover:text-[#4F46E5] cursor-pointer transition-all inline-block px-2 py-1`}>
+              <span className={`${pathname.startsWith('/practice') || pathname.startsWith('/mock-exam') || pathname.startsWith('/exam-') || pathname.startsWith('/listening') ? 'text-[#4F46E5] font-semibold' : 'text-[#111827]'} hover:text-[#4F46E5] cursor-pointer transition-all inline-block px-2 py-1`}>
                 Luyện đề
               </span>
               <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity duration-150 absolute left-1/2 -translate-x-1/2 top-full pt-2 z-50">
@@ -162,7 +162,7 @@ export default function Navbar() {
             <NavLink to="/" onClick={closeMobileMenu} className={getMobileNavLinkClass('/')}>Trang chủ</NavLink>
             <a onClick={closeMobileMenu} className="block text-[#111827] hover:text-[#4F46E5] py-2">Học bài</a>
             <div className="py-2">
-              <div className={`text-xs mb-1 ${pathname.startsWith('/practice') || pathname.startsWith('/mock-exam') || pathname.startsWith('/exam-') ? 'text-[#4F46E5] font-semibold' : 'text-gray-500'}`}>Luyện đề</div>
+              <div className={`text-xs mb-1 ${pathname.startsWith('/practice') || pathname.startsWith('/mock-exam') || pathname.startsWith('/exam-') || pathname.startsWith('/listening') ? 'text-[#4F46E5] font-semibold' : 'text-gray-500'}`}>Luyện đề</div>
               <Link to="/practice-jlpt" onClick={closeMobileMenu} className="block text-[#111827] hover:text-[#4F46E5] py-2">Luyện thi JLPT</Link>
               <Link to="/practice-eju" onClick={closeMobileMenu} className="block text-[#111827] hover:text-[#4F46E5] py-2">Luyện thi EJU</Link>
             </div>
