@@ -9,6 +9,16 @@ import QuestionButtons from "../../../components/Exam/QuestionButtons";
 import TimeUpModal from "../../../components/Exam/TimeUpModal";
 import { Bold } from "lucide-react";
 
+// 1. IMPORT CÁC HÀM RENDER TỪ FILE UTILS MỚI
+import {
+  formatTime,
+  renderPassageContent,
+  renderFramedPassageBlocks,
+  PassageBorderBox,
+  Underline,
+  formatAnswerText
+} from "../../../components/Exam/ExamRenderUtils";
+
 export default function ExamPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -239,15 +249,6 @@ export default function ExamPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-
-  // Format time display as MM:SS; optionally pad minutes to two digits
-  const formatTime = (seconds, padMinutes = false) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    const m = padMinutes ? String(minutes).padStart(2, "0") : String(minutes);
-    return `${m}:${String(secs).padStart(2, "0")}`;
-  };
-
   // Track expanded inline questions from <question> placeholders within passages
   const [openPassageQuestions, setOpenPassageQuestions] = useState({}); // { [questionId]: boolean }
   const passageQuestionRefs = useRef({}); // { [questionId]: HTMLElement }
@@ -279,270 +280,6 @@ export default function ExamPage() {
     document.addEventListener('mousedown', handleDocumentClick);
     return () => document.removeEventListener('mousedown', handleDocumentClick);
   }, [openPassageQuestions]);
-
-  // Render passage content supporting <frame_start>/<frame_end>, <center>/<right>, and inline <question> placeholders
-  // options: { questions: Question[], questionTypeId: string }
-  const renderPassageContent = (text, options = {}) => {
-    if (!text) return null;
-
-    const questions = Array.isArray(options.questions) ? [...options.questions].sort((a, b) => (a.position || 0) - (b.position || 0)) : null;
-    let globalQuestionIndex = 0;
-
-    const renderInlineBlock = (blockText, keyPrefix) => {
-      const lines = blockText.split('<enter>');
-      return (
-        <div className="leading-relaxed">
-          {lines.map((line, lineIndex) => {
-            const segments = [];
-            const tagRegex = /<(center|right)>([\s\S]*?)<\/\1>|<question\s*\/>|<question\s*>/g;
-            let lastIndex = 0;
-            let match;
-
-            // helper: render plain text but convert custom <table> markup to actual table and handle <underline>
-            const renderTextWithTables = (rawText, keyBase) => {
-              const tableRegex = /<table>([\s\S]*?)<\/table>/g;
-              let tMatch;
-              let tLast = 0;
-              const out = [];
-              while ((tMatch = tableRegex.exec(rawText)) !== null) {
-                if (tMatch.index > tLast) {
-                  const plain = rawText.slice(tLast, tMatch.index);
-                  if (plain) out.push(<span key={`${keyBase}-plain-${tLast}`}>{renderWithUnderline(plain, `${keyBase}-${tLast}`)}</span>);
-                }
-                const tableContent = tMatch[1] || '';
-                const rows = [];
-                const rowRegex = /<r\d+>([\s\S]*?)<\/r\d+>/g;
-                let rMatch;
-                while ((rMatch = rowRegex.exec(tableContent)) !== null) {
-                  const rowHtml = rMatch[1] || '';
-                  const cells = [];
-                  const cellRegex = /<c\d+>([\s\S]*?)<\/c\d+>/g;
-                  let cMatch;
-                  while ((cMatch = cellRegex.exec(rowHtml)) !== null) {
-                    cells.push(cMatch[1] || '');
-                  }
-                  rows.push(cells);
-                }
-                out.push(
-                  <div key={`${keyBase}-table-${tMatch.index}`} className="my-2 overflow-x-auto">
-                    <table className="mx-auto table-auto min-w-[540px] border border-gray-400 text-sm">
-                      <tbody>
-                        {rows.map((cells, ri) => (
-                          <tr key={`r-${ri}`} className={ri === 0 ? 'bg-gray-100 font-semibold' : ''}>
-                            {cells.map((cell, ci) => (
-                              <td key={`c-${ci}`} className="border border-gray-400 px-4 py-2 text-center whitespace-pre-wrap min-w-[160px]">
-                                {cell}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-                tLast = tMatch.index + tMatch[0].length;
-              }
-              if (tLast < rawText.length) {
-                const tail = rawText.slice(tLast);
-                if (tail) out.push(<span key={`${keyBase}-plain-tail-${tLast}`}>{renderWithUnderline(tail, `${keyBase}-tail`)}</span>);
-              }
-              return out;
-            };
-
-            // helper: render text with <underline> tags
-            const renderWithUnderline = (text, keyBase) => {
-              const underlineRegex = /<underline>([\s\S]*?)<\/underline>/g;
-              const parts = [];
-              let lastIndex = 0;
-              let match;
-              
-              while ((match = underlineRegex.exec(text)) !== null) {
-                if (match.index > lastIndex) {
-                  parts.push(text.slice(lastIndex, match.index));
-                }
-                parts.push(
-                  <Underline key={`${keyBase}-ul-${match.index}`} weight={2}>
-                    {match[1]}
-                  </Underline>
-                );
-                lastIndex = match.index + match[0].length;
-              }
-              
-              if (lastIndex < text.length) {
-                parts.push(text.slice(lastIndex));
-              }
-              
-              return parts.length > 0 ? parts : text;
-            };
-
-            while ((match = tagRegex.exec(line)) !== null) {
-              if (match.index > lastIndex) {
-                const before = line.slice(lastIndex, match.index);
-                if (before) {
-                  segments.push(
-                    <span key={`${keyPrefix}-t-${lineIndex}-${lastIndex}`}>
-                      {renderTextWithTables(before, `${keyPrefix}-seg-${lineIndex}-${lastIndex}`)}
-                    </span>
-                  );
-                }
-              }
-              if (match[0].startsWith('<question')) {
-                if (questions && globalQuestionIndex < questions.length) {
-                  const q = questions[globalQuestionIndex];
-                  const isOpen = !!openPassageQuestions[q.id];
-                  segments.push(
-                    <span
-                      key={`${keyPrefix}-q-${lineIndex}-${match.index}`}
-                      className="inline-block align-middle relative"
-                      ref={(el) => {
-                        if (el) {
-                          passageQuestionRefs.current[q.id] = el;
-                        } else {
-                          delete passageQuestionRefs.current[q.id];
-                        }
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className={`inline-flex items-center justify-center border-2 rounded px-3 py-1.5 text-sm font-semibold mr-2 min-w-[60px] relative ${isOpen ? 'bg-white border-[#3748EF] text-[#3748EF]' : 'bg-white border-[#3748EF] text-gray-900'} hover:bg-gray-50`}
-                        onClick={() => togglePassageQuestion(q.id)}
-                        title={`Câu ${q.position || ''}`}
-                      >
-                        {q.position ?? ''}
-                        <svg 
-                          className={`ml-1 w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
-                          fill="none" 
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      {isOpen && Array.isArray(q.answers) && q.answers.length > 0 && (
-                        <div className="absolute z-50 left-0 top-0 translate-y-9">
-                          <div className="shadow-lg rounded bg-white max-w-[85vw] w-[240px]">
-                            <div className="grid grid-cols-1">
-                              {(() => {
-                                const byOrder = new Map();
-                                (q.answers || []).forEach((a) => {
-                                  const key = String(a.show_order);
-                                  if (!byOrder.has(key)) byOrder.set(key, a);
-                                });
-                                const normalizedAnswers = Array.from(byOrder.values()).sort(
-                                  (a, b) => Number(a.show_order) - Number(b.show_order)
-                                );
-                                return normalizedAnswers.map((ans) => {
-                                  const selected = isAnswerSelected(q.id, ans.id, q.question_type_id);
-                                  return (
-                                    <button
-                                      key={ans.id}
-                                      type="button"
-                                      onClick={() => handleAnswerSelect(q.id, ans.id, q.question_type_id)}
-                                      className={`text-left w-full px-3 py-2.5 transition-colors ${selected ? 'bg-[#DDE5FF]' : 'bg-white hover:bg-gray-50'}`}
-                                    >
-                                      <div className="flex items-start text-gray-900 leading-6">
-                                        <span className="whitespace-pre-wrap break-words">
-                                          {formatAnswerText(ans?.answer_text || ans?.content || '', q?.question_text || '', q?.questionTypeId || q?.question_type_id)}
-                                        </span>
-                                      </div>
-                                    </button>
-                                  );
-                                });
-                              })()}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </span>
-                  );
-                  globalQuestionIndex += 1;
-                } else {
-                  segments.push(
-                    <span key={`${keyPrefix}-q-${lineIndex}-${match.index}`} className="inline-block align-middle">
-                      <span className="inline-flex items-center justify-center border-2 border-gray-800 rounded px-3 py-1 text-sm font-semibold mr-2">?</span>
-                    </span>
-                  );
-                }
-              } else {
-                const tag = match[1];
-                const content = match[2];
-                if (tag === 'center') {
-                  segments.push(
-                    <div key={`${keyPrefix}-c-${lineIndex}-${match.index}`} className="text-center">
-                      {renderWithUnderline(content, `${keyPrefix}-c-${lineIndex}-${match.index}`)}
-                    </div>
-                  );
-                } else if (tag === 'right') {
-                  segments.push(
-                    <div key={`${keyPrefix}-r-${lineIndex}-${match.index}`} className="text-right">
-                      {renderWithUnderline(content, `${keyPrefix}-r-${lineIndex}-${match.index}`)}
-                    </div>
-                  );
-                }
-              }
-              lastIndex = match.index + match[0].length;
-            }
-
-            if (lastIndex < line.length) {
-              const remaining = line.slice(lastIndex);
-              if (remaining) {
-                segments.push(
-                  <span key={`${keyPrefix}-t-${lineIndex}-end`}>
-                    {renderTextWithTables(remaining, `${keyPrefix}-rem-${lineIndex}`)}
-                  </span>
-                );
-              }
-            }
-
-            return (
-              <div key={`${keyPrefix}-line-${lineIndex}`} className="leading-relaxed">
-                {segments.length > 0 ? segments : <span />}
-                {lineIndex < lines.length - 1 && <br className="leading-relaxed" />}
-              </div>
-            );
-          })}
-        </div>
-      );
-    };
-
-    const parts = [];
-    const frameRegex = /<frame_start>([\s\S]*?)<frame_end>/g;
-    let lastIndex = 0;
-    let match;
-    let idx = 0;
-    while ((match = frameRegex.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        const before = text.slice(lastIndex, match.index);
-        if (before.trim().length > 0) {
-          parts.push(
-            <div key={`nf-${idx++}`}>
-              {renderInlineBlock(before, `nf-${idx}`)}
-            </div>
-          );
-        }
-      }
-      const frameContent = match[1];
-      parts.push(
-        <div key={`fr-${idx++}`} className="mt-4 border-2 border-black p-4 bg-white rounded-lg">
-          <div className="text-lg leading-relaxed text-gray-800">
-            {renderInlineBlock(frameContent, `frc-${idx}`)}
-          </div>
-        </div>
-      );
-      lastIndex = match.index + match[0].length;
-    }
-    if (lastIndex < text.length) {
-      const remaining = text.slice(lastIndex);
-      if (remaining.trim().length > 0) {
-        parts.push(
-          <div key={`nf-${idx++}`}>
-            {renderInlineBlock(remaining, `nf-${idx}`)}
-          </div>
-        );
-      }
-    }
-    return <>{parts}</>;
-  };
 
   // Handle answer selection
   const handleAnswerSelect = (questionId, answerId, questionTypeId) => {
@@ -609,64 +346,6 @@ export default function ExamPage() {
     } else {
       return studentAnswers[questionId] === answerId;
     }
-  };
-
-  // Function to underline matching content in answers for QT005 question types
-  const formatAnswerText = (answerText, questionText, questionTypeId) => {
-    if (questionTypeId !== "QT005" || !answerText || !questionText) {
-      return answerText;
-    }
-
-    // Clean and normalize text for better matching
-    const normalizeText = (text) => {
-      return text.replace(/\s+/g, ' ').trim().toLowerCase();
-    };
-
-    // Find the longest common substring between answer and question
-    const findLongestCommonSubstring = (str1, str2) => {
-      const normalized1 = normalizeText(str1);
-      const normalized2 = normalizeText(str2);
-      
-      let longest = "";
-      let longestLength = 0;
-      
-      // Try different minimum lengths for better matching
-      const minLengths = [5, 4, 3, 2];
-      
-      for (const minLength of minLengths) {
-        for (let i = 0; i < normalized1.length - minLength + 1; i++) {
-          for (let j = i + minLength; j <= normalized1.length; j++) {
-            const substring = normalized1.substring(i, j);
-            if (normalized2.includes(substring) && substring.length > longestLength) {
-              // Find the original text position to get the actual substring
-              const originalSubstring = str1.substring(i, j);
-              longest = originalSubstring;
-              longestLength = substring.length;
-            }
-          }
-        }
-        if (longestLength > 0) break; // Found a match, no need to try shorter lengths
-      }
-      
-      return longest;
-    };
-
-    const commonText = findLongestCommonSubstring(answerText, questionText);
-    
-    if (commonText && commonText.length >= 2) {
-      const parts = answerText.split(commonText);
-      return (
-          <>
-            {parts[0]}
-            <Underline weight={1} offset={5} colorClass="decoration-black">
-              {commonText}
-            </Underline>
-            {parts[1]}
-          </>
-      );
-    }
-    
-    return answerText;
   };
 
   // Get all questions flattened
@@ -905,111 +584,6 @@ export default function ExamPage() {
     );
   };
 
-  // Parse and render framed passage (<frame_start> ... <frame_end>) once
-  const renderFramedPassageBlocks = (passageText, isTimeUp) => {
-    if (!passageText) return null;
-
-    const parts = [];
-    let currentIndex = 0;
-    const frameRegex = /<frame_start>(.*?)<frame_end>/gs;
-    let match;
-
-    while ((match = frameRegex.exec(passageText)) !== null) {
-      if (match.index > currentIndex) {
-        const beforeText = passageText.slice(currentIndex, match.index);
-        parts.push({
-          type: 'text',
-          content: beforeText.split('<enter>').map((part, index, arr) => (
-            <span key={index}>
-              {part}
-              {index < arr.length - 1 && <br />}
-            </span>
-          )),
-        });
-      }
-
-      const frameContent = match[1];
-      parts.push({
-        type: 'frame',
-        content: frameContent.split('<enter>').map((part, index, arr) => {
-          if (part.includes('<right>')) {
-            const rightContent = part.replace('<right>', '');
-            return (
-              <div key={index} className="text-right">
-                {rightContent}
-                {index < arr.length - 1 && <br />}
-              </div>
-            );
-          }
-          return (
-            <span key={index}>
-              {part}
-              {index < arr.length - 1 && <br />}
-            </span>
-          );
-        }),
-      });
-      currentIndex = match.index + match[0].length;
-    }
-
-    if (currentIndex < passageText.length) {
-      const remainingText = passageText.slice(currentIndex);
-      parts.push({
-        type: 'text',
-        content: remainingText.split('<enter>').map((part, index, arr) => (
-          <span key={index}>
-            {part}
-            {index < arr.length - 1 && <br />}
-          </span>
-        )),
-      });
-    }
-
-    if (parts.length === 0) {
-      parts.push({
-        type: 'text',
-        content: passageText.split('<enter>').map((part, index, arr) => (
-          <span key={index}>
-            {part}
-            {index < arr.length - 1 && <br />}
-          </span>
-        )),
-      });
-    }
-
-    return parts.map((part, index) => {
-      if (part.type === 'frame') {
-        return (
-          <div key={index} className={`mt-4 border-2 border-black p-4 rounded-lg ${isTimeUp ? 'bg-red-100' : 'bg-white'}`}>
-            <div className="text-lg md:text-xl leading-relaxed text-gray-800">
-              {part.content}
-            </div>
-          </div>
-        );
-      }
-      return <div key={index}>{part.content}</div>;
-    });
-  };
-
-  // Border box wrapper for jlpt_question_passages blocks
-  const PassageBorderBox = ({ isTimeUp, children }) => (
-    <div className={`border-2 border-black p-6 rounded-lg ${isTimeUp ? 'bg-red-100' : 'bg-white'}`}>
-      <div className="text-lg md:text-xl leading-relaxed text-gray-800">
-        {children}
-      </div>
-    </div>
-  );
-
-  // Underline helper to standardize underline styles
-  const Underline = ({ children, weight = 1, offset = 4, colorClass = '' }) => {
-    const weightClass = weight === 2 ? 'decoration-2' : 'decoration-1';
-    const offsetClass = offset === 5 ? 'underline-offset-5' : 'underline-offset-4';
-    return (
-      <span className={`underline ${weightClass} ${offsetClass} ${colorClass}`.trim()}>
-        {children}
-      </span>
-    );
-  };
   // Handle question type tab click
   const handleQuestionTypeChange = (questionTypeId) => {
     if (!examData) return;
@@ -1597,7 +1171,14 @@ export default function ExamPage() {
                     <div key={passageIndex}>
                       {passage.content && (
                         <div className="whitespace-pre-line text-lg md:text-xl">
-                          {renderPassageContent(passage.content, { questions: groupedQuestions[activeQuestionType]?.questions || [], questionTypeId: activeQuestionType })}
+                          {renderPassageContent(passage.content, { 
+                            questions: groupedQuestions[activeQuestionType]?.questions || [], 
+                            questionTypeId: activeQuestionType,
+                            onQuestionClick: togglePassageQuestion,
+                            renderQuestionPopover: renderPassageQuestionPopover,
+                            passageQuestionState: openPassageQuestions,
+                            questionRefs: passageQuestionRefs
+                          })}                        
                         </div>
                       )}
                     </div>
