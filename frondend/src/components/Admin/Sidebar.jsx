@@ -1,17 +1,14 @@
 // frontend/src/components/admin/Sidebar.jsx
-import React, { useState, useEffect } from 'react';
+import React, {useRef } from 'react';
 import SidebarMenuItem from './SidebarMenuItem';
 
-// 1. IMPORT CẢ BA LOGO
-import logoFullDark from '../../assets/logo.png';     // Logo gốc (cho theme tối)
-import logoFullLight from '../../assets/logo3.png';    // Logo mới (cho theme sáng - winter)
-import logoIcon from '../../assets/logo-icon.png';     // Logo icon (khi thu gọn)
-
-// 2. IMPORT ICON ĐĂNG XUẤT (Hoặc đổi sang PrimeIcons nếu muốn)
+import logoFullDark from '../../assets/logo.png';
+import logoFullLight from '../../assets/logo3.png';
+import logoIcon from '../../assets/logo-icon.png';
 import { HiArrowLeftOnRectangle } from "react-icons/hi2"; 
 
-// Mảng menuItems với icon PrimeIcons (giữ nguyên)
 const menuItems = [
+  // ... (mảng menuItems giữ nguyên) ...
   { to: "/admin/dashboard", icon: "pi pi-chart-pie", label: "Dashboard" },
   { to: "/admin/accounts", icon: "pi pi-users", label: "Quản lý tài khoản" },
   { to: "/admin/students", icon: "pi pi-users", label: "Quản lý học viên" },
@@ -21,17 +18,15 @@ const menuItems = [
   { to: "/admin/levels", icon: "pi pi-sliders-h", label: "Quản lý level học" },
   { to: "/admin/jlpt-exams", icon: "pi pi-file-edit", label: "Quản lý đề thi" },
   { type: 'divider' },
-  { to: "/admin/settings", icon: "pi pi-cog", label: "Cài đặt" },
 ];
 const LIGHT_THEME = 'winter'; const DARK_THEME = 'black';
-// Nhận currentTheme trực tiếp từ props
-export default function Sidebar({ isSidebarOpen, currentTheme }) {
 
-
-  // Logic chọn logo giờ dùng state local currentTheme
+// 1. NHẬN THÊM PROP `onLogout`
+export default function Sidebar({ isSidebarOpen, currentTheme, onLogout }) {
+  const modalRef = useRef(null);
+  // ... (logic logoToShow giữ nguyên) ...
   let logoToShow;
   if (isSidebarOpen) {
-    console.log(currentTheme);
     if(currentTheme === LIGHT_THEME) logoToShow = logoFullDark;
     else if(currentTheme === DARK_THEME) logoToShow = logoFullLight;
   } else {
@@ -47,17 +42,15 @@ export default function Sidebar({ isSidebarOpen, currentTheme }) {
       ></label>
       <ul
         className={`menu p-4 min-h-full bg-base-200 text-base-content transition-all duration-300 ease-in-out ${
-          isSidebarOpen ? 'w-60' : 'w-24' // Giữ nguyên chiều rộng từ code của mày
+          isSidebarOpen ? 'w-60' : 'w-24'
         }`}
       >
-        {/* Header với Logo */}
+        {/* ... (Phần Header/Logo giữ nguyên) ... */}
         <li className="mb-2">
           <div className="h-16 flex items-center justify-center">
-            {/* 6. SỬ DỤNG BIẾN `logoToShow` */}
             <img
               src={logoToShow}
               alt="Samurai App Logo"
-              // Giữ nguyên class width từ code của mày
               className={`transition-all duration-300 ${isSidebarOpen ? 'w-40' : 'w-16 h-16'}`} 
               style={{ objectFit: 'contain' }}
             />
@@ -65,30 +58,65 @@ export default function Sidebar({ isSidebarOpen, currentTheme }) {
         </li>
         <div className="divider my-0"></div>
 
-        {/* Lặp qua menuItems */}
+        {/* ... (Phần lặp qua menuItems giữ nguyên) ... */}
         {menuItems.map((item, index) => 
           item.type === 'divider' ? (
-            <div key={`divider-${index}`} className="divider my-1"></div> // Thêm my-1
+            <div key={`divider-${index}`} className="divider my-1"></div>
           ) : (
-            // 7. TRUYỀN `item` VÀ `currentTheme` XUỐNG `SidebarMenuItem`
             <SidebarMenuItem
               key={item.to}
-              item={item} // Truyền cả object item
+              item={item}
               isSidebarOpen={isSidebarOpen}
-              currentTheme={currentTheme} // Truyền theme xuống
+              currentTheme={currentTheme}
             />
           )
         )}
 
+        {/* --- SỬA TẠI ĐÂY --- */}
         {/* Mục Đăng xuất riêng */}
         <li>
-          {/* Giữ nguyên icon HiArrowLeftOnRectangle hoặc đổi sang pi pi-sign-out */}
-          <a href="#" className={`flex items-center gap-4 py-2 px-4 rounded-md transition-colors duration-200 hover:bg-base-300 ${!isSidebarOpen && 'justify-center'}`}>
+          {/* 3. Sửa onClick: Thay vì gọi onLogout, ta MỞ modal */}
+          <button 
+            onClick={() => modalRef.current.showModal()} // <-- MỞ MODAL
+            className={`flex items-center gap-4 py-2 px-4 rounded-md transition-colors duration-200 hover:bg-base-300 w-full ${!isSidebarOpen && 'justify-center'}`}
+          >
             <HiArrowLeftOnRectangle className="w-6 h-6" /> 
             <span className={`transition-opacity duration-200 ${!isSidebarOpen ? 'opacity-0 hidden' : 'opacity-100'}`}>Đăng xuất</span>
-          </a>
+          </button>
         </li>
+        {/* --- KẾT THÚC SỬA --- */}
       </ul>
+
+      <dialog id="logout_confirm_modal" className="modal" ref={modalRef}>
+        <div className="modal-box">
+          <h3 className="font-bold text-lg">Xác nhận Đăng xuất</h3>
+          <p className="py-4">Bạn có chắc chắn muốn đăng xuất khỏi tài khoản admin không?</p>
+          <div className="modal-action">
+            {/* Nút Hủy: Chỉ đóng modal */}
+            <button 
+              className="btn" 
+              onClick={() => modalRef.current.close()}
+            >
+              Hủy
+            </button>
+            
+            {/* Nút Xác nhận: Đóng modal VÀ gọi onLogout */}
+            <button 
+              className="btn btn-error" // Nút màu đỏ
+              onClick={() => {
+                modalRef.current.close(); // Đóng modal
+                onLogout(); // <-- Gọi hàm logout thật
+              }}
+            >
+              Tôi chắc chắn
+            </button>
+          </div>
+        </div>
+        {/* Vùng nền mờ, click vào cũng đóng modal */}
+        <form method="dialog" className="modal-backdrop">
+            <button>close</button>
+        </form>
+      </dialog>
     </div>
   );
 }
