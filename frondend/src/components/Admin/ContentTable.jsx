@@ -10,7 +10,7 @@ export default function ContentTable({
   currentPage, 
   pageSize,
   sortConfig,
-  onSort 
+  onSort
 }) {
   if (!data || data.length === 0) {
     return (
@@ -21,9 +21,10 @@ export default function ContentTable({
   return (
     <div className="overflow-x-auto">
       <table className="table w-full table-zebra">
+        {/* thead giữ nguyên */}
         <thead>
           <tr>
-            <th>#</th>
+            <th className="w-10">#</th>
             {columns.map((col) => (
               <th key={col.accessor}>
                 <SortableHeader
@@ -33,10 +34,11 @@ export default function ContentTable({
                 />
               </th>
             ))}
-            <th>Hành động</th>
+            <th className="w-28 text-center">Hành động</th>
           </tr>
         </thead>
         <tbody>
+          {/* data giờ là dataWithCustomActions */}
           {data.map((row, index) => (
             <tr key={row.id} className="hover">
               <th>{((currentPage - 1) * pageSize) + index + 1}</th>
@@ -45,11 +47,15 @@ export default function ContentTable({
                   {col.format ? col.format(row[col.accessor]) : row[col.accessor]}
                 </td>
               ))}
-              <td>
-                <ActionButtons
-                  onEdit={() => onEdit(row.id)}
-                  onDelete={() => onDelete(row.id)}
-                />
+              <td className="w-28">
+                <div className="flex justify-center">
+                   <ActionButtons
+                     recordId={row.id}       // Truyền ID bản ghi
+                     onEdit={onEdit}         // Truyền handler Edit
+                     onDelete={onDelete}     // Truyền handler Delete
+                     customActions={row.customActions || []} // Lấy customActions từ row
+                   />
+                </div>
               </td>
             </tr>
           ))}

@@ -8,11 +8,6 @@ import { HiBars3,HiUserCircle } from "react-icons/hi2";
 import Sidebar from '../components/Admin/Sidebar'; // Sidebar được import ở đây
 import ThemeToggleButton from '../components/Admin/ThemeToggleButton';
 
-// ... (imports CSS giữ nguyên) ...
-import "primereact/resources/themes/lara-light-indigo/theme.css"; 
-import "primereact/resources/primereact.min.css";
-import "primeicons/primeicons.css";
-
 const LIGHT_THEME = 'winter'; 
 const DARK_THEME = 'black';   
 

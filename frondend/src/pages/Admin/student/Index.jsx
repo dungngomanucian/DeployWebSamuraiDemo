@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format } from 'date-fns';  
 
 // Layouts và Components
 import IndexLayout from '../../../layouts/IndexLayout';
@@ -118,6 +118,39 @@ function Index() {
     // Thêm logic xóa ở đây
     console.log(`Xóa học viên ID: ${id}`);
   };
+  const handleCreateAccountForStudent = (studentId) => { navigate(`/admin/accounts/new?studentId=${studentId}`); };
+  const handleViewAccount = (accountId) => { navigate(`/admin/accounts/details/${accountId}`); };
+
+  const dataWithCustomActions = useMemo(() => {
+      return filteredData.map(student => {
+        let customActionsForRow = []; // Mảng custom actions cho hàng này
+
+        if (student.account_id) {
+          customActionsForRow.push({
+            label: "Xem tài khoản",
+            icon: "pi pi-eye",
+            // Quan trọng: onClick giờ không cần tham số, vì recordId sẽ được ActionButtons tự thêm vào
+            onClick: handleViewAccount, 
+            className: "text-neutral hover:bg-neutral hover:text-neutral-content"
+          });
+        } else {
+          customActionsForRow.push({
+            label: "Tạo tài khoản",
+            icon: "pi pi-user-plus",
+            onClick: handleCreateAccountForStudent, // Không cần truyền student.id ở đây
+            className: "text-success hover:bg-success hover:text-success-content"
+          });
+        }
+        
+        // Thêm các custom action khác nếu cần
+
+        // Trả về object student gốc kèm mảng custom actions
+        return {
+          ...student,
+          customActions: customActionsForRow // Key mới để lưu custom actions
+        };
+      });
+    }, [filteredData, navigate]); // Dependency là dữ liệu đã lọc/sắp xếp
 
   return (
     <IndexLayout
@@ -160,7 +193,7 @@ function Index() {
         <>
           <ContentTable 
             columns={columns}
-            data={filteredData}
+            data={dataWithCustomActions}
             onEdit={handleEdit}
             onDelete={handleDelete}
             currentPage={currentPage}
