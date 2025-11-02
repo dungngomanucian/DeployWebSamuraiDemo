@@ -9,7 +9,7 @@ import QuestionButtons from "../../../components/Exam/QuestionButtons";
 import TimeUpModal from "../../../components/Exam/TimeUpModal";
 import { Bold } from "lucide-react";
 
-// 1. IMPORT CÁC HÀM RENDER TỪ FILE UTILS MỚI
+// 1. IMPORT CÁC HÀM RENDER (Giữ nguyên)
 import {
   formatTime,
   renderPassageContent,
@@ -17,45 +17,98 @@ import {
   PassageBorderBox,
   Underline,
   formatAnswerText
-} from "../../../components/Exam/ExamRenderUtils";
+} from "../../../components/Exam/ExamRenderUtils"; // Đảm bảo đường dẫn này đúng
+
+// 2. IMPORT 2 HOOK MỚI (Giả sử nằm trong 'src/hooks/exam/')
+import { useExamTimers } from "../../../hooks/exam/useExamTimers";
+import { useExamState } from "../../../hooks/exam/useExamState";
 
 export default function ExamPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const examId = params.get("examId");
 
+  // === CÁC STATE GỐC CÒN GIỮ LẠI ===
+  // (State liên quan đến tải dữ liệu)
   const [examData, setExamData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [studentAnswers, setStudentAnswers] = useState({});
-  const [answerOrder, setAnswerOrder] = useState({}); // For QT007: stores order of selected answers
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [totalTime, setTotalTime] = useState(0);
+  const [totalTime, setTotalTime] = useState(0); // Chỉ giữ lại state tổng thời gian
+  const [groupedQuestions, setGroupedQuestions] = useState({});
 
+  // (State liên quan đến UI)
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [activeSection, setActiveSection] = useState(null);
   const [activeQuestionType, setActiveQuestionType] = useState(null);
-  const [groupedQuestions, setGroupedQuestions] = useState({});
-  const [expandedQuestionType, setExpandedQuestionType] = useState({}); // Track which tab is expanded per section
-  const [barWidths, setBarWidths] = useState({}); // Store bar widths for each tab
-  const [collapsedTabWidths, setCollapsedTabWidths] = useState({}); // Dynamic width for collapsed tabs per section
+  const [expandedQuestionType, setExpandedQuestionType] = useState({});
+  const [barWidths, setBarWidths] = useState({});
+  const [collapsedTabWidths, setCollapsedTabWidths] = useState({});
   const [expandedTabWidths, setExpandedTabWidths] = useState({});
   const [showStickyProgress, setShowStickyProgress] = useState(false);
   const [hideHeader, setHideHeader] = useState(false);
-  const [currentQuestionPage, setCurrentQuestionPage] = useState(0); // For pagination
-  const [questionTimeRemaining, setQuestionTimeRemaining] = useState({}); // Time remaining for each question {questionId: seconds}
-  const timerRef = useRef(null);
-  const questionTimerRef = useRef(null); // Separate ref for question timer
-  const toastShownRef = useRef({}); // Use ref to track toast shown to avoid stale closures
-  const tabContainerRefs = useRef({}); // Refs for tab containers per section
-  const userSelectedSectionRef = useRef(false); // Track if user has manually selected a section
-  const activeSectionRef = useRef(null); // Ref to track activeSection to prevent unwanted resets
-
+  const [currentQuestionPage, setCurrentQuestionPage] = useState(0);
+  const [openPassageQuestions, setOpenPassageQuestions] = useState({});
+  
+  // (State liên quan đến nộp bài)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCertificate, setShowCertificate] = useState(false);
   const [finalResultData, setFinalResultData] = useState(null);
-  const [showReadingTimeUpModal, setShowReadingTimeUpModal] = useState(false);
+  
+  // (Refs)
+  const tabContainerRefs = useRef({});
+  const userSelectedSectionRef = useRef(false);
+  const activeSectionRef = useRef(null);
+  const passageQuestionRefs = useRef({});
+  
+  
+  // === 3. GỌI CÁC HOOK MỚI ===
 
-  // Load exam data
+  // Helper: Lấy câu hỏi hiện tại (Cần cho hook timer)
+  const getFilteredQuestions = () => {
+    if (!activeQuestionType || !groupedQuestions[activeQuestionType]) return [];
+    const questions = groupedQuestions[activeQuestionType].questions;
+    const uniqueQuestions = questions.filter((question, index, self) => 
+      index === self.findIndex(q => q.id === question.id)
+    );
+    return uniqueQuestions;
+  };
+  const filteredQuestions = getFilteredQuestions();
+  const shouldUsePagination = filteredQuestions.length > 0 && 
+    groupedQuestions[activeQuestionType]?.type?.duration &&
+    (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
+  const currentQuestion = shouldUsePagination ? 
+    filteredQuestions[currentQuestionPage] : 
+    (filteredQuestions[currentQuestionIndex] || null); // Thêm || null để tránh lỗi
+  
+  // Hook quản lý Timer
+  const {
+    timeRemaining,
+    showReadingTimeUpModal,
+    setShowReadingTimeUpModal,
+    stopGlobalTimer,
+    questionTimeRemaining,
+    resetQuestionToast,
+    stopQuestionTimer
+  } = useExamTimers(
+    totalTime, 
+    !loading && !!examData, // isExamDataLoaded
+    currentQuestion,
+    groupedQuestions,
+    activeQuestionType
+  );
+
+  // Hook quản lý State (Câu trả lời)
+  const {
+    studentAnswers,
+    answerOrder,
+    handleAnswerSelect, // <-- Hàm xử lý logic chính
+    getAnswerOrder,
+    isAnswerSelected
+  } = useExamState();
+
+  
+  // === 5. CÁC HÀM VÀ useEffect GỐC CÒN GIỮ LẠI ===
+
+  // useEffect: Tải dữ liệu thi (Cập nhật: Chỉ set totalTime)
   useEffect(() => {
     const loadExamData = async () => {
       if (!examId) {
@@ -73,17 +126,16 @@ export default function ExamPage() {
         return;
       }
 
-
       setExamData(data);
-      // Calculate total exam time from the first two jlpt_exam_sections durations (minutes)
+      
+      // TÍNH TOÁN VÀ SET totalTime (Hook timer sẽ tự bắt theo)
       const totalMinutesFromSections = Array.isArray(data?.sections)
         ? data.sections.slice(0, 2).reduce((sum, section) => sum + (Number(section?.duration) || 0), 0)
         : 0;
       const totalSeconds = totalMinutesFromSections * 60;
-      setTimeRemaining(totalSeconds);
-      setTotalTime(totalSeconds);
+      setTotalTime(totalSeconds); 
       
-      // Group questions by question type - avoid duplicates
+      // Group questions by question type
       const grouped = {};
       data.sections.forEach((section) => {
         section.question_types.forEach((qt) => {
@@ -96,7 +148,6 @@ export default function ExamPage() {
             };
           }
           qt.questions.forEach((q) => {
-            // Check if question already exists to avoid duplicates
             const existingQuestion = grouped[qt.id].questions.find(existing => existing.id === q.id);
             if (!existingQuestion) {
               grouped[qt.id].questions.push({
@@ -110,10 +161,9 @@ export default function ExamPage() {
           });
         });
       });
-      
       setGroupedQuestions(grouped);
       
-      // Set active section and question type to first ones (only if user hasn't selected one yet)
+      // Set active section and question type
       if (data.sections && data.sections.length > 0 && !userSelectedSectionRef.current) {
         const firstSectionType = data.sections[0].type;
         setActiveSection(firstSectionType);
@@ -130,26 +180,7 @@ export default function ExamPage() {
     loadExamData();
   }, [examId, navigate]);
 
-  // Timer countdown (global - first two sections)
-  useEffect(() => {
-    if (!examData || timeRemaining <= 0) return;
-
-    timerRef.current = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          // Show modal when global time is up (instead of auto-submitting)
-          setShowReadingTimeUpModal(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timerRef.current);
-  }, [examData, timeRemaining]);
-
-  // Calculate bar widths when expanded tab changes
+  // useEffect: Tính toán độ rộng của thanh bar (Giữ nguyên)
   useEffect(() => {
     const expandedTabs = Object.values(expandedQuestionType).filter(Boolean);
     if (expandedTabs.length > 0) {
@@ -172,13 +203,12 @@ export default function ExamPage() {
     }
   }, [expandedQuestionType, groupedQuestions]);
 
-  // Calculate initial bar widths for all tabs
+  // useEffect: Tính toán độ rộng ban đầu (Giữ nguyên)
   useEffect(() => {
     if (examData && Object.keys(groupedQuestions).length > 0) {
       const newWidths = {};
       Object.keys(groupedQuestions).forEach(qtId => {
         const questionCount = groupedQuestions[qtId]?.questions?.length || 0;
-        // Calculate estimated width: button width (40px) * count + gap (8px) * (count-1)
         const estimatedWidth = questionCount > 0 ? (40 * questionCount + 8 * (questionCount - 1)) : 120;
         newWidths[qtId] = estimatedWidth;
       });
@@ -186,14 +216,13 @@ export default function ExamPage() {
     }
   }, [examData, groupedQuestions]);
 
-  // Calculate collapsed tab width when expanded tab changes (per section)
+  // useEffect: Tính toán độ rộng tab co dãn (Giữ nguyên)
   useEffect(() => {
     if (examData && Object.keys(expandedQuestionType).length > 0) {
       setTimeout(() => {
         const newCollapsedWidths = {};
         const newExpandedWidths = {};
         
-        // For each section
         examData.sections.forEach(section => {
           const sectionType = section.type;
           const expandedQtId = expandedQuestionType[sectionType];
@@ -204,24 +233,13 @@ export default function ExamPage() {
             const expandedTabBarWidth = barWidths[expandedQtId] || 0;
             const totalTabs = section.question_types.length;
             const collapsedTabCount = totalTabs - 1;
-            const gapWidth = 16; // gap-4 = 16px
+            const gapWidth = 16;
             const totalGaps = (totalTabs - 1) * gapWidth;
-            
-            // Start with minimum collapsed width
             const minCollapsedWidth = 80;
-            
-            // Calculate available space
-            // Total container - gaps - (minCollapsedWidth * collapsedTabCount) = space for expanded
             const spaceForExpanded = containerWidth - totalGaps - (minCollapsedWidth * collapsedTabCount);
-            
-            // Expanded tab: use bar width but don't exceed available space
             const expandedWidth = Math.min(expandedTabBarWidth + 40, spaceForExpanded);
-            
-            // Recalculate collapsed width with actual expanded width
             const remainingSpace = containerWidth - expandedWidth - totalGaps;
             const collapsedWidth = remainingSpace / collapsedTabCount;
-            
-            // Final collapsed width (ensure it's reasonable)
             const finalCollapsedWidth = Math.max(Math.min(collapsedWidth, 150), 70);
             
             newExpandedWidths[sectionType] = expandedWidth;
@@ -235,32 +253,18 @@ export default function ExamPage() {
     }
   }, [expandedQuestionType, barWidths, examData]);  
 
-  // Handle scroll to show/hide sticky progress bar and hide header
+  // useEffect: Xử lý cuộn trang (Giữ nguyên)
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      // Show sticky progress bar when scrolled down more than 200px
       setShowStickyProgress(scrollTop > 200);
-      // Hide header when scrolled down more than 200px
       setHideHeader(scrollTop > 200);
     };
-
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Track expanded inline questions from <question> placeholders within passages
-  const [openPassageQuestions, setOpenPassageQuestions] = useState({}); // { [questionId]: boolean }
-  const passageQuestionRefs = useRef({}); // { [questionId]: HTMLElement }
-
-  const togglePassageQuestion = (questionId) => {
-    setOpenPassageQuestions((prev) => ({
-      ...prev,
-      [questionId]: !prev[questionId]
-    }));
-  };
-
-  // Close any open inline question popovers when clicking outside
+  // useEffect: Đóng popover câu hỏi (Giữ nguyên)
   useEffect(() => {
     const handleDocumentClick = (event) => {
       const target = event.target;
@@ -281,77 +285,20 @@ export default function ExamPage() {
     return () => document.removeEventListener('mousedown', handleDocumentClick);
   }, [openPassageQuestions]);
 
-  // Handle answer selection
-  const handleAnswerSelect = (questionId, answerId, questionTypeId) => {
-    //console.log(`handleAnswerSelect called for Q:${questionId} with A:${answerId} (Type: ${questionTypeId})`); //DEBUG
-    
-    if (questionTypeId === "QT007") {
-      // Handle QT007: sequential answer selection
-      setAnswerOrder((prev) => {
-        const currentOrder = prev[questionId] || [];
-        
-        // If answer is already selected, remove it and reorder the remaining answers
-        if (currentOrder.includes(answerId)) {
-          const newOrder = currentOrder.filter(id => id !== answerId);
-          const newState = {
-            ...prev,
-            [questionId]: newOrder
-          };
-          
-          // Also update student answers
-          setStudentAnswers((prevAnswers) => ({
-            ...prevAnswers,
-            [questionId]: newOrder
-          }));
-          
-          return newState;
-        }
-        
-        // Add answer to order if not already selected
-        const newOrder = [...currentOrder, answerId];
-        const newState = {
-          ...prev,
-          [questionId]: newOrder
-        };
-        
-        // Also update student answers
-        setStudentAnswers((prevAnswers) => ({
-          ...prevAnswers,
-          [questionId]: newOrder
-        }));
-        
-        return newState;
-      });
-    } else {
-      // Handle normal single answer selection
-      setStudentAnswers((prev) => ({
-        ...prev,
-        [questionId]: answerId,
-      }));
-    }
+
+  // === 6. CÁC HÀM LOGIC GỐC (Giữ lại hoặc cập nhật) ===
+
+  // Helper: Bật/tắt Popover câu hỏi QT008
+  const togglePassageQuestion = (questionId) => {
+    setOpenPassageQuestions((prev) => ({
+      ...prev,
+      [questionId]: !prev[questionId]
+    }));
   };
 
-  // Get answer order for QT007 questions
-  const getAnswerOrder = (questionId, answerId) => {
-    const order = answerOrder[questionId] || [];
-    const index = order.indexOf(answerId);
-    return index >= 0 ? index + 1 : null;
-  };
-
-  // Check if answer is selected for QT007 questions
-  const isAnswerSelected = (questionId, answerId, questionTypeId) => {
-    if (questionTypeId === "QT007") {
-      const order = answerOrder[questionId] || [];
-      return order.includes(answerId);
-    } else {
-      return studentAnswers[questionId] === answerId;
-    }
-  };
-
-  // Get all questions flattened
+  // Helper: Lấy tất cả câu hỏi (Giữ nguyên)
   const getAllQuestions = () => {
     if (!groupedQuestions) return [];
-    
     const allQuestions = [];
     Object.values(groupedQuestions).forEach((group) => {
       group.questions.forEach((q) => {
@@ -360,25 +307,11 @@ export default function ExamPage() {
     });
     return allQuestions;
   };
+  const allQuestions = getAllQuestions(); // (Biến này có thể không cần nữa)
 
-  // Get questions filtered by active section and question type
-  const getFilteredQuestions = () => {
-    if (!activeQuestionType || !groupedQuestions[activeQuestionType]) return [];
-    
-    const questions = groupedQuestions[activeQuestionType].questions;
-    
-    // Remove duplicates if any exist
-    const uniqueQuestions = questions.filter((question, index, self) => 
-      index === self.findIndex(q => q.id === question.id)
-    );
-    
-    return uniqueQuestions;
-  };
-
-  // Get question type tabs for current section
+  // Helper: Lấy các tab loại câu hỏi (Giữ nguyên)
   const getQuestionTypeTabs = () => {
     if (!activeSection || !examData) return [];
-    
     const tabs = [];
     examData.sections.forEach((section) => {
       if (section.type === activeSection) {
@@ -395,116 +328,11 @@ export default function ExamPage() {
     });
     return tabs;
   };
-
-  const allQuestions = getAllQuestions();
-  const filteredQuestions = getFilteredQuestions();
   const sectionTabs = examData?.sections?.map((s) => s.type) || [];
   const questionTypeTabs = getQuestionTypeTabs();
   
-  // Check if current question type should use pagination
-  const shouldUsePagination = filteredQuestions.length > 0 && 
-    groupedQuestions[activeQuestionType]?.type?.duration &&
-    (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
-  
-  // Fix: Use currentQuestionPage for pagination, currentQuestionIndex for regular navigation
-  const currentQuestion = shouldUsePagination ? 
-    filteredQuestions[currentQuestionPage] : 
-    filteredQuestions[currentQuestionIndex];
-
-  // Timer for individual questions with duration
-  useEffect(() => {
-    // Clear existing timer
-    if (questionTimerRef.current) {
-      clearInterval(questionTimerRef.current);
-      questionTimerRef.current = null;
-    }
-
-    // Check if current question type has duration and should use pagination
-  const currentQuestionType = groupedQuestions[activeQuestionType];
-  const duration = currentQuestionType?.type?.duration;
-    
-    if (!duration || filteredQuestions.length === 0) {
-      return;
-    }
-
-  const firstQuestion = filteredQuestions[0];
-  const shouldUsePagination = Boolean(duration) && (firstQuestion?.passage || firstQuestion?.jlpt_question_passages);
-
-    if (shouldUsePagination && currentQuestion) {
-      // Only initialize timer if this question doesn't have a timer yet
-      if (!questionTimeRemaining[currentQuestion.id]) {
-        // Convert duration to seconds
-        const durationStr = duration.replace('00:', ''); // Remove hours if 00:
-        const [minutes, seconds] = durationStr.split(':').map(Number);
-        const totalSeconds = minutes * 60 + seconds;
-        
-        setQuestionTimeRemaining(prev => ({
-          ...prev,
-          [currentQuestion.id]: totalSeconds
-        }));
-      }
-
-      // Start countdown timer for current question only
-      questionTimerRef.current = setInterval(() => {
-        setQuestionTimeRemaining((prev) => {
-          const currentTime = prev[currentQuestion.id];
-          if (currentTime <= 1) {
-            clearInterval(questionTimerRef.current);
-            questionTimerRef.current = null;
-            // Only show toast if time just ran out and toast hasn't been shown yet
-            if (currentTime === 1 && !toastShownRef.current[currentQuestion.id]) {
-              toast('Bạn đã hết thời gian làm cho câu hỏi này. Bạn nên chuyển sang câu tiếp theo.');
-              toastShownRef.current[currentQuestion.id] = true;
-            }
-            return {
-              ...prev,
-              [currentQuestion.id]: 0
-            };
-          }
-          return {
-            ...prev,
-            [currentQuestion.id]: currentTime - 1
-          };
-        });
-      }, 1000);
-      
-      return () => {
-        // Don't clear timer when component unmounts, let it continue running
-        // Only clear when explicitly changing to a different question
-      };
-    }
-  }, [activeQuestionType, currentQuestionPage, currentQuestion?.id]); // Combined dependencies
-
-  
-  // Calculate progress bar color and text color based on time remaining
-  const getProgressBarStyles = () => {
-    const minutesRemaining = timeRemaining / 60;
-    
-    if (minutesRemaining <= 15) {
-      return {
-        backgroundColor: '#F24822',
-        textColor: '#FFFFFF',
-        iconColor: '#FFFFFF'
-      };
-    } else if (minutesRemaining <= 30) {
-      return {
-        backgroundColor: '#FFC943',
-        textColor: '#986D00',
-        iconColor: '#986D00'
-      };
-    } else {
-      return {
-        backgroundColor: '#66D575',
-        textColor: '#00620D',
-        iconColor: '#006C0F'
-      };
-    }
-  };
-  
-  // Calculate progress percentage
-  const progressPercentage = totalTime > 0 ? ((totalTime - timeRemaining) / totalTime) * 100 : 0;
-
-  // (question buttons are rendered via shared component QuestionButtons)
+  // Hàm render Popover câu hỏi (Giữ nguyên)
+  // Nó hoạt động vì 'isAnswerSelected' và 'handleAnswerSelect' đến từ hook
   const renderPassageQuestionPopover = (q) => {
     return (
       <div className="absolute z-50 left-0 top-0 translate-y-9">
@@ -543,32 +371,27 @@ export default function ExamPage() {
     );
   }
   
-  // Handle section tab click
+  // Hàm: Đổi Section (Cập nhật: Thêm reset toast)
   const handleSectionChange = (sectionType, questionTypeId = null) => {
-    if (!examData) return; // Guard: don't change section if exam data isn't loaded yet
+    if (!examData) return;
     
-    // Mark that user has manually selected a section
     userSelectedSectionRef.current = true;
     activeSectionRef.current = sectionType;
     
     setActiveSection(sectionType);
-    setCurrentQuestionIndex(0); // Reset to first question of this section
+    setCurrentQuestionIndex(0); 
     
-    // Set first question type of the new section as active
     const newSection = examData.sections.find(s => s.type === sectionType);
     if (newSection && newSection.question_types.length > 0) {
-      // If a specific questionTypeId is provided, use it (if it exists in the new section)
       if (questionTypeId) {
         const targetQuestionType = newSection.question_types.find(qt => qt.id === questionTypeId);
         if (targetQuestionType) {
           setActiveQuestionType(questionTypeId);
-          // Also set expanded state for this question type in the new section
           setExpandedQuestionType(prev => ({
             ...prev,
             [sectionType]: prev[sectionType] === questionTypeId ? null : questionTypeId
           }));
         } else {
-          // Fallback to first question type if provided questionTypeId doesn't exist
           const firstQuestionTypeId = newSection.question_types[0].id;
           setActiveQuestionType(firstQuestionTypeId);
           setExpandedQuestionType(prev => ({
@@ -577,33 +400,61 @@ export default function ExamPage() {
           }));
         }
       } else {
-        // Find the question type that matches the current activeQuestionType in the new section
         const matchingQuestionType = newSection.question_types.find(qt => qt.id === activeQuestionType);
-        
         if (matchingQuestionType) {
-          // Keep the same question type if it exists in the new section
           setActiveQuestionType(activeQuestionType);
         } else {
-          // Use first question type of the new section
           const firstQuestionTypeId = newSection.question_types[0].id;
           setActiveQuestionType(firstQuestionTypeId);
         }
       }
       
-      setCurrentQuestionPage(0); // Reset pagination when switching sections
-      toastShownRef.current = {}; // Reset ref when switching sections
+      setCurrentQuestionPage(0);
+      resetQuestionToast(); // <-- Cập nhật
     }
   };
 
-  // Reusable progress bar with timer
-  const TimerProgressBar = ({ progressPercentageValue }) => {
+  // Hàm: Đổi Loại câu hỏi (Cập nhật: Thêm reset toast)
+  const handleQuestionTypeChange = (questionTypeId) => {
+    if (!examData) return;
+    
+    const targetSection = examData.sections.find(section => 
+      section.question_types.some(qt => qt.id === questionTypeId)
+    );
+    
+    if (targetSection && targetSection.type !== activeSection) {
+      userSelectedSectionRef.current = true;
+      activeSectionRef.current = targetSection.type;
+      handleSectionChange(targetSection.type, questionTypeId);
+      return;
+    }
+    
+    if (targetSection && targetSection.type === activeSection) {
+      setActiveQuestionType(questionTypeId);
+      setCurrentQuestionPage(0);
+      setCurrentQuestionIndex(0);
+      resetQuestionToast(); // <-- Cập nhật
+    }
+  };
+
+  // Hàm: Đổi trang (Giữ nguyên)
+  const handlePageChange = (newPage) => {
+    setCurrentQuestionPage(newPage);
+  };
+
+  // Component: Thanh thời gian (Giữ nguyên)
+  // Hoạt động vì 'timeRemaining' lấy từ hook
+  const TimerProgressBar = ({ }) => {
     const barStyles = getProgressBarStyles();
+    // Cập nhật: Lấy 'progressPercentage' từ đây
+    const progressPercentage = totalTime > 0 ? ((totalTime - timeRemaining) / totalTime) * 100 : 0;
+    
     return (
       <div className="w-[240px] relative">
         <div className="w-full h-5 rounded-full bg-gray-200 overflow-hidden relative">
           <div
             className="h-5 transition-all duration-1000 relative"
-            style={{ width: `${100 - progressPercentageValue}%`, backgroundColor: barStyles.backgroundColor }}
+            style={{ width: `${100 - progressPercentage}%`, backgroundColor: barStyles.backgroundColor }}
           >
             <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 pointer-events-none">
               <svg width="16" height="16" viewBox="0 0 20 20" fill={barStyles.iconColor} xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -619,74 +470,49 @@ export default function ExamPage() {
       </div>
     );
   };
-
-  // Handle question type tab click
-  const handleQuestionTypeChange = (questionTypeId) => {
-    if (!examData) return;
-    
-    // Find which section this question type belongs to
-    const targetSection = examData.sections.find(section => 
-      section.question_types.some(qt => qt.id === questionTypeId)
-    );
-    
-    // If the question type belongs to a different section, switch to that section first
-    if (targetSection && targetSection.type !== activeSection) {
-      // Mark that user has manually selected (via question type)
-      userSelectedSectionRef.current = true;
-      activeSectionRef.current = targetSection.type;
-      handleSectionChange(targetSection.type, questionTypeId);
-      return;
-    }
-    
-    // Otherwise, just change the question type
-    // Ensure we're still in the correct section - double check
-    if (targetSection && targetSection.type === activeSection) {
-      setActiveQuestionType(questionTypeId);
-      setCurrentQuestionPage(0); // Reset pagination when switching question types
-      setCurrentQuestionIndex(0); // Reset to first question of this type
-      toastShownRef.current = {}; // Reset ref when switching question types
-    }
+  
+  // Helper: Lấy style cho thanh thời gian (Giữ nguyên)
+  const getProgressBarStyles = () => {
+    const minutesRemaining = timeRemaining / 60; // 'timeRemaining' từ hook
+    if (minutesRemaining <= 15) return { backgroundColor: '#F24822', textColor: '#FFFFFF', iconColor: '#FFFFFF' };
+    if (minutesRemaining <= 30) return { backgroundColor: '#FFC943', textColor: '#986D00', iconColor: '#986D00' };
+    return { backgroundColor: '#66D575', textColor: '#00620D', iconColor: '#006C0F' };
   };
 
-  // Handle pagination change
-  const handlePageChange = (newPage) => {
-    setCurrentQuestionPage(newPage);
-  };
-
-  // Submit exam (new submit version)
+  // Hàm: Nộp bài (Cập nhật: Dùng hook)
   const handleSubmitExam = async () => {
-    if (isSubmitting) return; // Chặn spam click
+    if (isSubmitting) return;
 
     setIsSubmitting(true);
-    clearInterval(timerRef.current);
+    // Dừng tất cả timer
+    stopGlobalTimer(); 
+    stopQuestionTimer();
     
-    // 1. Tính toán thời gian làm bài (tính bằng giây)
-    const duration_taken = totalTime - timeRemaining;
+    // 1. Tính toán thời gian
+    const duration_taken = totalTime - timeRemaining; // 'timeRemaining' từ hook
 
-    // 2. Chuyển đổi state 'studentAnswers' (object) sang 'answersList' (array)
-    // Khớp với 'SubmittedAnswerSerializer' của backend
+    // 2. Chuyển đổi state (dùng 'studentAnswers' từ hook)
     const answersList = [];
-    Object.keys(studentAnswers).forEach(qId => {
+    Object.keys(studentAnswers).forEach(qId => { // 'studentAnswers' từ hook
       const answerData = studentAnswers[qId];
       
       if (Array.isArray(answerData)) {
-        // Đây là câu hỏi (Sắp xếp)
+        // Câu sắp xếp
         answerData.forEach((answerId, index) => {
           answersList.push({
             exam_question_id: qId,
             chosen_answer_id: answerId,
-            position: index + 1 // Lưu vị trí (1, 2, 3...)
+            position: index + 1
           });
         });
       } else if (answerData) {
-        // Đây là câu hỏi chọn 1 đáp án
+        // Câu trắc nghiệm
         answersList.push({
           exam_question_id: qId,
           chosen_answer_id: answerData,
-          position: 1 // Vị trí mặc định là 1
+          position: 1
         });
       }
-      // (Nếu answerData là null/undefined thì bỏ qua - không nộp)
     });
 
     // 3. Chuẩn bị data nộp bài
@@ -706,19 +532,15 @@ export default function ExamPage() {
     if (error) {
       console.error("Lỗi khi nộp bài:", error);
       alert(`Nộp bài thất bại: ${error}`);
-      // (Có thể xem xét cho làm tiếp hoặc lưu local)
     } else {
       console.log("Nộp bài thành công, kết quả:", resultData);
-      setFinalResultData(resultData); // Lưu kết quả lại
-      setShowCertificate(true); // Mở overlay
+      setFinalResultData(resultData); // Lưu kết quả (chứa submission_id)
+      setShowCertificate(true);
     }
-    if (questionTimerRef.current) {
-      clearInterval(questionTimerRef.current);
-      questionTimerRef.current = null;
-    }
-    // TODO: Calculate score and save results
-    // Điều hướng sẽ được thực hiện sau khi đóng overlay trong onHide
   };
+
+  // === PHẦN JSX (RETURN) ===
+  // (Phần này được dán y nguyên từ file gốc của bạn)
 
   if (loading) {
     return (
@@ -728,7 +550,6 @@ export default function ExamPage() {
     );
   }
 
-  // THÊM MÀN HÌNH LOADING KHI NỘP BÀI (new submit version)
   if (isSubmitting) { 
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#E9EFFC]">
@@ -760,7 +581,7 @@ export default function ExamPage() {
             {/* Top row: Progress Bar with Timer, Section Tabs, Submit */}
             <div className="flex items-center justify-between gap-4 mb-4">
             {/* Progress Bar with Timer */}
-            <TimerProgressBar progressPercentageValue={progressPercentage} />
+            <TimerProgressBar />
 
             {/* Section Tabs - Same height as progress bar and submit button */}
             <div className="flex items-center justify-center gap-2 flex-1">
@@ -986,7 +807,7 @@ export default function ExamPage() {
             {/* Progress Bar with Timer - Header (same as sticky style) */}
             {!showStickyProgress && (
               <div className="mt-4 flex justify-center">
-                <TimerProgressBar progressPercentageValue={progressPercentage} />
+                <TimerProgressBar />
               </div>
             )}
 
@@ -1595,23 +1416,26 @@ export default function ExamPage() {
 
       {/* === COMPONENT OVERLAY === */}
       <TimeUpModal
-        show={showReadingTimeUpModal}
-        onClose={() => setShowReadingTimeUpModal(false)}
+        show={showReadingTimeUpModal} // <-- Lấy từ hook
+        onClose={() => setShowReadingTimeUpModal(false)} // <-- LRouteấy từ hook
         onAction={() => {
           setShowReadingTimeUpModal(false);
-          navigate('/listening-intro');
+          navigate('/listening-intro'); // (Logic này có thể cần xem lại)
         }}
       />
       <ExamCertificateOverlay
         show={showCertificate}
         onHide={() => {
           setShowCertificate(false);
+          // === SỬA DUY NHẤT Ở ĐÂY ===
           // Chuyển trang SAU KHI đóng overlay
-          navigate("/exam-result", { 
+          // Dùng 'finalResultData.id' (là submission_id)
+          navigate(`/exam-result/${finalResultData.id}`, { 
             state: { 
-              resultData: finalResultData 
+              resultData: finalResultData // Vẫn gửi state để load nhanh
             } 
           });
+          // ==========================
         }}
         resultData={finalResultData}
         examData={examData} // Truyền cả examData để lấy level, điểm đỗ...
@@ -1623,15 +1447,15 @@ export default function ExamPage() {
       <Toaster 
         position="top-right"
         toastOptions={{
-          duration: 6000, // Tăng thời gian hiển thị lên 6 giây
+          duration: 6000, 
           style: {
-            background: '#ef4444', // Màu đỏ (Tailwind's red-500)
-            color: '#fff', // Chữ trắng để dễ đọc
+            background: '#ef4444', 
+            color: '#fff', 
             borderRadius: '8px',
-            padding: '12px 24px', // Tăng padding để toast rộng hơn
+            padding: '12px 24px', 
             fontSize: '14px',
             fontWeight: '500',
-            minWidth: '300px', // Đảm bảo độ rộng tối thiểu
+            minWidth: '300px', 
           },
         }}
       />
