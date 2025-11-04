@@ -23,6 +23,8 @@ import {
 import { useExamTimers } from "../../../hooks/exam/useExamTimers";
 import { useExamState } from "../../../hooks/exam/useExamState";
 
+import ExamQuestionTypeTabs from "../../../components/Exam/ExamQuestionTypeTabs";
+
 export default function ExamPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -39,10 +41,6 @@ export default function ExamPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [activeSection, setActiveSection] = useState(null);
   const [activeQuestionType, setActiveQuestionType] = useState(null);
-  const [expandedQuestionType, setExpandedQuestionType] = useState({});
-  const [barWidths, setBarWidths] = useState({});
-  const [collapsedTabWidths, setCollapsedTabWidths] = useState({});
-  const [expandedTabWidths, setExpandedTabWidths] = useState({});
   const [showStickyProgress, setShowStickyProgress] = useState(false);
   const [hideHeader, setHideHeader] = useState(false);
   const [currentQuestionPage, setCurrentQuestionPage] = useState(0);
@@ -54,7 +52,6 @@ export default function ExamPage() {
   const [finalResultData, setFinalResultData] = useState(null);
   
   // (Refs)
-  const tabContainerRefs = useRef({});
   const userSelectedSectionRef = useRef(false);
   const activeSectionRef = useRef(null);
   const passageQuestionRefs = useRef({});
@@ -179,79 +176,6 @@ export default function ExamPage() {
 
     loadExamData();
   }, [examId, navigate]);
-
-  // useEffect: Tính toán độ rộng của thanh bar (Giữ nguyên)
-  useEffect(() => {
-    const expandedTabs = Object.values(expandedQuestionType).filter(Boolean);
-    if (expandedTabs.length > 0) {
-      setTimeout(() => {
-        expandedTabs.forEach(qtId => {
-          const container = document.getElementById(`question-buttons-${qtId}`);
-          if (container) {
-            const buttons = container.querySelectorAll('button');
-            if (buttons.length > 0) {
-              const firstButton = buttons[0];
-              const lastButton = buttons[buttons.length - 1];
-              const firstRect = firstButton.getBoundingClientRect();
-              const lastRect = lastButton.getBoundingClientRect();
-              const width = lastRect.right - firstRect.left;
-              setBarWidths(prev => ({ ...prev, [qtId]: width }));
-            }
-          }
-        });
-      }, 0);
-    }
-  }, [expandedQuestionType, groupedQuestions]);
-
-  // useEffect: Tính toán độ rộng ban đầu (Giữ nguyên)
-  useEffect(() => {
-    if (examData && Object.keys(groupedQuestions).length > 0) {
-      const newWidths = {};
-      Object.keys(groupedQuestions).forEach(qtId => {
-        const questionCount = groupedQuestions[qtId]?.questions?.length || 0;
-        const estimatedWidth = questionCount > 0 ? (40 * questionCount + 8 * (questionCount - 1)) : 120;
-        newWidths[qtId] = estimatedWidth;
-      });
-      setBarWidths(newWidths);
-    }
-  }, [examData, groupedQuestions]);
-
-  // useEffect: Tính toán độ rộng tab co dãn (Giữ nguyên)
-  useEffect(() => {
-    if (examData && Object.keys(expandedQuestionType).length > 0) {
-      setTimeout(() => {
-        const newCollapsedWidths = {};
-        const newExpandedWidths = {};
-        
-        examData.sections.forEach(section => {
-          const sectionType = section.type;
-          const expandedQtId = expandedQuestionType[sectionType];
-          const containerRef = tabContainerRefs.current[sectionType];
-          
-          if (expandedQtId && containerRef) {
-            const containerWidth = containerRef.offsetWidth;
-            const expandedTabBarWidth = barWidths[expandedQtId] || 0;
-            const totalTabs = section.question_types.length;
-            const collapsedTabCount = totalTabs - 1;
-            const gapWidth = 16;
-            const totalGaps = (totalTabs - 1) * gapWidth;
-            const minCollapsedWidth = 80;
-            const spaceForExpanded = containerWidth - totalGaps - (minCollapsedWidth * collapsedTabCount);
-            const expandedWidth = Math.min(expandedTabBarWidth + 40, spaceForExpanded);
-            const remainingSpace = containerWidth - expandedWidth - totalGaps;
-            const collapsedWidth = remainingSpace / collapsedTabCount;
-            const finalCollapsedWidth = Math.max(Math.min(collapsedWidth, 150), 70);
-            
-            newExpandedWidths[sectionType] = expandedWidth;
-            newCollapsedWidths[sectionType] = finalCollapsedWidth;
-          }
-        });
-        
-        setExpandedTabWidths(newExpandedWidths);
-        setCollapsedTabWidths(newCollapsedWidths);
-      }, 0);
-    }
-  }, [expandedQuestionType, barWidths, examData]);  
 
   // useEffect: Xử lý cuộn trang (Giữ nguyên)
   useEffect(() => {
@@ -612,134 +536,24 @@ export default function ExamPage() {
           </div>
 
             {/* Question Type Progress Bar */}
+            {/* === 4. GỌI COMPONENT MỚI (LẦN 1) === */}
             {questionTypeTabs.length > 0 && (
               <div className="mt-4">
-                <div 
-                  ref={(el) => tabContainerRefs.current[activeSection] = el}
-                  className={`flex gap-4 ${!expandedQuestionType[activeSection] ? 'grid' : ''}`}
-                  style={!expandedQuestionType[activeSection] ? { gridTemplateColumns: `repeat(${questionTypeTabs.length}, 1fr)` } : {}}>
-                  {questionTypeTabs.map((tab) => {
-                    // Calculate answered questions count
-                    const answeredCount = Array.from({ length: tab.questionCount }, (_, index) => {
-                      const question = groupedQuestions[tab.id]?.questions[index];
-                      return question ? (
-                        question.questionTypeId === "QT007" 
-                          ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
-                          : studentAnswers[question.id]
-                      ) : false;
-                    }).filter(Boolean).length;
-
-                    const isActive = expandedQuestionType[activeSection] === tab.id;
-                    const currentSectionExpanded = expandedQuestionType[activeSection];
-
-                    return (
-                      <div 
-                        key={tab.id} 
-                        className={`flex flex-col transition-all ${
-                          currentSectionExpanded 
-                            ? 'flex-shrink-0' 
-                            : ''
-                        }`}
-                        style={
-                          currentSectionExpanded 
-                            ? (isActive 
-                                ? { width: expandedTabWidths[activeSection] ? `${expandedTabWidths[activeSection]}px` : 'auto' } 
-                                : { width: `${collapsedTabWidths[activeSection] || 150}px` }
-                              )
-                            : {}
-                        }
-                      >
-                        {/* Tab button with top/bottom bar */}
-                        <div className="flex flex-col items-center">
-                          {/* Top bar (gray) - shown when not active */}
-                          {!isActive && (
-                            <div 
-                              className="h-0.5 bg-gray-300 mb-2 transition-all" 
-                              style={{ 
-                                width: currentSectionExpanded 
-                                  ? `${Math.min((collapsedTabWidths[activeSection] || 150) * 0.7, 100)}px`
-                                  : '100%'
-                              }}
-                            ></div>
-                          )}
-                          
-                          {/* Tab text */}
-                           <button
-                             onClick={() => {
-                               const targetSection = examData.sections.find(section => 
-                                 section.question_types.some(qt => qt.id === tab.id)
-                               );
-                               
-                               if (targetSection && targetSection.type !== activeSection) {
-                                 // Pass the question type ID when changing section
-                                 // handleSectionChange will handle setting both activeSection and activeQuestionType
-                                 handleSectionChange(targetSection.type, tab.id);
-                                 return;
-                               }
-                               
-                               setExpandedQuestionType(prev => ({
-                                 ...prev,
-                                 [activeSection]: isActive ? null : tab.id
-                               }));
-                               
-                               handleQuestionTypeChange(tab.id);
-                               setCurrentQuestionIndex(0);
-                            
-                             }}
-                            className={`text-sm font-medium whitespace-nowrap transition-all ${
-                              isActive
-                                ? "text-[#4169E1]"
-                                : "text-gray-600 hover:text-gray-800"
-                            }`}
-                            style={{fontFamily: "Inter"}}
-                          >
-                             <span
-                               title={(tab?.question_guides?.name || tab.taskInstructions || tab.name) || ''}
-                               className={`${
-                                 currentSectionExpanded 
-                                   ? 'truncate' 
-                                   : ''
-                               } inline-block align-middle`}
-                               style={{
-                                 fontWeight: "bold",
-                                 maxWidth: currentSectionExpanded 
-                                   ? (isActive 
-                                       ? '280px' 
-                                       : `${Math.min((collapsedTabWidths[activeSection] || 150) * 0.9, 140)}px`)
-                                   : 'none'
-                               }}
-                             >
-                               {tab?.question_guides?.name || tab.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || tab.name}
-                             </span> {answeredCount}/{tab.questionCount}
-                          </button>
-                          
-                          {/* Bottom bar (blue) and question buttons - shown when active */}
-                          {isActive && (
-                            <>
-                              <div 
-                                className="h-0.5 bg-[#4169E1] mt-2 mb-3"
-                                style={{ width: barWidths[tab.id] || '100%' }}
-                              ></div>
-                              <QuestionButtons
-                                tab={tab}
-                                groupedQuestions={groupedQuestions}
-                                activeQuestionType={activeQuestionType}
-                                currentQuestionIndex={currentQuestionIndex}
-                                currentQuestionPage={currentQuestionPage}
-                                studentAnswers={studentAnswers}
-                                answerOrder={answerOrder}
-                                handleQuestionTypeChange={handleQuestionTypeChange}
-                                setCurrentQuestionIndex={setCurrentQuestionIndex}
-                                setCurrentQuestionPage={setCurrentQuestionPage}
-                                containerId={`question-buttons-sticky-${tab.id}`}
-                              />
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <ExamQuestionTypeTabs
+                  examData={examData}
+                  questionTypeTabs={questionTypeTabs}
+                  activeSection={activeSection}
+                  activeQuestionType={activeQuestionType}
+                  groupedQuestions={groupedQuestions}
+                  studentAnswers={studentAnswers}
+                  answerOrder={answerOrder}
+                  currentQuestionIndex={currentQuestionIndex}
+                  currentQuestionPage={currentQuestionPage}
+                  handleQuestionTypeChange={handleQuestionTypeChange}
+                  handleSectionChange={handleSectionChange}
+                  setCurrentQuestionIndex={setCurrentQuestionIndex}
+                  setCurrentQuestionPage={setCurrentQuestionPage}
+                />
               </div>
             )}
           </div>
@@ -812,138 +626,24 @@ export default function ExamPage() {
             )}
 
             {/* Question Type Progress Bar */}
+            {/* === 5. GỌI COMPONENT MỚI (LẦN 2) === */}
             {!showStickyProgress && questionTypeTabs.length > 0 && (
               <div className="mt-6">
-                <div 
-                  ref={(el) => tabContainerRefs.current[activeSection] = el}
-                  className={`flex gap-4 ${!expandedQuestionType[activeSection] ? 'grid' : ''}`}
-                  style={!expandedQuestionType[activeSection] ? { gridTemplateColumns: `repeat(${questionTypeTabs.length}, 1fr)` } : {}}>
-                  {questionTypeTabs.map((tab) => {
-                    // Calculate answered questions count
-                    const answeredCount = Array.from({ length: tab.questionCount }, (_, index) => {
-                      const question = groupedQuestions[tab.id]?.questions[index];
-                      return question ? (
-                        question.questionTypeId === "QT007" 
-                          ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
-                          : studentAnswers[question.id]
-                      ) : false;
-                    }).filter(Boolean).length;
-
-                    const isActive = expandedQuestionType[activeSection] === tab.id;
-                    const currentSectionExpanded = expandedQuestionType[activeSection];
-
-                    return (
-                      <div 
-                        key={tab.id} 
-                        className={`flex flex-col transition-all ${
-                          currentSectionExpanded 
-                            ? 'flex-shrink-0' 
-                            : ''
-                        }`}
-                        style={
-                          currentSectionExpanded 
-                            ? (isActive 
-                                ? { width: expandedTabWidths[activeSection] ? `${expandedTabWidths[activeSection]}px` : 'auto' } 
-                                : { width: `${collapsedTabWidths[activeSection] || 150}px` }
-                              )
-                            : {}
-                        }
-                      >
-                        {/* Tab button with top/bottom bar */}
-                        <div className="flex flex-col items-center">
-                          {/* Top bar (gray) - shown when not active */}
-                          {!isActive && (
-                            <div 
-                              className="h-0.5 bg-gray-300 mb-2 transition-all" 
-                              style={{ 
-                                width: currentSectionExpanded 
-                                  ? `${Math.min((collapsedTabWidths[activeSection] || 150) * 0.7, 100)}px`  // 70% of collapsed tab width or max 100px
-                                  : '100%'  // Full width when no tab is expanded
-                              }}
-                            ></div>
-                          )}
-                          
-                          {/* Tab text */}
-                           <button
-                             onClick={() => {
-                               // Find which section this question type belongs to
-                               const targetSection = examData.sections.find(section => 
-                                 section.question_types.some(qt => qt.id === tab.id)
-                               );
-                               
-                               // If the question type belongs to a different section, switch to that section first
-                               if (targetSection && targetSection.type !== activeSection) {
-                                 // Pass the question type ID when changing section
-                                 // handleSectionChange will handle setting both activeSection and activeQuestionType
-                                 handleSectionChange(targetSection.type, tab.id);
-                                 return;
-                               }
-                               
-                               // Toggle expand/collapse per section
-                               setExpandedQuestionType(prev => ({
-                                 ...prev,
-                                 [activeSection]: isActive ? null : tab.id
-                               }));
-                               
-                               // Switch to this question type and go to first question
-                               handleQuestionTypeChange(tab.id);
-                               setCurrentQuestionIndex(0);
-                            
-                             }}
-                            className={`text-sm font-medium whitespace-nowrap transition-all ${
-                              isActive
-                                ? "text-[#4169E1]"
-                                : "text-gray-600 hover:text-gray-800"
-                            }`}
-                            style={{fontFamily: "Inter"}}
-                          >
-                             <span
-                               title={(tab?.question_guides?.name || tab.taskInstructions || tab.name) || ''}
-                               className={`${
-                                 currentSectionExpanded 
-                                   ? 'truncate' 
-                                   : ''
-                               } inline-block align-middle`}
-                               style={{
-                                 fontWeight: "bold",
-                                 maxWidth: currentSectionExpanded 
-                                   ? (isActive 
-                                       ? '280px' 
-                                       : `${Math.min((collapsedTabWidths[activeSection] || 150) * 0.9, 140)}px`)
-                                   : 'none'
-                               }}
-                             >
-                               {tab?.question_guides?.name || tab.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || tab.name}
-                             </span> {answeredCount}/{tab.questionCount}
-                          </button>
-                          
-                          {/* Bottom bar (blue) and question buttons - shown when active */}
-                          {isActive && (
-                            <>
-                              <div 
-                                className="h-0.5 bg-[#4169E1] mt-2 mb-3"
-                                style={{ width: barWidths[tab.id] || '100%' }}
-                              ></div>
-                              <QuestionButtons
-                                tab={tab}
-                                groupedQuestions={groupedQuestions}
-                                activeQuestionType={activeQuestionType}
-                                currentQuestionIndex={currentQuestionIndex}
-                                currentQuestionPage={currentQuestionPage}
-                                studentAnswers={studentAnswers}
-                                answerOrder={answerOrder}
-                                handleQuestionTypeChange={handleQuestionTypeChange}
-                                setCurrentQuestionIndex={setCurrentQuestionIndex}
-                                setCurrentQuestionPage={setCurrentQuestionPage}
-                                containerId={`question-buttons-${tab.id}`}
-                              />
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <ExamQuestionTypeTabs
+                  examData={examData}
+                  questionTypeTabs={questionTypeTabs}
+                  activeSection={activeSection}
+                  activeQuestionType={activeQuestionType}
+                  groupedQuestions={groupedQuestions}
+                  studentAnswers={studentAnswers}
+                  answerOrder={answerOrder}
+                  currentQuestionIndex={currentQuestionIndex}
+                  currentQuestionPage={currentQuestionPage}
+                  handleQuestionTypeChange={handleQuestionTypeChange}
+                  handleSectionChange={handleSectionChange}
+                  setCurrentQuestionIndex={setCurrentQuestionIndex}
+                  setCurrentQuestionPage={setCurrentQuestionPage}
+                />
               </div>
             )}
           </div>
