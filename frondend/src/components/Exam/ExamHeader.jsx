@@ -24,6 +24,9 @@ export default function ExamHeader({
   currentQuestionPage,
   isSubmitting,
   
+  // === 1. NHẬN STATE MỚI TỪ EXAMPAGE ===
+  expandedQuestionType,
+  
   // === Props sự kiện ===
   onSectionChange,
   onQuestionTypeChange,
@@ -145,6 +148,7 @@ export default function ExamHeader({
       {questionTypeTabs.length > 0 && (
         <div className={`${isSticky ? 'mt-4' : 'mt-6'} w-full`}>
           <ExamQuestionTypeTabs
+            // === 2. TRUYỀN TIẾP XUỐNG TABS ===
             examData={examData}
             questionTypeTabs={questionTypeTabs}
             activeSection={activeSection}
@@ -154,6 +158,9 @@ export default function ExamHeader({
             answerOrder={answerOrder}
             currentQuestionIndex={currentQuestionIndex}
             currentQuestionPage={currentQuestionPage}
+            
+            expandedQuestionType={expandedQuestionType} // <--- TRUYỀN XUỐNG
+            
             handleQuestionTypeChange={onQuestionTypeChange}
             handleSectionChange={onSectionChange}
             setCurrentQuestionIndex={setCurrentQuestionIndex}
@@ -180,4 +187,4 @@ export default function ExamHeader({
       {headerContent}
     </div>
   );
-}
+} 
