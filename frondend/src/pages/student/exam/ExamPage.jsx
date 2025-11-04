@@ -24,6 +24,7 @@ import { useExamTimers } from "../../../hooks/exam/useExamTimers";
 import { useExamState } from "../../../hooks/exam/useExamState";
 
 import ExamQuestionTypeTabs from "../../../components/Exam/ExamQuestionTypeTabs";
+import ExamHeader from "../../../components/Exam/ExamHeader";
 
 export default function ExamPage() {
   const navigate = useNavigate();
@@ -500,153 +501,51 @@ export default function ExamPage() {
 
       {/* Sticky Progress Bar - Shows when scrolling */}
       {showStickyProgress && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-lg border-b border-gray-200 px-6 py-3" style={{fontFamily: "Nunito"}}>
-          <div className="max-w-7xl mx-auto">
-            {/* Top row: Progress Bar with Timer, Section Tabs, Submit */}
-            <div className="flex items-center justify-between gap-4 mb-4">
-            {/* Progress Bar with Timer */}
-            <TimerProgressBar />
-
-            {/* Section Tabs - Same height as progress bar and submit button */}
-            <div className="flex items-center justify-center gap-2 flex-1">
-              {sectionTabs.map((tab, idx) => (
-                <button
-                  style={{fontFamily: "UD Digi Kyokasho N-R"}}
-                  key={`${tab}-${idx}`}
-                  onClick={() => handleSectionChange(tab)}
-                  className={`h-8 px-3 rounded-lg text-sm font-medium border transition-all cursor-pointer flex items-center ${
-                    tab === activeSection
-                      ? "bg-[#4169E1] text-white border-[#4169E1]"
-                      : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            {/* Submit Button */}
-            <button
-              onClick={handleSubmitExam}
-                disabled={isSubmitting}
-              className="px-4 h-8 rounded-lg border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all text-sm flex items-center"
-            >
-                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-            </button>
-          </div>
-
-            {/* Question Type Progress Bar */}
-            {/* === 4. GỌI COMPONENT MỚI (LẦN 1) === */}
-            {questionTypeTabs.length > 0 && (
-              <div className="mt-4">
-                <ExamQuestionTypeTabs
-                  examData={examData}
-                  questionTypeTabs={questionTypeTabs}
-                  activeSection={activeSection}
-                  activeQuestionType={activeQuestionType}
-                  groupedQuestions={groupedQuestions}
-                  studentAnswers={studentAnswers}
-                  answerOrder={answerOrder}
-                  currentQuestionIndex={currentQuestionIndex}
-                  currentQuestionPage={currentQuestionPage}
-                  handleQuestionTypeChange={handleQuestionTypeChange}
-                  handleSectionChange={handleSectionChange}
-                  setCurrentQuestionIndex={setCurrentQuestionIndex}
-                  setCurrentQuestionPage={setCurrentQuestionPage}
-                />
-              </div>
-            )}
-          </div>
-        </div>
+        <ExamHeader
+          isSticky={true}
+          examData={examData}
+          activeSection={activeSection}
+          activeQuestionType={activeQuestionType}
+          questionTypeTabs={questionTypeTabs}
+          groupedQuestions={groupedQuestions}
+          studentAnswers={studentAnswers}
+          answerOrder={answerOrder}
+          currentQuestionIndex={currentQuestionIndex}
+          currentQuestionPage={currentQuestionPage}
+          isSubmitting={isSubmitting}
+          onSectionChange={handleSectionChange}
+          onQuestionTypeChange={handleQuestionTypeChange}
+          onSubmitExam={handleSubmitExam}
+          setCurrentQuestionIndex={setCurrentQuestionIndex}
+          setCurrentQuestionPage={setCurrentQuestionPage}
+          TimerProgressBarComponent={TimerProgressBar} // Truyền component vào
+        />
       )}
 
       <main className={`flex-1 py-8 ${showStickyProgress ? 'pt-44' : ''} ${hideHeader ? 'pt-0' : ''}`}>
         <div className="max-w-7xl mx-auto px-6">
           {/* Header - Exam Info */}
-          <div className="bg-white rounded-2xl shadow-md px-6 md:px-8 py-5 mb-6">
-            {/* Top row: back, tabs, submit */}
-            <div className="flex items-center justify-between gap-4">
-              <button
-                style={{fontFamily: "Nunito"}}
-                onClick={() => navigate(-1)}
-                className="px-4 py-2 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-extrabold hover:bg-[#5427B4] hover:text-white transition-all"
-              >
-                Quay lại
-              </button>
-
-              {!showStickyProgress && (
-                <div className="hidden md:flex items-center gap-2">
-                  {sectionTabs.map((tab, idx) => (
-                    <button
-                      style={{fontFamily: "UD Digi Kyokasho N-R"}}
-                      key={`${tab}-${idx}`}
-                      onClick={() => handleSectionChange(tab)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all cursor-pointer ${
-                        tab === activeSection
-                          ? "bg-[#4169E1] text-white border-[#4169E1]"
-                          : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center gap-3">
-                <button
-                  style={{fontFamily: "Nunito", font: Bold}}
-                  onClick={handleSubmitExam}
-                  disabled={isSubmitting}
-                  className="px-5 py-2.5 rounded-lg border-2 border-red-500 text-red-500 font-extrabold hover:bg-red-500 hover:text-white transition-all"
-                >
-                  {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-                </button>
-              </div>
-            </div>
-
-            {/* Title and level */}
-            <div className="mt-4 flex items-center justify-center">
-              <div className="text-center">
-                  <h1 className="text-3xl md:text-4xl font-extrabold text-[#3563E9] leading-tight">
-                    {/* {examData.exam.level.title} */}
-                    言語知識 {activeSection}
-                  </h1>
-                {/* <p className="text-base md:text-lg text-gray-600 mt-1">
-                  {activeSection}
-                </p> */}
-              </div>
-            </div>
-
-            {/* Progress Bar with Timer - Header (same as sticky style) */}
-            {!showStickyProgress && (
-              <div className="mt-4 flex justify-center">
-                <TimerProgressBar />
-              </div>
-            )}
-
-            {/* Question Type Progress Bar */}
-            {/* === 5. GỌI COMPONENT MỚI (LẦN 2) === */}
-            {!showStickyProgress && questionTypeTabs.length > 0 && (
-              <div className="mt-6">
-                <ExamQuestionTypeTabs
-                  examData={examData}
-                  questionTypeTabs={questionTypeTabs}
-                  activeSection={activeSection}
-                  activeQuestionType={activeQuestionType}
-                  groupedQuestions={groupedQuestions}
-                  studentAnswers={studentAnswers}
-                  answerOrder={answerOrder}
-                  currentQuestionIndex={currentQuestionIndex}
-                  currentQuestionPage={currentQuestionPage}
-                  handleQuestionTypeChange={handleQuestionTypeChange}
-                  handleSectionChange={handleSectionChange}
-                  setCurrentQuestionIndex={setCurrentQuestionIndex}
-                  setCurrentQuestionPage={setCurrentQuestionPage}
-                />
-              </div>
-            )}
-          </div>
+          {!showStickyProgress && (
+            <ExamHeader
+              isSticky={false}
+              examData={examData}
+              activeSection={activeSection}
+              activeQuestionType={activeQuestionType}
+              questionTypeTabs={questionTypeTabs}
+              groupedQuestions={groupedQuestions}
+              studentAnswers={studentAnswers}
+              answerOrder={answerOrder}
+              currentQuestionIndex={currentQuestionIndex}
+              currentQuestionPage={currentQuestionPage}
+              isSubmitting={isSubmitting}
+              onSectionChange={handleSectionChange}
+              onQuestionTypeChange={handleQuestionTypeChange}
+              onSubmitExam={handleSubmitExam}
+              setCurrentQuestionIndex={setCurrentQuestionIndex}
+              setCurrentQuestionPage={setCurrentQuestionPage}
+              TimerProgressBarComponent={TimerProgressBar} // Truyền component vào
+            />
+          )}
 
           {/* Questions Container */}
           <div id="questions-container" className="bg-white rounded-2xl shadow-md px-6 md:px-8 py-8">
