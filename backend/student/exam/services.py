@@ -31,17 +31,31 @@ class ExamService:
     
     @staticmethod
     def get_exam_by_id(exam_id: str) -> Dict:
-        """Get exam details by ID"""
+        """Get exam details by ID including sections for duration calculation"""
         try:
+            # Get exam details
             response = supabase.table('jlpt_exams')\
                 .select('*, level:levels(id, title, description)')\
                 .eq('id', exam_id)\
                 .single()\
                 .execute()
             
+            exam_data = response.data
+            
+            # Get first 3 sections to calculate durations for intro pages
+            sections_response = supabase.table('jlpt_exam_sections')\
+                .select('id, duration, position')\
+                .eq('exam_id', exam_id)\
+                .order('position')\
+                .limit(3)\
+                .execute()
+            
+            # Add sections to exam data
+            exam_data['sections'] = sections_response.data if sections_response.data else []
+            
             return {
                 'success': True,
-                'data': response.data
+                'data': exam_data
             }
         except Exception as e:
             return {
@@ -94,50 +108,15 @@ class ExamService:
     def get_question_types(section_id: str) -> Dict:
         """Get all question types of a section"""
         try:
-            # 1) Lấy các question_types theo section
-            qt_response = supabase.table('jlpt_question_types')\
-                .select('id, exam_section_id, question_guides_id, task_instructions, image_path, duration')\
+            response = supabase.table('jlpt_question_types')\
+                .select('*, question_guides:jlpt_question_guides(id, name)')\
                 .eq('exam_section_id', section_id)\
                 .order('id')\
                 .execute()
-
-            qts = qt_response.data or []
-
-            # 2) Thu thập tất cả question_guides_id và lấy tên từ bảng jlpt_question_guides
-            guide_ids = []
-            for qt in qts:
-                qg_id = qt.get('question_guides_id')
-                # Kiểm tra qg_id hợp lệ (không None, không null, không rỗng)
-                if qg_id is not None and qg_id != 'null' and str(qg_id).strip():
-                    guide_ids.append(str(qg_id).strip())
             
-            guides_map = {}
-            if guide_ids:
-                try:
-                    guides_res = supabase.table('jlpt_question_guides')\
-                        .select('id, name')\
-                        .in_('id', guide_ids)\
-                        .execute()
-                    for g in (guides_res.data or []):
-                        guides_map[g['id']] = g
-                except Exception as e:
-                    print(f"Error fetching question guides: {e}")
-
-            # 3) Gắn thêm trường question_guides vào từng question_type (để FE hiển thị tiếng Việt)
-            for qt in qts:
-                qg_id = qt.get('question_guides_id')
-                if qg_id is not None and qg_id != 'null' and str(qg_id).strip():
-                    guide = guides_map.get(str(qg_id).strip())
-                    if guide:
-                        qt['question_guides'] = {'id': guide['id'], 'name': guide.get('name')}
-                    else:
-                        qt['question_guides'] = None
-                else:
-                    qt['question_guides'] = None
-
             return {
                 'success': True,
-                'data': qts
+                'data': response.data
             }
         except Exception as e:
             return {
@@ -291,194 +270,195 @@ class ExamService:
 
     # Xu ly luu bai thi   
     @staticmethod
-    def _calculate_score(submitted_answers: List[Dict], question_details_map: Dict) -> int:
+    def _calculate_score(submitted_answers: List[Dict], all_question_details_map: Dict, section_name_map: Dict) -> Dict:
         """
-        [Hàm private] Tính tổng điểm - ĐÃ CẬP NHẬT LOGIC
-        - Trắc nghiệm: So sánh 1-1, lấy điểm từ jlpt_answers (thường là 1).
-        - Sắp xếp:
-            1. Nếu đúng HẾT VỊ TRÍ -> Lấy điểm tối đa từ jlpt_questions (ví dụ: 1).
-            2. Nếu sai -> Kiểm tra xem câu có 'is_correct: true' có đúng vị trí không.
-            3. Nếu đúng -> Lấy điểm partial (ví dụ: 0.5) từ jlpt_answers.
+        [Hàm private] Tính tổng điểm - ĐÃ CẬP NHẬT
+        TRẢ VỀ: Một dictionary chứa tổng điểm VÀ điểm từng phần (theo section_id).
+        Ví dụ: 
+        {
+            'total_score': 8.5, 
+            'section_scores': [
+                {'id': 'S01', 'score': 5.0, 'max': 10},
+                {'id': 'S02', 'score': 3.5, 'max': 10}
+            ]
+        }
         """
         try:
-            # 1. Lấy ID câu hỏi từ danh sách nộp
-            question_ids = list(question_details_map.keys())
-            if not question_ids:
-                return 0
+            question_ids_answered = [a['exam_question_id'] for a in submitted_answers]
+            if not question_ids_answered:
+                 question_ids_answered = list(all_question_details_map.keys())
 
-            # 2. Lấy TẤT CẢ các đáp án (cả đúng và sai) cho các câu hỏi này
             a_data_res = supabase.table('jlpt_answers')\
                 .select('id, question_id, points, position, is_correct')\
-                .in_('question_id', question_ids)\
+                .in_('question_id', question_ids_answered)\
                 .is_('deleted_at', 'null')\
                 .execute()
 
             if not a_data_res.data:
-                return 0
+                 print("Lỗi: Không tìm thấy dữ liệu đáp án cho các câu đã trả lời.")
 
-            # 3. Xây dựng 3 Map tra cứu
-            
-            # Map 1: Lưu điểm của TỪNG ĐÁP ÁN (cho cả trắc nghiệm và partial)
-            # {'AW000185': 1.0, 'AW000193': 0.5, ...}
             answer_points_map = {
                 a['id']: float(a.get('points', 0)) 
                 for a in a_data_res.data 
                 if a.get('points') is not None
             }
             
-            # Map 2: Lưu đáp án ĐÚNG (cho cả MC và Sắp xếp)
-            # {'Q00046': {'AW000185': 1}, 
-            #  'Q00049': {'AW000195': 1, 'AW000194': 2, 'AW000193': 3, 'AW000196': 4}}
             correct_answer_map = {}
-            for a in a_data_res.data:
-                q_id = a['question_id']
-                if q_id not in correct_answer_map:
-                    correct_answer_map[q_id] = {}
-                
-                if a['position'] is not None: # Đây là câu sắp xếp (Rule 3)
-                    correct_answer_map[q_id][a['id']] = a['position']
-                elif a['is_correct']: # Đây là câu trắc nghiệm (Rule 2)
-                    correct_answer_map[q_id][a['id']] = 1 # Vị trí mặc định là 1
-
-            # Map 3: Lưu ID của đáp án cho ĐIỂM PARTIAL (chỉ dành cho câu sắp xếp)
-            # Ví dụ: {'Q00049': 'AW000193'}
             partial_credit_answer_map = {}
             for a in a_data_res.data:
-                # Nếu là câu sắp xếp VÀ là câu cho điểm partial
-                if a['position'] is not None and a['is_correct']:
-                    partial_credit_answer_map[a['question_id']] = a['id']
-
-            # 4. Nhóm các câu trả lời học sinh đã nộp
+                q_id = a['question_id']
+                if q_id not in correct_answer_map: correct_answer_map[q_id] = {}
+                if a['position'] is not None:
+                    correct_answer_map[q_id][a['id']] = a['position']
+                    if a['is_correct']: partial_credit_answer_map[q_id] = a['id']
+                elif a['is_correct']:
+                    correct_answer_map[q_id][a['id']] = 1
+            
             submitted_map = {}
             for sa in submitted_answers:
                 q_id = sa['exam_question_id']
-                if q_id not in submitted_map:
-                    submitted_map[q_id] = {}
+                if q_id not in submitted_map: submitted_map[q_id] = {}
                 submitted_map[q_id][sa['chosen_answer_id']] = sa['position']
-
-            # 5. So sánh và tính điểm
+            
+            
+            # === SỬA BƯỚC 5: TÍNH ĐIỂM ===
             total_score = 0.0
+            
+            # 5A: TẠO TRACKER VỚI MAX_SCORE
+            section_score_tracker = {}
+            for q_id, q_info in all_question_details_map.items():
+                section_id = q_info.get('section_id')
+                section_type_name = section_name_map.get(section_id, 'Unknown') 
+                question_max_score = float(q_info.get('score', 1))
+
+                if section_type_name not in section_score_tracker:
+                    # === SỬA LỖI: Thêm 'id' và 'type' vào value ===
+                    section_score_tracker[section_type_name] = {
+                        'id': section_id,
+                        'type': section_type_name,
+                        'score': 0.0, 
+                        'max': 0.0
+                    }
+                
+                section_score_tracker[section_type_name]['max'] += question_max_score
+
+            # 5B: TÍNH ĐIỂM ĐẠT ĐƯỢC
             for q_id, student_answers_dict in submitted_map.items():
-                q_info = question_details_map.get(q_id)
+                q_info = all_question_details_map.get(q_id)
                 correct_answers_dict = correct_answer_map.get(q_id)
                 
-                if not q_info or not correct_answers_dict:
-                    continue # Bỏ qua nếu câu hỏi hoặc đáp án đúng không tồn tại
+                if not q_info or not correct_answers_dict: continue
 
-                # Tự động phát hiện câu sắp xếp (nếu có > 1 đáp án đúng)
+                section_id = q_info.get('section_id')
+                section_type_name = section_name_map.get(section_id, 'Unknown')
+                question_max_score = float(q_info.get('score', 1))
+                
+                earned_score = 0.0
                 is_sorting_question = len(correct_answers_dict) > 1
                 
                 if is_sorting_question:
-                    # === LOGIC MỚI ===
-                    
-                    # TRƯỜNG HỢP 2: Học viên sắp xếp đúng HẾT TẤT CẢ
                     if student_answers_dict == correct_answers_dict:
-                        # Lấy điểm tối đa từ bảng jlpt_questions
-                        total_score += float(q_info.get('score', 0))
+                        earned_score = question_max_score
                     else:
-                        # TRƯỜNG HỢP 1: Học viên sai, kiểm tra partial credit
-                        print(f"  -> Sắp xếp sai. Bắt đầu kiểm tra partial credit cho Q:{q_id}") # DEBUG
-
-                        # Lấy ID của đáp án duy nhất cho điểm partial (ví dụ 'AW000193' cho 'Q00049')
                         partial_credit_ans_id = partial_credit_answer_map.get(q_id)
-                        print(f"    -> ID đáp án (có sao) cần đúng vị trí: {partial_credit_ans_id}") # DEBUG
-
                         if partial_credit_ans_id:
-                            # Lấy vị trí HỌC VIÊN nộp cho câu đó
                             student_pos = student_answers_dict.get(partial_credit_ans_id)
-                            # Lấy vị trí ĐÚNG của câu đó
                             correct_pos = correct_answers_dict.get(partial_credit_ans_id)
-                            
-                            print(f"    -> Vị trí học viên đặt: {student_pos} (kiểu: {type(student_pos)})") # DEBUG
-                            print(f"    -> Vị trí đúng cần đặt: {correct_pos} (kiểu: {type(correct_pos)})") # DEBUG
-
-                            # Nếu 2 vị trí khớp NHAU
                             if student_pos is not None and student_pos == correct_pos:
-                                partial_points = answer_points_map.get(partial_credit_ans_id, 0.5)
-                                total_score += partial_points
-                                print(f"    -> >> ĐÚNG VỊ TRÍ PARTIAL! << Lấy điểm từ answer_points_map: {partial_points}. Tổng điểm hiện tại: {total_score}") # DEBUG
-                            else:
-                                print(f"    -> SAI vị trí partial hoặc học viên không chọn đáp án này.") # DEBUG
-                        else:
-                            print(f"    -> Không tìm thấy đáp án is_correct=True cho câu này trong partial_credit_answer_map.") # DEBUG
-                
-                else:
-                    # Xử lý câu trắc nghiệm (MC) - Logic này vẫn đúng
+                                earned_score = answer_points_map.get(partial_credit_ans_id, 0.5)
+                else: # Câu trắc nghiệm
                     if student_answers_dict == correct_answers_dict:
-                        submitted_ans_id = list(student_answers_dict.keys())[0]
-                        total_score += answer_points_map.get(submitted_ans_id, 1.0)
+                        earned_score = question_max_score
+                
+                total_score += earned_score
+                if section_type_name in section_score_tracker:
+                    section_score_tracker[section_type_name]['score'] += earned_score
 
-            return total_score
+            # === SỬA LỖI: Lặp qua .values() thay vì .items() ===
+            section_scores_list = [
+                {
+                    'id': v['id'],
+                    'type': v['type'],
+                    'score': v['score'],
+                    'max_score': int(round(v['max']))
+                } 
+                for v in section_score_tracker.values()
+            ]
+
+            return {
+                'total_score': total_score,
+                'section_scores': section_scores_list
+            }
 
         except Exception as e:
             print(f"Lỗi nghiêm trọng khi tính điểm: {str(e)}")
-            return 0
+            return {'total_score': 0, 'section_scores': []}
         
         
     @staticmethod
     def submit_full_exam(student_id: str, exam_id: str, duration: int, answers_list: List[Dict]) -> Dict:
         """
-        Hàm service chính để nộp bài (PHIÊN BẢN ĐÚNG):
-        1. Lấy thông tin câu hỏi (để lấy section_id và pass cho hàm tính điểm)
-        2. Tính điểm
-        3. Tạo 'exam_results' (Bản ghi mới)
-        4. Lưu 'save_answers' (với section_id)
+        Hàm service chính để nộp bài (ĐÃ CẬP NHẬT):
         """
         try:
-            # 1. Lấy ID câu hỏi từ danh sách nộp
-            question_ids = list(set(a['exam_question_id'] for a in answers_list))
-            if not question_ids:
-                raise Exception("Không có câu trả lời nào được nộp")
-
-            # 2. Lấy thông tin chi tiết (score, type, section_id) cho TẤT CẢ câu hỏi đã nộp
-            q_data_res = supabase.table('jlpt_questions')\
-                .select('id, score, question_type_id, exam_section_id')\
-                .in_('id', question_ids)\
+            # 1. Lấy TẤT CẢ sections cho exam_id
+            all_section_res = supabase.table('jlpt_exam_sections')\
+                .select('id, type')\
+                .eq('exam_id', exam_id)\
                 .execute()
-                
-            if not q_data_res.data:
-                raise Exception("Không tìm thấy thông tin câu hỏi")
-                
-            # Tạo Map tra cứu: {'Q00049': {'score': 1, 'type': 'QT007', 'section_id': 'S02'}, ...}
-            question_details_map = {
+            if not all_section_res.data: raise Exception("Không tìm thấy section cho exam")
+            
+            # Tạo map: {'S01': '文字・語彙', 'S02': '文法・読解', ...}
+            section_name_map = {s['id']: s['type'] for s in all_section_res.data}
+            all_section_ids = list(section_name_map.keys())
+
+            # 2. Lấy TẤT CẢ questions cho TẤT CẢ sections
+            all_q_data_res = supabase.table('jlpt_questions')\
+                .select('id, score, question_type_id, exam_section_id')\
+                .in_('exam_section_id', all_section_ids)\
+                .is_('deleted_at', 'null')\
+                .execute()
+            if not all_q_data_res.data: raise Exception("Không tìm thấy câu hỏi cho exam")
+            
+            # map ĐẦY ĐỦ
+            all_question_details_map = {
                 q['id']: {
-                    'score': q.get('score', 0), 
+                    'score': q.get('score', 1),
                     'type': q.get('question_type_id'), 
                     'section_id': q.get('exam_section_id')
-                } for q in q_data_res.data
+                } for q in all_q_data_res.data
             }
+            # === KẾT THÚC SỬA LỖI ===
 
-            # 3. Tính điểm (GỌI HÀM MỚI CỦA BẠN)
-            sum_score = ExamService._calculate_score(answers_list, question_details_map)
+            # 3. Tính điểm (dùng map ĐẦY ĐỦ)
+            score_result = ExamService._calculate_score(answers_list, all_question_details_map, section_name_map)
             
-            duration_in_minutes = round(duration / 60)
+            sum_score = score_result['total_score']
+            section_scores = score_result['section_scores'] # List này giờ chứa ID và Tên
 
+            duration_in_minutes = round(duration / 60)
+            
             # 4. Chuẩn bị dữ liệu cho 'exam_results'
             result_data = {
                 'exam_id': exam_id,
                 'student_id': student_id,
-                'sum_score': sum_score, # <-- Điểm thật
+                'sum_score': sum_score, # <-- Điểm float (8.5)
                 'duration': duration_in_minutes,
                 'datetime': datetime.now(timezone.utc).isoformat(),
                 'created_at': datetime.now(timezone.utc).isoformat()
             }
             
-            # 5. Tạo 'exam_results' (LUÔN TẠO MỚI)
+            # 5. Tạo 'exam_results'
             result_res = supabase.table('exam_results').insert(result_data).execute()
-            
-            if not result_res.data:
-                raise Exception("Không thể tạo exam_result")
-                
+            if not result_res.data: raise Exception("Không thể tạo exam_result")
             new_exam_result = result_res.data[0]
-            new_exam_result_id = new_exam_result['id']
+            new_exam_result_id = new_exam_result['id'] # Lấy ID (số nguyên) vừa tạo
             
             # 6. Chuẩn bị dữ liệu cho 'save_answers'
             answers_to_save = []
             for answer in answers_list:
                 q_id = answer['exam_question_id']
-                # Lấy section_id từ map đã tạo ở bước 2
-                section_id = question_details_map.get(q_id, {}).get('section_id')
-
+                section_id = all_question_details_map.get(q_id, {}).get('section_id') # Dùng map đầy đủ
                 answers_to_save.append({
                     'exam_result_id': new_exam_result_id,
                     'exam_section_id': section_id,
@@ -486,36 +466,45 @@ class ExamService:
                     'chosen_answer_id': answer['chosen_answer_id'],
                     'position': answer['position'],
                     'created_at': datetime.now(timezone.utc).isoformat()
-
                 })
 
-            # 7. Lưu 'save_answers'
+            # 7a. Lưu 'save_answers'
             if answers_to_save:
-                save_res = supabase.table('save_answers').insert(answers_to_save).execute()
-                if not save_res.data:
-                    # TODO: Lý tưởng nhất là ROLLBACK (xóa exam_result đã tạo)
-                    raise Exception("Lưu chi tiết câu trả lời thất bại")
+                supabase.table('save_answers').insert(answers_to_save).execute()
 
-            # === BƯỚC MỚI (7b): TẠO CHỨNG CHỈ ===
+            # 7b. Lưu 'exam_result_sections'
+            if section_scores:
+                sections_to_save = []
+                for sec in section_scores:
+                    sections_to_save.append({
+                        'exam_result_id': new_exam_result_id,
+                        'exam_section_id': sec['id'], # <-- Lưu ID ('S01', 'S02')
+                        'score': sec['score'],
+                        'max_score': sec['max_score']
+                    })
+                
+                if sections_to_save:
+                    # Sửa lại lệnh insert để khớp với DB
+                    supabase.table('exam_result_sections').insert(sections_to_save).execute()
+
+            # 7c. Tạo chứng chỉ
             try:
                 cert_data = {
                     'student_id': student_id,
                     'exam_result_id': new_exam_result_id,
                     'created_at': datetime.now(timezone.utc).isoformat()
                 }
-                cert_res = supabase.table('certificates').insert(cert_data).execute()
-                
-                if not cert_res.data:
-                     # Chỉ log lỗi, không dừng luồng chính
-                    print(f"Cảnh báo: Không thể tạo chứng chỉ cho exam_result_id {new_exam_result_id}")
-            
+                supabase.table('certificates').insert(cert_data).execute()
             except Exception as cert_error:
                 print(f"Lỗi khi tạo chứng chỉ: {str(cert_error)}")
-            # ==================================
+
+            # Gộp dữ liệu trả về
+            response_data = new_exam_result
+            response_data['section_scores'] = section_scores # Gắn điểm từng phần vào
 
             return {
                 'success': True,
-                'data': new_exam_result # Trả về kết quả (gồm điểm)
+                'data': response_data
             }
             
         except Exception as e:
@@ -525,42 +514,170 @@ class ExamService:
             }
 
     @staticmethod
-    def save_exam_result(result_data: Dict) -> Dict:
-        """Save exam result"""
+    def submit_listening_exam(exam_result_id: str, student_id: str, exam_id: str, duration: int, answers_list: List[Dict]) -> Dict:
+        """
+        Submit listening exam - update existing exam_result_sections and exam_results
+        """
         try:
-            response = supabase.table('exam_results')\
-                .insert(result_data)\
+            # 1. Get exam_result to verify it exists and belongs to this student
+            exam_result_res = supabase.table('exam_results')\
+                .select('id, sum_score')\
+                .eq('id', exam_result_id)\
+                .eq('student_id', student_id)\
+                .eq('exam_id', exam_id)\
+                .single()\
                 .execute()
             
-            return {
-                'success': True,
-                'data': response.data
+            if not exam_result_res.data:
+                return {'success': False, 'error': 'Exam result not found'}
+            
+            current_sum_score = float(exam_result_res.data.get('sum_score', 0))
+            
+            # 2. Get listening section IDs first
+            sections_res = supabase.table('jlpt_exam_sections')\
+                .select('id, type, exam_id')\
+                .eq('exam_id', exam_id)\
+                .eq('is_listening', True)\
+                .execute()
+            
+            if not sections_res.data:
+                return {'success': False, 'error': 'No listening sections found'}
+            
+            listening_section_ids = [s['id'] for s in sections_res.data]
+            section_name_map = {s['id']: s['type'] for s in sections_res.data}
+            
+            # 3. Get questions for listening sections only
+            questions_res = supabase.table('jlpt_questions')\
+                .select('id, exam_section_id, score')\
+                .in_('exam_section_id', listening_section_ids)\
+                .is_('deleted_at', 'null')\
+                .execute()
+            
+            if not questions_res.data:
+                return {'success': False, 'error': 'No questions found'}
+            
+            # 4. Create question details map
+            all_question_details_map = {
+                q['id']: {
+                    'section_id': q['exam_section_id'],
+                    'score': q.get('score', 1)
+                }
+                for q in questions_res.data
             }
+            
+            # 5. Calculate listening score
+            score_result = ExamService._calculate_score(answers_list, all_question_details_map, section_name_map)
+            listening_score = score_result['total_score']
+            section_scores = score_result['section_scores']
+            
+            # 6. Update exam_result_sections for listening sections
+            for section_score_data in section_scores:
+                section_id = section_score_data['id']
+                section_score = section_score_data['score']
+                
+                # Update the existing record
+                supabase.table('exam_result_sections')\
+                    .update({'score': section_score})\
+                    .eq('exam_result_id', exam_result_id)\
+                    .eq('exam_section_id', section_id)\
+                    .execute()
+            
+            # 7. Update exam_results.sum_score
+            new_sum_score = current_sum_score + listening_score
+            supabase.table('exam_results')\
+                .update({'sum_score': new_sum_score})\
+                .eq('id', exam_result_id)\
+                .execute()
+            
+            # 8. Save listening answers
+            formatted_answers = []
+            for ans in answers_list:
+                q_id = ans['exam_question_id']
+                section_id = all_question_details_map.get(q_id, {}).get('section_id')
+                formatted_answers.append({
+                    'exam_result_id': exam_result_id,
+                    'exam_section_id': section_id,
+                    'exam_question_id': q_id,
+                    'chosen_answer_id': ans['chosen_answer_id'],
+                    'position': ans.get('position', 1),
+                    'created_at': datetime.now(timezone.utc).isoformat()
+                })
+            
+            if formatted_answers:
+                supabase.table('save_answers').insert(formatted_answers).execute()
+            
+            # 9. Get full exam_result data to return
+            final_result_res = supabase.table('exam_results')\
+                .select('*')\
+                .eq('id', exam_result_id)\
+                .single()\
+                .execute()
+            
+            # 10. Get all section scores from exam_result_sections (including reading sections)
+            all_section_scores_res = supabase.table('exam_result_sections')\
+                .select('exam_section_id, score, jlpt_exam_sections(type)')\
+                .eq('exam_result_id', exam_result_id)\
+                .execute()
+            
+            # 11. Get max scores for each section by summing question scores
+            all_sections_in_exam = supabase.table('jlpt_exam_sections')\
+                .select('id, type')\
+                .eq('exam_id', exam_id)\
+                .is_('deleted_at', 'null')\
+                .execute()
+            
+            section_max_scores = {}
+            if all_sections_in_exam.data:
+                section_ids = [s['id'] for s in all_sections_in_exam.data]
+                questions_in_sections = supabase.table('jlpt_questions')\
+                    .select('exam_section_id, score')\
+                    .in_('exam_section_id', section_ids)\
+                    .is_('deleted_at', 'null')\
+                    .execute()
+                
+                for q in questions_in_sections.data:
+                    sec_id = q['exam_section_id']
+                    q_score = float(q.get('score', 1))
+                    section_max_scores[sec_id] = section_max_scores.get(sec_id, 0.0) + q_score
+            
+            # Format section scores for response
+            all_section_scores = []
+            if all_section_scores_res.data:
+                for item in all_section_scores_res.data:
+                    section_info = item.get('jlpt_exam_sections', {})
+                    sec_id = item['exam_section_id']
+                    all_section_scores.append({
+                        'id': sec_id,
+                        'type': section_info.get('type', 'N/A'),
+                        'score': item['score'],
+                        'max_score': int(round(section_max_scores.get(sec_id, 0)))
+                    })
+            
+            if final_result_res.data:
+                result_data = final_result_res.data
+                result_data['section_scores'] = all_section_scores
+                result_data['listening_score'] = listening_score
+                
+                return {
+                    'success': True,
+                    'data': result_data
+                }
+            else:
+                return {
+                    'success': True,
+                    'data': {
+                        'id': exam_result_id,
+                        'sum_score': new_sum_score,
+                        'listening_score': listening_score,
+                        'section_scores': all_section_scores
+                    }
+                }
+            
+            
         except Exception as e:
+            print(f"Error in submit_listening_exam: {str(e)}")
             return {
                 'success': False,
                 'error': str(e)
             }
-    
-    @staticmethod
-    def save_student_answers(answers: List[Dict]) -> Dict:
-        """Save student answers"""
-        try:
-            response = supabase.table('save_answers')\
-                .insert(answers)\
-                .execute()
-            
-            return {
-                'success': True,
-                'data': response.data
-            }
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
-        
-
-
-
 

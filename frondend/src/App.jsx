@@ -13,6 +13,7 @@ import ExamListPage from "./pages/student/exam/ExamListPage";
 import ExamIntro from "./pages/student/exam/ExamIntro";
 import ListeningIntro from "./pages/student/exam/ListeningIntro";
 import ExamPage from "./pages/student/exam/ExamPage";
+import ListeningPage from "./pages/student/exam/ListeningPage";
 import StudentDashboard from "./pages/student/home/StudentDashboard";
 
 import ProtectedAdminRoute from './components/admin/ProtectedAdminRoute';
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/exam-intro" element={<ExamIntro />} />
           <Route path="/listening-intro" element={<ListeningIntro />} />
           <Route path="/exam-start" element={<ExamPage />} />
+          <Route path="/listening-start" element={<ListeningPage />} />
           
           <Route path="/student-dashboard" element={<StudentDashboard />} />     
 

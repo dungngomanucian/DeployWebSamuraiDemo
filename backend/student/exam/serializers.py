@@ -11,6 +11,11 @@ class LevelSerializer(serializers.Serializer):
     description = serializers.CharField(allow_null=True)
 
 
+class SectionDurationSerializer(serializers.Serializer):
+    """Serializer for section duration only"""
+    id = serializers.CharField()
+    duration = serializers.IntegerField(required=False, allow_null=True)
+
 class ExamSerializer(serializers.Serializer):
     """Serializer for exam details"""
     id = serializers.CharField()
@@ -21,6 +26,7 @@ class ExamSerializer(serializers.Serializer):
     type = serializers.CharField(required=False, allow_null=True)
     version = serializers.CharField(required=False, allow_null=True)
     level = LevelSerializer(required=False)
+    sections = SectionDurationSerializer(many=True, required=False)  # Thêm field sections
 
 
 class QuestionGuideSerializer(serializers.Serializer):
@@ -93,15 +99,21 @@ class FullExamDataSerializer(serializers.Serializer):
     exam = ExamSerializer()
     sections = ExamSectionSerializer(many=True)
 
+class SectionScoreSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    score = serializers.FloatField()
+    max_score = serializers.IntegerField()
 
 class ExamResultSerializer(serializers.Serializer):
     """Serializer for exam results"""
-    id = serializers.CharField()
+    id = serializers.IntegerField()
     exam_id = serializers.CharField()
     student_id = serializers.CharField()
     sum_score = serializers.FloatField(required=False, allow_null=True)
     duration = serializers.IntegerField(required=False, allow_null=True)
     datetime = serializers.DateTimeField(required=False, allow_null=True)
+    
+    section_scores = SectionScoreSerializer(many=True, required=False)
 
 class StudentAnswerSerializer(serializers.Serializer):
     """Serializer for student answers"""
@@ -109,7 +121,7 @@ class StudentAnswerSerializer(serializers.Serializer):
     exam_section_id = serializers.CharField()
     exam_question_id = serializers.CharField()
     chosen_answer_id = serializers.CharField()
-    exam_result_id = serializers.CharField()
+    exam_result_id = serializers.IntegerField()
     position = serializers.IntegerField()
 
 class SubmittedAnswerSerializer(serializers.Serializer):

@@ -56,6 +56,11 @@ export default function ExamIntro() {
     );
   }
 
+  // Tính tổng thời gian từ 2 sections đầu tiên (KHÔNG dùng total_duration từ jlpt_exams)
+  const totalDurationFromSections = examData.sections && examData.sections.length > 0
+    ? examData.sections.slice(0, 2).reduce((sum, section) => sum + (section.duration || 0), 0)
+    : 0;
+
   return (
     <div className="min-h-screen flex flex-col bg-[#E9EFFC]">
       <Navbar />
@@ -87,7 +92,7 @@ export default function ExamIntro() {
                   letterSpacing: "0"
                 }}
               >
-                ({examData.total_duration}分)
+                ({totalDurationFromSections}分)
               </div>
             </div>
 

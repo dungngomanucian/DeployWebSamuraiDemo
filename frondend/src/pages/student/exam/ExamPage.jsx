@@ -535,7 +535,10 @@ export default function ExamPage() {
     } else {
       console.log("Nộp bài thành công, kết quả:", resultData);
       setFinalResultData(resultData); // Lưu kết quả (chứa submission_id)
-      setShowCertificate(true);
+      // Lưu exam_result_id vào localStorage để listening page sử dụng
+      localStorage.setItem('exam_result_id', resultData.id);
+      // Chuyển sang trang ListeningIntro thay vì hiển thị overlay
+      navigate(`/listening-intro?examId=${examId}`);
     }
   };
 
@@ -553,7 +556,7 @@ export default function ExamPage() {
   if (isSubmitting) { 
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#E9EFFC]">
-        <div className="text-2xl font-bold text-[#0B1320]">Đang nộp bài và chấm điểm...</div>
+        <div className="text-2xl font-bold text-[#0B1320]">Chuyển sang phần nghe hiểu...</div>
       </div>
     );
   }
@@ -1430,7 +1433,8 @@ export default function ExamPage() {
           // === SỬA DUY NHẤT Ở ĐÂY ===
           // Chuyển trang SAU KHI đóng overlay
           // Dùng 'finalResultData.id' (là submission_id)
-          navigate(`/exam-result/${finalResultData.id}`, { 
+          // navigate(`/exam-result/${finalResultData.id}`, { 
+          navigate(`/student-dashboard`, {
             state: { 
               resultData: finalResultData // Vẫn gửi state để load nhanh
             } 

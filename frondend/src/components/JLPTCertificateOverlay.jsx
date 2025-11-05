@@ -57,9 +57,32 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
   const examTotalScore = examData?.exam?.total_score || 180;
   const passingScore = examData?.exam?.request_score ?? 'N/A';
   const isPassed = (typeof totalScore === 'number' && typeof passingScore === 'number') ? totalScore >= passingScore : false;
-  const resultText = isPassed ? '合格 (Đạt)' : '不合格 (Chưa đạt)';
+  const resultText = isPassed
+    ? (
+        <>
+          <span style={{fontFamily: 'UD Digi Kyokasho N-R'}}>
+            合格
+          </span>
+          &nbsp;
+          <span style={{fontFamily: 'Nunito'}}>
+            (Đạt)
+          </span>
+        </>
+      )
+    : (
+        <>
+          <span style={{fontFamily: 'UD Digi Kyokasho N-R'}}>
+            不合格
+          </span>
+          &nbsp;
+          <span style={{fontFamily: 'Nunito'}}>
+            (Chưa đạt)
+          </span>
+        </>
+      );
   const resultColor = isPassed ? 'text-green-600' : 'text-red-600';
-  // Bỏ qua điểm từng phần
+
+  const sectionScores = resultData?.section_scores || [];
 
   if (!show && !isVisible) {
     return null; // Không render gì cả khi ẩn
@@ -89,10 +112,10 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
                 <span className="font-semibold text-gray-600">Ngày thi:</span>
                 <span className="ml-2 text-gray-800">{examDate}</span>
               </div>
-              <div>
+            </div>
+            <div className="text-sm">
                 <span className="font-semibold text-gray-600">Mã học viên:</span>
                 <span className="ml-2 text-gray-800">{studentId}</span>
-              </div>
             </div>
             {/* Hàng 2: Tên HV */}
             <div className="text-sm">
@@ -107,17 +130,37 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
           </div>
 
           {/* Phần điểm */}
-          <div className="text-center mb-6">
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-1">Điểm tổng</p>
-              <p className="text-4xl font-bold text-blue-700">{totalScore} / {examTotalScore}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Kết quả</p>
-              <p className={`text-2xl font-bold ${resultColor}`}>{resultText}</p>
-              {typeof passingScore === 'number' && (
-                <p className="text-xs text-gray-500">(Điểm đỗ: {passingScore})</p>
-              )}
+          <div className="mb-6">
+            {/* === LƯỚI ĐIỂM TỪNG PHẦN (MỚI) === */}
+            {sectionScores.length > 0 && (
+              <div className="mb-6 border-b pb-6">
+                <p className="text-sm text-gray-600 mb-3 text-center">Điểm theo từng phần</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {sectionScores.map((sec) => (
+                    <div key={sec.id} className="bg-gray-100 rounded-lg p-3 text-center">
+                      <p className="text-xs font-semibold text-gray-500 uppercase">{sec.type || sec.id}</p>
+                      <p className="text-xl font-bold text-gray-800">
+                        {sec.score} / {sec.max_score}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Điểm tổng và Kết quả (giữ nguyên) */}
+            <div className="text-center">
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-1">Điểm tổng</p>
+                <p className="text-4xl font-bold text-blue-700">{totalScore} / {examTotalScore}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Kết quả</p>
+                <p className={`text-2xl font-bold ${resultColor}`}>{resultText}</p>
+                {typeof passingScore === 'number' && (
+                  <p className="text-xs text-gray-500">(Điểm đỗ: {passingScore})</p>
+                )}
+              </div>
             </div>
           </div>
 

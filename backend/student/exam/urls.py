@@ -12,5 +12,6 @@ urlpatterns = [
 
     path('answers/', views.save_student_answers, name='save-student-answers'),
     path('exams/<str:exam_id>/submit/', views.submit_exam, name='submit-exam'),
+    path('exams/<str:exam_id>/submit-listening/', views.submit_listening_exam, name='submit-listening-exam'),
     path('results/', views.save_exam_result, name='save-exam-result')
 ]

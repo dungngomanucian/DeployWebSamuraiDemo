@@ -35,7 +35,7 @@ export default function ListeningIntro() {
   }, [examId, navigate]);
 
   const handleStart = () => {
-    navigate(`/exam-start?examId=${examId}`);
+    navigate(`/listening-start?examId=${examId}`);
   };
 
   if (loading) {
@@ -54,8 +54,10 @@ export default function ListeningIntro() {
     );
   }
 
-  const listeningDuration =
-    examData.listening_duration || examData.total_duration || 50;
+  // Lấy duration từ section thứ 3 (index 2). Không dùng bất kỳ fallback nào
+  const listeningDuration = (examData.sections && examData.sections.length >= 3)
+    ? examData.sections[2]?.duration
+    : undefined;
   const isN3 = examData?.level?.title === "N3";
 
   return (
