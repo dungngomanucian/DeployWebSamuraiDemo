@@ -8,6 +8,9 @@ import toast, { Toaster } from "react-hot-toast";
 import QuestionButtons from "../../../components/Exam/QuestionButtons";
 import TimeUpModal from "../../../components/Exam/TimeUpModal";
 import { Bold } from "lucide-react";
+import ContentHighlighter from '../../../components/Highlight/ContentHighlighter';
+import NotepadModal from '../../../components/Highlight/NotepadModal';
+import { AnnotationProvider, useAnnotationContext } from '../../../context/AnnotationContext';
 
 // 1. IMPORT CÁC HÀM RENDER (Giữ nguyên)
 import {
@@ -27,7 +30,7 @@ import { useExamState } from "../../../hooks/exam/useExamState";
 // (Không cần import ExamQuestionTypeTabs nữa, vì ExamHeader đã gọi nó)
 import ExamHeader from "../../../components/Exam/ExamHeader";
 
-export default function ExamPage() {
+function ExamPageContent() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const examId = params.get("examId");
@@ -58,6 +61,9 @@ export default function ExamPage() {
   // === 4. ĐƯA STATE TỪ CON LÊN CHA (NÂNG CẤP) ===
   const [expandedQuestionType, setExpandedQuestionType] = useState({});
   // ===========================================
+
+  const { annotations } = useAnnotationContext();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   
   // === 5. GỌI CÁC HOOK MỚI ===
@@ -482,6 +488,8 @@ export default function ExamPage() {
           setCurrentQuestionIndex={setCurrentQuestionIndex}
           setCurrentQuestionPage={setCurrentQuestionPage}
           TimerProgressBarComponent={TimerProgressBar} 
+          annotations={annotations}
+          onNotepadOpen={() => setIsModalOpen(true)}
           expandedQuestionType={expandedQuestionType} // <--- TRUYỀN STATE
         />
       )}
@@ -510,6 +518,8 @@ export default function ExamPage() {
                 setCurrentQuestionIndex={setCurrentQuestionIndex}
                 setCurrentQuestionPage={setCurrentQuestionPage}
                 TimerProgressBarComponent={TimerProgressBar}
+                annotations={annotations}
+                onNotepadOpen={() => setIsModalOpen(true)}
                 expandedQuestionType={expandedQuestionType} // <--- TRUYỀN STATE
               />
             </div>
@@ -517,6 +527,7 @@ export default function ExamPage() {
           
           {/* Questions Container (Chưa tách) */}
           <div id="questions-container" className="bg-white rounded-2xl shadow-md px-6 md:px-8 py-8">
+          <ContentHighlighter>
             {/* Question Header */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-4">
@@ -937,6 +948,7 @@ export default function ExamPage() {
                 ));
               }
             })()}
+            </ContentHighlighter>
           </div>
         </div>
       </main>
@@ -982,6 +994,17 @@ export default function ExamPage() {
           },
         }}
       />
+
+      {/* Đặt NotepadModal ở đây để nó render một lần và hiển thị trên toàn trang khi cần */}
+      <NotepadModal isVisible={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }
+
+const ExamPage = (props) => (
+  <AnnotationProvider>
+    <ExamPageContent {...props} />
+  </AnnotationProvider>
+);
+
+export default ExamPage;
