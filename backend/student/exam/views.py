@@ -160,3 +160,66 @@ def save_student_answers(request):
             return Response(result['data'], status=status.HTTP_201_CREATED)
         return Response({'error': result['error']}, status=status.HTTP_400_BAD_REQUEST)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def submit_listening_exam(request, exam_id):
+    """Submit listening exam - updates existing exam_result with listening scores"""
+    # Authentication
+    auth_header = request.headers.get('Authorization', None)
+    
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return Response({"error": "Thiếu token xác thực."}, status=status.HTTP_401_UNAUTHORIZED)
+    
+    jwt_token = auth_header.split(' ')[1]
+    
+    try:
+        payload = jwt.decode(jwt_token, SECRET_KEY, algorithms=["HS256"])
+        account_id = payload.get('id')
+
+        if not account_id:
+            return Response({"error": "Token không hợp lệ (thiếu ID)."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        student_res = supabase.table('students')\
+            .select('id')\
+            .eq('account_id', account_id)\
+            .single()\
+            .execute()
+
+        if not student_res.data:
+            return Response({"error": "Không tìm thấy hồ sơ học sinh cho tài khoản này."}, status=status.HTTP_404_NOT_FOUND)
+
+        student_id = student_res.data['id']
+
+    except jwt.ExpiredSignatureError:
+        return Response({"error": "Token đã hết hạn."}, status=status.HTTP_401_UNAUTHORIZED)
+    except jwt.InvalidTokenError:
+        return Response({"error": "Token không hợp lệ."}, status=status.HTTP_401_UNAUTHORIZED)
+    except Exception as e:
+        return Response({"error": f"Lỗi không xác định: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    # Validate data
+    serializer = ExamSubmissionSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+    validated_data = serializer.validated_data
+    
+    # Get exam_result_id from request
+    exam_result_id = request.data.get('exam_result_id')
+    if not exam_result_id:
+        return Response({"error": "exam_result_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Call service
+    result = ExamService.submit_listening_exam(
+        exam_result_id=exam_result_id,
+        student_id=student_id,
+        exam_id=exam_id,
+        duration=validated_data['duration'],
+        answers_list=validated_data['answers']
+    )
+    
+    if result['success']:
+        return Response(result['data'], status=status.HTTP_200_OK)
+    else:
+        return Response({"error": result['error']}, status=status.HTTP_400_BAD_REQUEST)

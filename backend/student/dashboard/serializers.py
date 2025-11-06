@@ -76,6 +76,7 @@ class DashboardGridSerializer(serializers.Serializer):
     total_test = serializers.IntegerField(read_only=True, allow_null=True)
     total_exam = serializers.IntegerField(read_only=True, allow_null=True)
 
+    practice_summary = serializers.DictField(read_only=True, required=False)
 
     # Dùng cho Card "Mục tiêu" (ví dụ)
     #target_jlpt_degree = serializers.CharField(read_only=True, allow_null=True)
