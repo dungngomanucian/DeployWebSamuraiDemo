@@ -5,9 +5,7 @@ import Footer from "../../../components/Footer";
 import { getFullExamData, submitExam } from "../../../api/examService";
 import ExamCertificateOverlay from "../../../components/JLPTCertificateOverlay";
 import toast, { Toaster } from "react-hot-toast";
-import QuestionButtons from "../../../components/Exam/QuestionButtons";
 import TimeUpModal from "../../../components/Exam/TimeUpModal";
-import { Bold } from "lucide-react";
 
 // 1. IMPORT CÁC HÀM RENDER (Giữ nguyên)
 import {
@@ -23,46 +21,44 @@ import {
 import { useExamTimers } from "../../../hooks/exam/useExamTimers";
 import { useExamState } from "../../../hooks/exam/useExamState";
 
+// 3. IMPORT CÁC COMPONENT UI ĐÃ TÁCH
+// (Không cần import ExamQuestionTypeTabs nữa, vì ExamHeader đã gọi nó)
+import ExamHeader from "../../../components/Exam/ExamHeader";
+
 export default function ExamPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const examId = params.get("examId");
 
   // === CÁC STATE GỐC CÒN GIỮ LẠI ===
-  // (State liên quan đến tải dữ liệu)
   const [examData, setExamData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [totalTime, setTotalTime] = useState(0); // Chỉ giữ lại state tổng thời gian
+  const [totalTime, setTotalTime] = useState(0); 
   const [groupedQuestions, setGroupedQuestions] = useState({});
-
-  // (State liên quan đến UI)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [activeSection, setActiveSection] = useState(null);
   const [activeQuestionType, setActiveQuestionType] = useState(null);
-  const [expandedQuestionType, setExpandedQuestionType] = useState({});
-  const [barWidths, setBarWidths] = useState({});
-  const [collapsedTabWidths, setCollapsedTabWidths] = useState({});
-  const [expandedTabWidths, setExpandedTabWidths] = useState({});
   const [showStickyProgress, setShowStickyProgress] = useState(false);
   const [hideHeader, setHideHeader] = useState(false);
   const [currentQuestionPage, setCurrentQuestionPage] = useState(0);
   const [openPassageQuestions, setOpenPassageQuestions] = useState({});
-  
-  // (State liên quan đến nộp bài)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCertificate, setShowCertificate] = useState(false);
   const [finalResultData, setFinalResultData] = useState(null);
   
   // (Refs)
-  const tabContainerRefs = useRef({});
   const userSelectedSectionRef = useRef(false);
   const activeSectionRef = useRef(null);
   const passageQuestionRefs = useRef({});
+  const nonStickyHeaderRef = useRef(null); 
+  const [scrollOffset, setScrollOffset] = useState(180); 
   
-  
-  // === 3. GỌI CÁC HOOK MỚI ===
+  // === 4. ĐƯA STATE TỪ CON LÊN CHA (NÂNG CẤP) ===
+  const [expandedQuestionType, setExpandedQuestionType] = useState({});
+  // ===========================================
 
-  // Helper: Lấy câu hỏi hiện tại (Cần cho hook timer)
+  
+  // === 5. GỌI CÁC HOOK MỚI ===
   const getFilteredQuestions = () => {
     if (!activeQuestionType || !groupedQuestions[activeQuestionType]) return [];
     const questions = groupedQuestions[activeQuestionType].questions;
@@ -77,9 +73,8 @@ export default function ExamPage() {
     (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
   const currentQuestion = shouldUsePagination ? 
     filteredQuestions[currentQuestionPage] : 
-    (filteredQuestions[currentQuestionIndex] || null); // Thêm || null để tránh lỗi
+    (filteredQuestions[currentQuestionIndex] || null);
   
-  // Hook quản lý Timer
   const {
     timeRemaining,
     showReadingTimeUpModal,
@@ -90,52 +85,44 @@ export default function ExamPage() {
     stopQuestionTimer
   } = useExamTimers(
     totalTime, 
-    !loading && !!examData, // isExamDataLoaded
+    !loading && !!examData,
     currentQuestion,
     groupedQuestions,
     activeQuestionType
   );
 
-  // Hook quản lý State (Câu trả lời)
   const {
     studentAnswers,
     answerOrder,
-    handleAnswerSelect, // <-- Hàm xử lý logic chính
+    handleAnswerSelect,
     getAnswerOrder,
     isAnswerSelected
   } = useExamState();
 
   
-  // === 5. CÁC HÀM VÀ useEffect GỐC CÒN GIỮ LẠI ===
+  // === 6. CÁC HÀM VÀ useEffect GỐC CÒN GIỮ LẠI ===
 
-  // useEffect: Tải dữ liệu thi (Cập nhật: Chỉ set totalTime)
+  // useEffect: Tải dữ liệu thi
   useEffect(() => {
     const loadExamData = async () => {
       if (!examId) {
         navigate("/mock-exam-jlpt");
         return;
       }
-
       setLoading(true);
       const { data, error } = await getFullExamData(examId);
-
       if (error) {
         console.error("Error loading exam:", error);
         alert("Không thể tải dữ liệu đề thi. Vui lòng thử lại!");
         navigate(-1);
         return;
       }
-
       setExamData(data);
-      
-      // TÍNH TOÁN VÀ SET totalTime (Hook timer sẽ tự bắt theo)
       const totalMinutesFromSections = Array.isArray(data?.sections)
         ? data.sections.slice(0, 2).reduce((sum, section) => sum + (Number(section?.duration) || 0), 0)
         : 0;
       const totalSeconds = totalMinutesFromSections * 60;
       setTotalTime(totalSeconds); 
-      
-      // Group questions by question type
       const grouped = {};
       data.sections.forEach((section) => {
         section.question_types.forEach((qt) => {
@@ -162,8 +149,6 @@ export default function ExamPage() {
         });
       });
       setGroupedQuestions(grouped);
-      
-      // Set active section and question type
       if (data.sections && data.sections.length > 0 && !userSelectedSectionRef.current) {
         const firstSectionType = data.sections[0].type;
         setActiveSection(firstSectionType);
@@ -173,87 +158,12 @@ export default function ExamPage() {
           setActiveQuestionType(firstQuestionType.id);
         }
       }
-      
       setLoading(false);
     };
-
     loadExamData();
   }, [examId, navigate]);
 
-  // useEffect: Tính toán độ rộng của thanh bar (Giữ nguyên)
-  useEffect(() => {
-    const expandedTabs = Object.values(expandedQuestionType).filter(Boolean);
-    if (expandedTabs.length > 0) {
-      setTimeout(() => {
-        expandedTabs.forEach(qtId => {
-          const container = document.getElementById(`question-buttons-${qtId}`);
-          if (container) {
-            const buttons = container.querySelectorAll('button');
-            if (buttons.length > 0) {
-              const firstButton = buttons[0];
-              const lastButton = buttons[buttons.length - 1];
-              const firstRect = firstButton.getBoundingClientRect();
-              const lastRect = lastButton.getBoundingClientRect();
-              const width = lastRect.right - firstRect.left;
-              setBarWidths(prev => ({ ...prev, [qtId]: width }));
-            }
-          }
-        });
-      }, 0);
-    }
-  }, [expandedQuestionType, groupedQuestions]);
-
-  // useEffect: Tính toán độ rộng ban đầu (Giữ nguyên)
-  useEffect(() => {
-    if (examData && Object.keys(groupedQuestions).length > 0) {
-      const newWidths = {};
-      Object.keys(groupedQuestions).forEach(qtId => {
-        const questionCount = groupedQuestions[qtId]?.questions?.length || 0;
-        const estimatedWidth = questionCount > 0 ? (40 * questionCount + 8 * (questionCount - 1)) : 120;
-        newWidths[qtId] = estimatedWidth;
-      });
-      setBarWidths(newWidths);
-    }
-  }, [examData, groupedQuestions]);
-
-  // useEffect: Tính toán độ rộng tab co dãn (Giữ nguyên)
-  useEffect(() => {
-    if (examData && Object.keys(expandedQuestionType).length > 0) {
-      setTimeout(() => {
-        const newCollapsedWidths = {};
-        const newExpandedWidths = {};
-        
-        examData.sections.forEach(section => {
-          const sectionType = section.type;
-          const expandedQtId = expandedQuestionType[sectionType];
-          const containerRef = tabContainerRefs.current[sectionType];
-          
-          if (expandedQtId && containerRef) {
-            const containerWidth = containerRef.offsetWidth;
-            const expandedTabBarWidth = barWidths[expandedQtId] || 0;
-            const totalTabs = section.question_types.length;
-            const collapsedTabCount = totalTabs - 1;
-            const gapWidth = 16;
-            const totalGaps = (totalTabs - 1) * gapWidth;
-            const minCollapsedWidth = 80;
-            const spaceForExpanded = containerWidth - totalGaps - (minCollapsedWidth * collapsedTabCount);
-            const expandedWidth = Math.min(expandedTabBarWidth + 40, spaceForExpanded);
-            const remainingSpace = containerWidth - expandedWidth - totalGaps;
-            const collapsedWidth = remainingSpace / collapsedTabCount;
-            const finalCollapsedWidth = Math.max(Math.min(collapsedWidth, 150), 70);
-            
-            newExpandedWidths[sectionType] = expandedWidth;
-            newCollapsedWidths[sectionType] = finalCollapsedWidth;
-          }
-        });
-        
-        setExpandedTabWidths(newExpandedWidths);
-        setCollapsedTabWidths(newCollapsedWidths);
-      }, 0);
-    }
-  }, [expandedQuestionType, barWidths, examData]);  
-
-  // useEffect: Xử lý cuộn trang (Giữ nguyên)
+  // useEffect: Xử lý cuộn trang
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
@@ -264,7 +174,7 @@ export default function ExamPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // useEffect: Đóng popover câu hỏi (Giữ nguyên)
+  // useEffect: Đóng popover câu hỏi
   useEffect(() => {
     const handleDocumentClick = (event) => {
       const target = event.target;
@@ -285,10 +195,32 @@ export default function ExamPage() {
     return () => document.removeEventListener('mousedown', handleDocumentClick);
   }, [openPassageQuestions]);
 
+  // (SỬA LỖI CUỘN) useEffect ĐỂ ĐO CHIỀU CAO HEADER
+  useEffect(() => {
+    if (showStickyProgress) {
+      setScrollOffset(180);
+    } else if (nonStickyHeaderRef.current) {
+      const height = nonStickyHeaderRef.current.offsetHeight;
+      setScrollOffset(height + 20); 
+    }
+  }, [showStickyProgress, examData, loading]);
 
-  // === 6. CÁC HÀM LOGIC GỐC (Giữ lại hoặc cập nhật) ===
 
-  // Helper: Bật/tắt Popover câu hỏi QT008
+  // === 7. CÁC HÀM LOGIC GỐC ===
+
+  // Helper: Kiểm tra xem question type có phải là sort question không (dựa trên is_Sort_Question)
+  const isSortQuestion = (questionTypeId) => {
+    if (!questionTypeId) return false;
+    return groupedQuestions[questionTypeId]?.type?.is_Sort_Question === true;
+  };
+
+  // Helper: Kiểm tra xem question type có phải là perforated question không (dựa trên is_perforated_question)
+  const isPerforatedQuestion = (questionTypeId) => {
+    if (!questionTypeId) return false;
+    return groupedQuestions[questionTypeId]?.type?.is_perforated_question === true;
+  };
+
+  // Helper: Bật/tắt Popover câu hỏi perforated question
   const togglePassageQuestion = (questionId) => {
     setOpenPassageQuestions((prev) => ({
       ...prev,
@@ -296,20 +228,7 @@ export default function ExamPage() {
     }));
   };
 
-  // Helper: Lấy tất cả câu hỏi (Giữ nguyên)
-  const getAllQuestions = () => {
-    if (!groupedQuestions) return [];
-    const allQuestions = [];
-    Object.values(groupedQuestions).forEach((group) => {
-      group.questions.forEach((q) => {
-        allQuestions.push(q);
-      });
-    });
-    return allQuestions;
-  };
-  const allQuestions = getAllQuestions(); // (Biến này có thể không cần nữa)
-
-  // Helper: Lấy các tab loại câu hỏi (Giữ nguyên)
+  // Helper: Lấy các tab loại câu hỏi
   const getQuestionTypeTabs = () => {
     if (!activeSection || !examData) return [];
     const tabs = [];
@@ -328,11 +247,9 @@ export default function ExamPage() {
     });
     return tabs;
   };
-  const sectionTabs = examData?.sections?.map((s) => s.type) || [];
   const questionTypeTabs = getQuestionTypeTabs();
   
-  // Hàm render Popover câu hỏi (Giữ nguyên)
-  // Nó hoạt động vì 'isAnswerSelected' và 'handleAnswerSelect' đến từ hook
+  // Hàm render Popover câu hỏi
   const renderPassageQuestionPopover = (q) => {
     return (
       <div className="absolute z-50 left-0 top-0 translate-y-9">
@@ -371,9 +288,24 @@ export default function ExamPage() {
     );
   }
   
-  // Hàm: Đổi Section (Cập nhật: Thêm reset toast)
+  // === 8. CẬP NHẬT CÁC HÀM HANDLER ===
+
+  // Hàm: Đổi Section
   const handleSectionChange = (sectionType, questionTypeId = null) => {
     if (!examData) return;
+    
+    const newSection = examData.sections.find(s => s.type === sectionType);
+    
+    // Kiểm tra nếu section là phần nghe (is_listening = true)
+    if (newSection && newSection.is_listening === true) {
+      toast.error("Vui lòng nộp bài 2 phần đầu tiên trước khi chuyển sang phần nghe!", {
+        duration: 2000,
+        style: {
+          fontFamily: 'Nunito, sans-serif',
+        },
+      });
+      return; // Không chuyển section, giữ nguyên tab hiện tại
+    }
     
     userSelectedSectionRef.current = true;
     activeSectionRef.current = sectionType;
@@ -381,12 +313,12 @@ export default function ExamPage() {
     setActiveSection(sectionType);
     setCurrentQuestionIndex(0); 
     
-    const newSection = examData.sections.find(s => s.type === sectionType);
     if (newSection && newSection.question_types.length > 0) {
       if (questionTypeId) {
         const targetQuestionType = newSection.question_types.find(qt => qt.id === questionTypeId);
         if (targetQuestionType) {
           setActiveQuestionType(questionTypeId);
+          // Cha cập nhật state expand
           setExpandedQuestionType(prev => ({
             ...prev,
             [sectionType]: prev[sectionType] === questionTypeId ? null : questionTypeId
@@ -394,6 +326,7 @@ export default function ExamPage() {
         } else {
           const firstQuestionTypeId = newSection.question_types[0].id;
           setActiveQuestionType(firstQuestionTypeId);
+          // Cha cập nhật state expand
           setExpandedQuestionType(prev => ({
             ...prev,
             [sectionType]: firstQuestionTypeId
@@ -410,11 +343,11 @@ export default function ExamPage() {
       }
       
       setCurrentQuestionPage(0);
-      resetQuestionToast(); // <-- Cập nhật
+      resetQuestionToast(); 
     }
   };
 
-  // Hàm: Đổi Loại câu hỏi (Cập nhật: Thêm reset toast)
+  // Hàm: Đổi Loại câu hỏi
   const handleQuestionTypeChange = (questionTypeId) => {
     if (!examData) return;
     
@@ -431,22 +364,22 @@ export default function ExamPage() {
     
     if (targetSection && targetSection.type === activeSection) {
       setActiveQuestionType(questionTypeId);
+      
+      // Cha cập nhật state expand
+      setExpandedQuestionType(prev => ({
+        ...prev,
+        [activeSection]: prev[activeSection] === questionTypeId ? null : questionTypeId
+      }));
+      
       setCurrentQuestionPage(0);
       setCurrentQuestionIndex(0);
-      resetQuestionToast(); // <-- Cập nhật
+      resetQuestionToast(); 
     }
   };
 
-  // Hàm: Đổi trang (Giữ nguyên)
-  const handlePageChange = (newPage) => {
-    setCurrentQuestionPage(newPage);
-  };
-
-  // Component: Thanh thời gian (Giữ nguyên)
-  // Hoạt động vì 'timeRemaining' lấy từ hook
-  const TimerProgressBar = ({ }) => {
+  // Component: Thanh thời gian
+  const TimerProgressBar = () => { 
     const barStyles = getProgressBarStyles();
-    // Cập nhật: Lấy 'progressPercentage' từ đây
     const progressPercentage = totalTime > 0 ? ((totalTime - timeRemaining) / totalTime) * 100 : 0;
     
     return (
@@ -471,64 +404,36 @@ export default function ExamPage() {
     );
   };
   
-  // Helper: Lấy style cho thanh thời gian (Giữ nguyên)
+  // Helper: Lấy style cho thanh thời gian
   const getProgressBarStyles = () => {
-    const minutesRemaining = timeRemaining / 60; // 'timeRemaining' từ hook
+    const minutesRemaining = timeRemaining / 60; 
     if (minutesRemaining <= 15) return { backgroundColor: '#F24822', textColor: '#FFFFFF', iconColor: '#FFFFFF' };
     if (minutesRemaining <= 30) return { backgroundColor: '#FFC943', textColor: '#986D00', iconColor: '#986D00' };
     return { backgroundColor: '#66D575', textColor: '#00620D', iconColor: '#006C0F' };
   };
 
-  // Hàm: Nộp bài (Cập nhật: Dùng hook)
+  // Hàm: Nộp bài
   const handleSubmitExam = async () => {
     if (isSubmitting) return;
-
     setIsSubmitting(true);
-    // Dừng tất cả timer
     stopGlobalTimer(); 
     stopQuestionTimer();
-    
-    // 1. Tính toán thời gian
-    const duration_taken = totalTime - timeRemaining; // 'timeRemaining' từ hook
-
-    // 2. Chuyển đổi state (dùng 'studentAnswers' từ hook)
+    const duration_taken = totalTime - timeRemaining; 
     const answersList = [];
-    Object.keys(studentAnswers).forEach(qId => { // 'studentAnswers' từ hook
+    Object.keys(studentAnswers).forEach(qId => { 
       const answerData = studentAnswers[qId];
-      
       if (Array.isArray(answerData)) {
-        // Câu sắp xếp
         answerData.forEach((answerId, index) => {
-          answersList.push({
-            exam_question_id: qId,
-            chosen_answer_id: answerId,
-            position: index + 1
-          });
+          answersList.push({ exam_question_id: qId, chosen_answer_id: answerId, position: index + 1 });
         });
       } else if (answerData) {
-        // Câu trắc nghiệm
-        answersList.push({
-          exam_question_id: qId,
-          chosen_answer_id: answerData,
-          position: 1
-        });
+        answersList.push({ exam_question_id: qId, chosen_answer_id: answerData, position: 1 });
       }
     });
-
-    // 3. Chuẩn bị data nộp bài
-    const submissionData = {
-      duration: duration_taken,
-      answers: answersList
-    };
-
+    const submissionData = { duration: duration_taken, answers: answersList };
     console.log("Đang nộp bài...", submissionData);
-
-    // 4. Gọi API
     const { data: resultData, error } = await submitExam(examId, submissionData);
-
     setIsSubmitting(false);
-
-    // 5. Xử lý kết quả
     if (error) {
       console.error("Lỗi khi nộp bài:", error);
       alert(`Nộp bài thất bại: ${error}`);
@@ -543,7 +448,6 @@ export default function ExamPage() {
   };
 
   // === PHẦN JSX (RETURN) ===
-  // (Phần này được dán y nguyên từ file gốc của bạn)
 
   if (loading) {
     return (
@@ -577,388 +481,66 @@ export default function ExamPage() {
       <Navbar />
       </div>
 
-      {/* Sticky Progress Bar - Shows when scrolling */}
+      {/* Sticky Header (Đã tách component) */}
       {showStickyProgress && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-lg border-b border-gray-200 px-6 py-3" style={{fontFamily: "Nunito"}}>
-          <div className="max-w-7xl mx-auto">
-            {/* Top row: Progress Bar with Timer, Section Tabs, Submit */}
-            <div className="flex items-center justify-between gap-4 mb-4">
-            {/* Progress Bar with Timer */}
-            <TimerProgressBar />
-
-            {/* Section Tabs - Same height as progress bar and submit button */}
-            <div className="flex items-center justify-center gap-2 flex-1">
-              {sectionTabs.map((tab, idx) => (
-                <button
-                  style={{fontFamily: "UD Digi Kyokasho N-R"}}
-                  key={`${tab}-${idx}`}
-                  onClick={() => handleSectionChange(tab)}
-                  className={`h-8 px-3 rounded-lg text-sm font-medium border transition-all cursor-pointer flex items-center ${
-                    tab === activeSection
-                      ? "bg-[#4169E1] text-white border-[#4169E1]"
-                      : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            {/* Submit Button */}
-            <button
-              onClick={handleSubmitExam}
-                disabled={isSubmitting}
-              className="px-4 h-8 rounded-lg border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all text-sm flex items-center"
-            >
-                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-            </button>
-          </div>
-
-            {/* Question Type Progress Bar */}
-            {questionTypeTabs.length > 0 && (
-              <div className="mt-4">
-                <div 
-                  ref={(el) => tabContainerRefs.current[activeSection] = el}
-                  className={`flex gap-4 ${!expandedQuestionType[activeSection] ? 'grid' : ''}`}
-                  style={!expandedQuestionType[activeSection] ? { gridTemplateColumns: `repeat(${questionTypeTabs.length}, 1fr)` } : {}}>
-                  {questionTypeTabs.map((tab) => {
-                    // Calculate answered questions count
-                    const answeredCount = Array.from({ length: tab.questionCount }, (_, index) => {
-                      const question = groupedQuestions[tab.id]?.questions[index];
-                      return question ? (
-                        question.questionTypeId === "QT007" 
-                          ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
-                          : studentAnswers[question.id]
-                      ) : false;
-                    }).filter(Boolean).length;
-
-                    const isActive = expandedQuestionType[activeSection] === tab.id;
-                    const currentSectionExpanded = expandedQuestionType[activeSection];
-
-                    return (
-                      <div 
-                        key={tab.id} 
-                        className={`flex flex-col transition-all ${
-                          currentSectionExpanded 
-                            ? 'flex-shrink-0' 
-                            : ''
-                        }`}
-                        style={
-                          currentSectionExpanded 
-                            ? (isActive 
-                                ? { width: expandedTabWidths[activeSection] ? `${expandedTabWidths[activeSection]}px` : 'auto' } 
-                                : { width: `${collapsedTabWidths[activeSection] || 150}px` }
-                              )
-                            : {}
-                        }
-                      >
-                        {/* Tab button with top/bottom bar */}
-                        <div className="flex flex-col items-center">
-                          {/* Top bar (gray) - shown when not active */}
-                          {!isActive && (
-                            <div 
-                              className="h-0.5 bg-gray-300 mb-2 transition-all" 
-                              style={{ 
-                                width: currentSectionExpanded 
-                                  ? `${Math.min((collapsedTabWidths[activeSection] || 150) * 0.7, 100)}px`
-                                  : '100%'
-                              }}
-                            ></div>
-                          )}
-                          
-                          {/* Tab text */}
-                           <button
-                             onClick={() => {
-                               const targetSection = examData.sections.find(section => 
-                                 section.question_types.some(qt => qt.id === tab.id)
-                               );
-                               
-                               if (targetSection && targetSection.type !== activeSection) {
-                                 // Pass the question type ID when changing section
-                                 // handleSectionChange will handle setting both activeSection and activeQuestionType
-                                 handleSectionChange(targetSection.type, tab.id);
-                                 return;
-                               }
-                               
-                               setExpandedQuestionType(prev => ({
-                                 ...prev,
-                                 [activeSection]: isActive ? null : tab.id
-                               }));
-                               
-                               handleQuestionTypeChange(tab.id);
-                               setCurrentQuestionIndex(0);
-                            
-                             }}
-                            className={`text-sm font-medium whitespace-nowrap transition-all ${
-                              isActive
-                                ? "text-[#4169E1]"
-                                : "text-gray-600 hover:text-gray-800"
-                            }`}
-                            style={{fontFamily: "Inter"}}
-                          >
-                             <span
-                               title={(tab?.question_guides?.name || tab.taskInstructions || tab.name) || ''}
-                               className={`${
-                                 currentSectionExpanded 
-                                   ? 'truncate' 
-                                   : ''
-                               } inline-block align-middle`}
-                               style={{
-                                 fontWeight: "bold",
-                                 maxWidth: currentSectionExpanded 
-                                   ? (isActive 
-                                       ? '280px' 
-                                       : `${Math.min((collapsedTabWidths[activeSection] || 150) * 0.9, 140)}px`)
-                                   : 'none'
-                               }}
-                             >
-                               {tab?.question_guides?.name || tab.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || tab.name}
-                             </span> {answeredCount}/{tab.questionCount}
-                          </button>
-                          
-                          {/* Bottom bar (blue) and question buttons - shown when active */}
-                          {isActive && (
-                            <>
-                              <div 
-                                className="h-0.5 bg-[#4169E1] mt-2 mb-3"
-                                style={{ width: barWidths[tab.id] || '100%' }}
-                              ></div>
-                              <QuestionButtons
-                                tab={tab}
-                                groupedQuestions={groupedQuestions}
-                                activeQuestionType={activeQuestionType}
-                                currentQuestionIndex={currentQuestionIndex}
-                                currentQuestionPage={currentQuestionPage}
-                                studentAnswers={studentAnswers}
-                                answerOrder={answerOrder}
-                                handleQuestionTypeChange={handleQuestionTypeChange}
-                                setCurrentQuestionIndex={setCurrentQuestionIndex}
-                                setCurrentQuestionPage={setCurrentQuestionPage}
-                                containerId={`question-buttons-sticky-${tab.id}`}
-                              />
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <ExamHeader
+          isSticky={true}
+          examData={examData}
+          activeSection={activeSection}
+          activeQuestionType={activeQuestionType}
+          questionTypeTabs={questionTypeTabs}
+          groupedQuestions={groupedQuestions}
+          studentAnswers={studentAnswers}
+          answerOrder={answerOrder}
+          currentQuestionIndex={currentQuestionIndex}
+          currentQuestionPage={currentQuestionPage}
+          isSubmitting={isSubmitting}
+          onSectionChange={handleSectionChange}
+          onQuestionTypeChange={handleQuestionTypeChange}
+          onSubmitExam={handleSubmitExam}
+          setCurrentQuestionIndex={setCurrentQuestionIndex}
+          setCurrentQuestionPage={setCurrentQuestionPage}
+          TimerProgressBarComponent={TimerProgressBar} 
+          expandedQuestionType={expandedQuestionType} // <--- TRUYỀN STATE
+        />
       )}
 
       <main className={`flex-1 py-8 ${showStickyProgress ? 'pt-44' : ''} ${hideHeader ? 'pt-0' : ''}`}>
         <div className="max-w-7xl mx-auto px-6">
-          {/* Header - Exam Info */}
-          <div className="bg-white rounded-2xl shadow-md px-6 md:px-8 py-5 mb-6">
-            {/* Top row: back, tabs, submit */}
-            <div className="flex items-center justify-between gap-4">
-              <button
-                style={{fontFamily: "Nunito"}}
-                onClick={() => navigate(-1)}
-                className="px-4 py-2 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-extrabold hover:bg-[#5427B4] hover:text-white transition-all"
-              >
-                Quay lại
-              </button>
-
-              {!showStickyProgress && (
-                <div className="hidden md:flex items-center gap-2">
-                  {sectionTabs.map((tab, idx) => (
-                    <button
-                      style={{fontFamily: "UD Digi Kyokasho N-R"}}
-                      key={`${tab}-${idx}`}
-                      onClick={() => handleSectionChange(tab)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all cursor-pointer ${
-                        tab === activeSection
-                          ? "bg-[#4169E1] text-white border-[#4169E1]"
-                          : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center gap-3">
-                <button
-                  style={{fontFamily: "Nunito", font: Bold}}
-                  onClick={handleSubmitExam}
-                  disabled={isSubmitting}
-                  className="px-5 py-2.5 rounded-lg border-2 border-red-500 text-red-500 font-extrabold hover:bg-red-500 hover:text-white transition-all"
-                >
-                  {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-                </button>
-              </div>
+          
+          {/* Non-Sticky Header (Đã tách component) */}
+          {!showStickyProgress && (
+            <div ref={nonStickyHeaderRef}> {/* (SỬA LỖI CUỘN) Gắn Ref vào đây */}
+              <ExamHeader
+                isSticky={false}
+                examData={examData}
+                activeSection={activeSection}
+                activeQuestionType={activeQuestionType}
+                questionTypeTabs={questionTypeTabs}
+                groupedQuestions={groupedQuestions}
+                studentAnswers={studentAnswers}
+                answerOrder={answerOrder}
+                currentQuestionIndex={currentQuestionIndex}
+                currentQuestionPage={currentQuestionPage}
+                isSubmitting={isSubmitting}
+                onSectionChange={handleSectionChange}
+                onQuestionTypeChange={handleQuestionTypeChange}
+                onSubmitExam={handleSubmitExam}
+                setCurrentQuestionIndex={setCurrentQuestionIndex}
+                setCurrentQuestionPage={setCurrentQuestionPage}
+                TimerProgressBarComponent={TimerProgressBar}
+                expandedQuestionType={expandedQuestionType} // <--- TRUYỀN STATE
+              />
             </div>
-
-            {/* Title and level */}
-            <div className="mt-4 flex items-center justify-center">
-              <div className="text-center">
-                  <h1 className="text-3xl md:text-4xl font-extrabold text-[#3563E9] leading-tight">
-                    {/* {examData.exam.level.title} */}
-                    言語知識 {activeSection}
-                  </h1>
-                {/* <p className="text-base md:text-lg text-gray-600 mt-1">
-                  {activeSection}
-                </p> */}
-              </div>
-            </div>
-
-            {/* Progress Bar with Timer - Header (same as sticky style) */}
-            {!showStickyProgress && (
-              <div className="mt-4 flex justify-center">
-                <TimerProgressBar />
-              </div>
-            )}
-
-            {/* Question Type Progress Bar */}
-            {!showStickyProgress && questionTypeTabs.length > 0 && (
-              <div className="mt-6">
-                <div 
-                  ref={(el) => tabContainerRefs.current[activeSection] = el}
-                  className={`flex gap-4 ${!expandedQuestionType[activeSection] ? 'grid' : ''}`}
-                  style={!expandedQuestionType[activeSection] ? { gridTemplateColumns: `repeat(${questionTypeTabs.length}, 1fr)` } : {}}>
-                  {questionTypeTabs.map((tab) => {
-                    // Calculate answered questions count
-                    const answeredCount = Array.from({ length: tab.questionCount }, (_, index) => {
-                      const question = groupedQuestions[tab.id]?.questions[index];
-                      return question ? (
-                        question.questionTypeId === "QT007" 
-                          ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
-                          : studentAnswers[question.id]
-                      ) : false;
-                    }).filter(Boolean).length;
-
-                    const isActive = expandedQuestionType[activeSection] === tab.id;
-                    const currentSectionExpanded = expandedQuestionType[activeSection];
-
-                    return (
-                      <div 
-                        key={tab.id} 
-                        className={`flex flex-col transition-all ${
-                          currentSectionExpanded 
-                            ? 'flex-shrink-0' 
-                            : ''
-                        }`}
-                        style={
-                          currentSectionExpanded 
-                            ? (isActive 
-                                ? { width: expandedTabWidths[activeSection] ? `${expandedTabWidths[activeSection]}px` : 'auto' } 
-                                : { width: `${collapsedTabWidths[activeSection] || 150}px` }
-                              )
-                            : {}
-                        }
-                      >
-                        {/* Tab button with top/bottom bar */}
-                        <div className="flex flex-col items-center">
-                          {/* Top bar (gray) - shown when not active */}
-                          {!isActive && (
-                            <div 
-                              className="h-0.5 bg-gray-300 mb-2 transition-all" 
-                              style={{ 
-                                width: currentSectionExpanded 
-                                  ? `${Math.min((collapsedTabWidths[activeSection] || 150) * 0.7, 100)}px`  // 70% of collapsed tab width or max 100px
-                                  : '100%'  // Full width when no tab is expanded
-                              }}
-                            ></div>
-                          )}
-                          
-                          {/* Tab text */}
-                           <button
-                             onClick={() => {
-                               // Find which section this question type belongs to
-                               const targetSection = examData.sections.find(section => 
-                                 section.question_types.some(qt => qt.id === tab.id)
-                               );
-                               
-                               // If the question type belongs to a different section, switch to that section first
-                               if (targetSection && targetSection.type !== activeSection) {
-                                 // Pass the question type ID when changing section
-                                 // handleSectionChange will handle setting both activeSection and activeQuestionType
-                                 handleSectionChange(targetSection.type, tab.id);
-                                 return;
-                               }
-                               
-                               // Toggle expand/collapse per section
-                               setExpandedQuestionType(prev => ({
-                                 ...prev,
-                                 [activeSection]: isActive ? null : tab.id
-                               }));
-                               
-                               // Switch to this question type and go to first question
-                               handleQuestionTypeChange(tab.id);
-                               setCurrentQuestionIndex(0);
-                            
-                             }}
-                            className={`text-sm font-medium whitespace-nowrap transition-all ${
-                              isActive
-                                ? "text-[#4169E1]"
-                                : "text-gray-600 hover:text-gray-800"
-                            }`}
-                            style={{fontFamily: "Inter"}}
-                          >
-                             <span
-                               title={(tab?.question_guides?.name || tab.taskInstructions || tab.name) || ''}
-                               className={`${
-                                 currentSectionExpanded 
-                                   ? 'truncate' 
-                                   : ''
-                               } inline-block align-middle`}
-                               style={{
-                                 fontWeight: "bold",
-                                 maxWidth: currentSectionExpanded 
-                                   ? (isActive 
-                                       ? '280px' 
-                                       : `${Math.min((collapsedTabWidths[activeSection] || 150) * 0.9, 140)}px`)
-                                   : 'none'
-                               }}
-                             >
-                               {tab?.question_guides?.name || tab.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || tab.name}
-                             </span> {answeredCount}/{tab.questionCount}
-                          </button>
-                          
-                          {/* Bottom bar (blue) and question buttons - shown when active */}
-                          {isActive && (
-                            <>
-                              <div 
-                                className="h-0.5 bg-[#4169E1] mt-2 mb-3"
-                                style={{ width: barWidths[tab.id] || '100%' }}
-                              ></div>
-                              <QuestionButtons
-                                tab={tab}
-                                groupedQuestions={groupedQuestions}
-                                activeQuestionType={activeQuestionType}
-                                currentQuestionIndex={currentQuestionIndex}
-                                currentQuestionPage={currentQuestionPage}
-                                studentAnswers={studentAnswers}
-                                answerOrder={answerOrder}
-                                handleQuestionTypeChange={handleQuestionTypeChange}
-                                setCurrentQuestionIndex={setCurrentQuestionIndex}
-                                setCurrentQuestionPage={setCurrentQuestionPage}
-                                containerId={`question-buttons-${tab.id}`}
-                              />
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Questions Container */}
+          )}
+          
+          {/* Questions Container (Chưa tách) */}
           <div id="questions-container" className="bg-white rounded-2xl shadow-md px-6 md:px-8 py-8">
             {/* Question Header */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-4">
               <div className="px-4 py-2 rounded-xl bg-[#FFD24D] text-[#1E1E1E] font-bold text-lg whitespace-nowrap">
                 {(() => {
-                  // Find the current active question type tab
                   const currentTab = questionTypeTabs.find(tab => tab.id === activeQuestionType);
                   return currentTab?.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || `問題 ${currentQuestionIndex + 1}`;
                 })()} 
@@ -967,22 +549,8 @@ export default function ExamPage() {
                 <p 
                   className="text-xl font-bold text-[#0B1320] leading-relaxed cursor-pointer hover:text-[#4169E1] transition-colors break-words hyphens-auto"
                   onClick={() => {
-                    // Toggle expand/collapse for current question type
-                    setExpandedQuestionType(prev => ({
-                      ...prev,
-                      [activeSection]: expandedQuestionType[activeSection] === currentQuestion.questionTypeId ? null : currentQuestion.questionTypeId
-                    }));
-                    
-                    // Auto scroll to questions section
-                    setTimeout(() => {
-                      const questionsSection = document.getElementById('questions-container');
-                      if (questionsSection) {
-                        questionsSection.scrollIntoView({ 
-                          behavior: 'smooth', 
-                          block: 'start' 
-                        });
-                      }
-                    }, 100);
+                    // Logic này giờ đã nằm trong handleQuestionTypeChange
+                    handleQuestionTypeChange(currentQuestion.questionTypeId);
                   }}
                 >
                   {currentQuestion.taskInstructions.replace(/^問題\s*[０-９0-9]+\s*[：:]\s*/, '')}
@@ -1002,7 +570,6 @@ export default function ExamPage() {
                if (duration && filteredQuestions.length > 0) {
                  if (shouldUsePagination) {
                    const currentQuestionTime = questionTimeRemaining[currentQuestion?.id] || 0;
-                   // Always show timer for paginated questions (including when time is up)
                    return (
                      <div className="mb-3 ml-4 -mt-2">
                       <span className={`text-xl font-bold ${currentQuestionTime === 0 ? 'text-red-500' : (currentQuestionTime <= 30 ? 'text-red-500' : 'text-[#874FFF]')}`}>
@@ -1011,7 +578,6 @@ export default function ExamPage() {
                      </div>
                    );
                  } else {
-                   // Show static duration for non-paginated questions
                    const durationStr = duration.replace('00:', ''); // Remove hours if 00:
                    return (
                      <div className="mb-3 ml-4 -mt-2">
@@ -1023,8 +589,8 @@ export default function ExamPage() {
                return null;
              })()}
 
-            {/* QT008: Display question type level passage from jlpt_question_passages */}
-            {activeQuestionType === 'QT008' && groupedQuestions[activeQuestionType]?.type?.passages && groupedQuestions[activeQuestionType]?.type?.passages.length > 0 && (
+            {/* Perforated Question: Display question type level passage from jlpt_question_passages */}
+            {isPerforatedQuestion(activeQuestionType) && groupedQuestions[activeQuestionType]?.type?.passages && groupedQuestions[activeQuestionType]?.type?.passages.length > 0 && (
               <div className="mb-6">
                 <PassageBorderBox isTimeUp={(filteredQuestions.length > 0 && questionTimeRemaining[filteredQuestions[0]?.id] !== undefined && questionTimeRemaining[filteredQuestions[0]?.id] <= 0)}>
                   {groupedQuestions[activeQuestionType].type.passages.map((passage, passageIndex) => (
@@ -1048,10 +614,7 @@ export default function ExamPage() {
             )}
 
             {/* Display questions - paginated for reading comprehension types */}
-            {activeQuestionType === 'QT008' ? null : (() => {
-              // Use the shouldUsePagination variable defined above
-              
-              
+            {isPerforatedQuestion(activeQuestionType) ? null : (() => {
               if (shouldUsePagination) {
                 // Show only current question for pagination
                 const safePageIndex = Math.min(currentQuestionPage, filteredQuestions.length - 1);
@@ -1062,8 +625,13 @@ export default function ExamPage() {
                 }
                 
                 return (
-                  <div key={currentQuestion.id} id={`question-${currentQuestion.id}`} className="scroll-mt-30" style={{ scrollMarginTop: '120px' }}>
-                    {/* Display passage from jlpt_questions table */}
+                  <div 
+                    key={currentQuestion.id} 
+                    id={`question-${currentQuestion.id}`} 
+                    className="scroll-mt-30" 
+                    style={{ scrollMarginTop: `${scrollOffset}px` }} // (SỬA LỖI CUỘN)
+                  >
+                    {/* ... (Code render câu hỏi phân trang giữ nguyên) ... */}
                     {currentQuestion.passage && (
                       <div className="mb-6 p-6 bg-gray-50 rounded-lg">
                         <div className="text-lg md:text-xl leading-relaxed text-gray-800">
@@ -1074,8 +642,6 @@ export default function ExamPage() {
                         </div>
                       </div>
                     )}
-
-                    {/* Display passage from jlpt_question_passages table with black border */}
                     {currentQuestion.jlpt_question_passages && currentQuestion.jlpt_question_passages.length > 0 && (
                       <div className="mb-6">
                         <PassageBorderBox isTimeUp={(questionTimeRemaining[currentQuestion?.id] !== undefined && questionTimeRemaining[currentQuestion?.id] <= 0)}>
@@ -1091,8 +657,6 @@ export default function ExamPage() {
                         </PassageBorderBox>
                       </div>
                     )}
-
-                    {/* Question Text with leading square index */}
                     <div className="mb-8">
                       <div className="flex items-start gap-3">
                         <div className="w-9 h-9 border-2 border-gray-300 rounded-md flex items-center justify-center text-base font-semibold text-gray-700 select-none">
@@ -1135,11 +699,8 @@ export default function ExamPage() {
                         </div>
                       </div>
                     </div>
-
-                    {/* Answer Options */}
                     <div className="space-y-2">
                       {currentQuestion.answers && currentQuestion.answers.length > 0 ? (
-                        // Normalize answers: unique by show_order, sorted asc
                         (() => {
                               const byOrder = new Map();
                               currentQuestion.answers.forEach((a) => {
@@ -1150,8 +711,7 @@ export default function ExamPage() {
                                 (a, b) => Number(a.show_order) - Number(b.show_order)
                               );
                             })().filter((answer) => {
-                              // For QT007, only show answers that are not in the tray
-                              if (currentQuestion.questionTypeId === "QT007") {
+                              if (isSortQuestion(currentQuestion.questionTypeId)) {
                                 const selectedAnswers = answerOrder[currentQuestion.id] || [];
                                 return !selectedAnswers.includes(answer.id);
                               }
@@ -1169,7 +729,6 @@ export default function ExamPage() {
                                       : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50"
                                   }`}
                                 >
-                                  {/* custom radio */}
                                   <input
                                     type="radio"
                                     name={`question-${currentQuestion.id}`}
@@ -1199,216 +758,202 @@ export default function ExamPage() {
                         <p className="text-gray-500">Không có đáp án</p>
                       )}
                     </div>
-
                   </div>
                 );
               } else {
-                // Show all questions for non-pagination types
+                // Show all questions
                 return filteredQuestions.map((question, questionIndex) => (
-              <div 
-                key={question.id} 
-                id={`question-${question.id}`}
-                className={`${questionIndex > 0 ? 'mt-8' : ''} scroll-mt-30`}
-                style={{ scrollMarginTop: '180px' }}
-              >
-                {/* Display passage from jlpt_questions table */}
-                {question.passage && (
-                  <div className="mb-6 p-6 bg-gray-50 rounded-lg">
-                    <div className="text-lg md:text-xl leading-relaxed text-gray-800">
-                      {renderFramedPassageBlocks(
-                        question.passage,
-                        (questionTimeRemaining[question?.id] !== undefined && questionTimeRemaining[question?.id] <= 0)
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Display passage from jlpt_question_passages table with black border */}
-                {question.jlpt_question_passages && question.jlpt_question_passages.length > 0 && (
-                  <div className="mb-6">
-                    <PassageBorderBox isTimeUp={(questionTimeRemaining[question?.id] !== undefined && questionTimeRemaining[question?.id] <= 0)}>
-                      {question.jlpt_question_passages.map((passage, passageIndex) => (
-                        <div key={passageIndex}>
-                          {passage.content && (
-                            <div className="whitespace-pre-line text-lg md:text-xl">
-                              {renderPassageContent(passage.content, { questions: groupedQuestions[activeQuestionType]?.questions || [], questionTypeId: activeQuestionType })}
-                            </div>
+                  <div 
+                    key={question.id} 
+                    id={`question-${question.id}`}
+                    className={`${questionIndex > 0 ? 'mt-8' : ''} scroll-mt-30`}
+                    style={{ scrollMarginTop: `${scrollOffset}px` }} // (SỬA LỖI CUỘN)
+                  >
+                    {/* ... (Code render toàn bộ câu hỏi giữ nguyên) ... */}
+                    {question.passage && (
+                      <div className="mb-6 p-6 bg-gray-50 rounded-lg">
+                        <div className="text-lg md:text-xl leading-relaxed text-gray-800">
+                          {renderFramedPassageBlocks(
+                            question.passage,
+                            (questionTimeRemaining[question?.id] !== undefined && questionTimeRemaining[question?.id] <= 0)
                           )}
                         </div>
-                      ))}
-                    </PassageBorderBox>
-                  </div>
-                )}
-
-                {/* Question Text with leading square index */}
-                <div className="mb-8">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 border-2 border-gray-300 rounded-md flex items-center justify-center text-base font-semibold text-gray-700 select-none">
-                      {question.position}
+                      </div>
+                    )}
+                    {question.jlpt_question_passages && question.jlpt_question_passages.length > 0 && (
+                      <div className="mb-6">
+                        <PassageBorderBox isTimeUp={(questionTimeRemaining[question?.id] !== undefined && questionTimeRemaining[question?.id] <= 0)}>
+                          {question.jlpt_question_passages.map((passage, passageIndex) => (
+                            <div key={passageIndex}>
+                              {passage.content && (
+                                <div className="whitespace-pre-line text-lg md:text-xl">
+                                  {renderPassageContent(passage.content, { questions: groupedQuestions[activeQuestionType]?.questions || [], questionTypeId: activeQuestionType })}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </PassageBorderBox>
+                      </div>
+                    )}
+                    <div className="mb-8">
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 border-2 border-gray-300 rounded-md flex items-center justify-center text-base font-semibold text-gray-700 select-none">
+                          {question.position}
+                        </div>
+                        <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
+                          {question.underline_text ? (
+                            <>
+                              {question.question_text.split(question.underline_text)[0].split('<enter>').map((part, index) => (
+                                <span key={index}>
+                                  {part}
+                                  {index < question.question_text.split(question.underline_text)[0].split('<enter>').length - 1 && <br />}
+                                </span>
+                              ))}
+                              <Underline weight={1}>
+                                {question.underline_text.split('<enter>').map((part, index) => (
+                                  <span key={index}>
+                                    {part}
+                                    {index < question.underline_text.split('<enter>').length - 1 && <br />}
+                                  </span>
+                                ))}
+                              </Underline>
+                              {question.question_text.split(question.underline_text)[1].split('<enter>').map((part, index) => (
+                                <span key={index}>
+                                  {part}
+                                  {index < question.question_text.split(question.underline_text)[1].split('<enter>').length - 1 && <br />}
+                                </span>
+                              ))}
+                            </>
+                          ) : (
+                            (question?.question_text ?? '')
+                              .split('<enter>')
+                              .map((part, index, arr) => (
+                                <span key={index}>
+                                  {part}
+                                  {index < arr.length - 1 && <br />}
+                                </span>
+                              ))
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
-                      {question.underline_text ? (
-                        <>
-                          {question.question_text.split(question.underline_text)[0].split('<enter>').map((part, index) => (
-                            <span key={index}>
-                              {part}
-                              {index < question.question_text.split(question.underline_text)[0].split('<enter>').length - 1 && <br />}
-                            </span>
-                          ))}
-                          <Underline weight={1}>
-                            {question.underline_text.split('<enter>').map((part, index) => (
-                              <span key={index}>
-                                {part}
-                                {index < question.underline_text.split('<enter>').length - 1 && <br />}
-                              </span>
-                            ))}
-                          </Underline>
-                          {question.question_text.split(question.underline_text)[1].split('<enter>').map((part, index) => (
-                            <span key={index}>
-                              {part}
-                              {index < question.question_text.split(question.underline_text)[1].split('<enter>').length - 1 && <br />}
-                            </span>
-                          ))}
-                        </>
+                    {isSortQuestion(question.questionTypeId) && (
+                      <div className="mb-8" style={{fontFamily: "Nunito"}}>
+                        <div className="bg-gray-100 rounded-xl p-6 border-2 border-dashed border-gray-300 min-h-[120px]">
+                          <h4 className="text-lg font-semibold text-gray-700 mb-4 text-center">
+                            Thứ tự đáp án của bạn:
+                          </h4>
+                          <div className="flex flex-wrap gap-3 justify-center">
+                            {(() => {
+                              const selectedAnswers = answerOrder[question.id] || [];
+                              return selectedAnswers.map((answerId, index) => {
+                                const answer = question.answers.find(a => a.id === answerId);
+                                if (!answer) return null;
+                                
+                                return (
+                                  <div
+                                    key={answerId}
+                                    className="flex items-center gap-2 bg-white px-4 py-3 rounded-lg border-2 border-[#874FFF] cursor-pointer hover:bg-purple-50 transition-all"
+                                    onClick={() => handleAnswerSelect(question.id, answerId, question.questionTypeId)}
+                                  >
+                                    <span className="w-8 h-8 bg-[#874FFF] text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                      {index + 1}
+                                    </span>
+                                    <span className="text-gray-800 font-normal">
+                                      {answer.show_order}. {answer.answer_text}
+                                    </span>
+                                    <span className="text-gray-400 text-sm">(Click để bỏ)</span>
+                                  </div>
+                                );
+                              });
+                            })()}
+                            {(!answerOrder[question.id] || answerOrder[question.id].length === 0) && (
+                              <div className="text-gray-500 text-center w-full py-8">
+                                Chọn đáp án từ danh sách bên dưới để sắp xếp thứ tự
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div className={activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4 ? "grid grid-cols-4 gap-3" : isSortQuestion(question.questionTypeId) ? "grid grid-cols-4 gap-3" : "space-y-2"}>
+                      {question.answers && question.answers.length > 0 ? (
+                        (() => {
+                              const byOrder = new Map();
+                              question.answers.forEach((a) => {
+                                const key = String(a.show_order);
+                                if (!byOrder.has(key)) byOrder.set(key, a);
+                              });
+                              return Array.from(byOrder.values()).sort(
+                                (a, b) => Number(a.show_order) - Number(b.show_order)
+                              );
+                            })().filter((answer) => {
+                              if (isSortQuestion(question.questionTypeId)) {
+                                const selectedAnswers = answerOrder[question.id] || [];
+                                return !selectedAnswers.includes(answer.id);
+                              }
+                              return true;
+                            }).map((answer) => {
+                              const isSelected = isAnswerSelected(question.id, answer.id, question.questionTypeId);
+                              const orderNumber = getAnswerOrder(question.id, answer.id);
+                              
+                              return (
+                                <label
+                                  key={answer.id}
+                                  className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all ${
+                                    activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4
+                                      ? "flex-row"
+                                      : isSortQuestion(question.questionTypeId)
+                                      ? "flex-row"
+                                      : "flex-row"
+                                  } ${
+                                    isSelected
+                                      ? isSortQuestion(question.questionTypeId)
+                                        ? "border-[#874FFF] bg-purple-50 opacity-60"
+                                        : "border-[#874FFF] bg-purple-50"
+                                      : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50"
+                                  }`}
+                                >
+                                  <input
+                                    type={isSortQuestion(question.questionTypeId) ? "checkbox" : "radio"}
+                                    name={`question-${question.id}`}
+                                    value={answer.id}
+                                    checked={isSelected}
+                                    onChange={() => handleAnswerSelect(question.id, answer.id, question.questionTypeId)}
+                                    className="hidden"
+                                  />
+                                  {isSortQuestion(question.questionTypeId) ? (
+                                    <span className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-gray-400 flex-shrink-0 font-bold text-xs text-gray-600">
+                                      {answer.show_order}
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className={`flex items-center justify-center w-5 h-5 rounded-full border-2 flex-shrink-0 ${
+                                        isSelected ? "border-[#874FFF]" : "border-gray-400"
+                                      }`}
+                                    >
+                                      <span
+                                        className={`w-3 h-3 rounded-full ${
+                                          isSelected ? "bg-[#874FFF]" : "bg-transparent"
+                                        }`}
+                                      />
+                                    </span>
+                                  )}
+                                  <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
+                                    {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
+                                  </span>
+                                  {isSortQuestion(question.questionTypeId) && (
+                                    <span className="ml-auto text-xs text-gray-500" style={{fontFamily: "Nunito"}}>(Click để chọn)</span>
+                                  )}
+                                </label>
+                              );
+                        })
                       ) : (
-                        (question?.question_text ?? '')
-                          .split('<enter>')
-                          .map((part, index, arr) => (
-                            <span key={index}>
-                              {part}
-                              {index < arr.length - 1 && <br />}
-                            </span>
-                          ))
+                        <p className="text-gray-500">Không có đáp án</p>
                       )}
                     </div>
                   </div>
-                </div>
-
-                {/* Answer Tray for QT007 */}
-                {question.questionTypeId === "QT007" && (
-                  <div className="mb-8" style={{fontFamily: "Nunito"}}>
-                    <div className="bg-gray-100 rounded-xl p-6 border-2 border-dashed border-gray-300 min-h-[120px]">
-                      <h4 className="text-lg font-semibold text-gray-700 mb-4 text-center">
-                        Thứ tự đáp án của bạn:
-                      </h4>
-                      <div className="flex flex-wrap gap-3 justify-center">
-                        {(() => {
-                          const selectedAnswers = answerOrder[question.id] || [];
-                          return selectedAnswers.map((answerId, index) => {
-                            const answer = question.answers.find(a => a.id === answerId);
-                            if (!answer) return null;
-                            
-                            return (
-                              <div
-                                key={answerId}
-                                className="flex items-center gap-2 bg-white px-4 py-3 rounded-lg border-2 border-[#874FFF] cursor-pointer hover:bg-purple-50 transition-all"
-                                onClick={() => handleAnswerSelect(question.id, answerId, question.questionTypeId)}
-                              >
-                                <span className="w-8 h-8 bg-[#874FFF] text-white rounded-full flex items-center justify-center font-bold text-sm">
-                                  {index + 1}
-                                </span>
-                                <span className="text-gray-800 font-normal">
-                                  {answer.show_order}. {answer.answer_text}
-                                </span>
-                                <span className="text-gray-400 text-sm">(Click để bỏ)</span>
-                              </div>
-                            );
-                          });
-                        })()}
-                        {(!answerOrder[question.id] || answerOrder[question.id].length === 0) && (
-                          <div className="text-gray-500 text-center w-full py-8">
-                            Chọn đáp án từ danh sách bên dưới để sắp xếp thứ tự
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Answer Options - Horizontal for first 4 question types of section 1, vertical for others */}
-                <div className={activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4 ? "grid grid-cols-4 gap-3" : question.questionTypeId === "QT007" ? "grid grid-cols-4 gap-3" : "space-y-2"}>
-                  {question.answers && question.answers.length > 0 ? (
-                    // Normalize answers: unique by show_order, sorted asc
-                    (() => {
-                          const byOrder = new Map();
-                          question.answers.forEach((a) => {
-                            const key = String(a.show_order);
-                            if (!byOrder.has(key)) byOrder.set(key, a);
-                          });
-                          return Array.from(byOrder.values()).sort(
-                            (a, b) => Number(a.show_order) - Number(b.show_order)
-                          );
-                        })().filter((answer) => {
-                          // For QT007, only show answers that are not in the tray
-                          if (question.questionTypeId === "QT007") {
-                            const selectedAnswers = answerOrder[question.id] || [];
-                            return !selectedAnswers.includes(answer.id);
-                          }
-                          return true;
-                        }).map((answer) => {
-                          const isSelected = isAnswerSelected(question.id, answer.id, question.questionTypeId);
-                          const orderNumber = getAnswerOrder(question.id, answer.id);
-
-                          //console.log(`Rendering answer for Q:${question.id} -> Answer Option: ${answer.id} (Show order: ${answer.show_order})`); //DEBUG
-                          
-                          return (
-                            <label
-                              key={answer.id}
-                              className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all ${
-                                activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4
-                                  ? "flex-row"
-                                  : question.questionTypeId === "QT007"
-                                  ? "flex-row"
-                                  : "flex-row"
-                              } ${
-                                isSelected
-                                  ? question.questionTypeId === "QT007"
-                                    ? "border-[#874FFF] bg-purple-50 opacity-60"
-                                    : "border-[#874FFF] bg-purple-50"
-                                  : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50"
-                              }`}
-                            >
-                              {/* custom radio or order number */}
-                              <input
-                                type={question.questionTypeId === "QT007" ? "checkbox" : "radio"}
-                                name={`question-${question.id}`}
-                                value={answer.id}
-                                checked={isSelected}
-                                onChange={() => handleAnswerSelect(question.id, answer.id, question.questionTypeId)}
-                                className="hidden"
-                              />
-                              {question.questionTypeId === "QT007" ? (
-                                <span className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-gray-400 flex-shrink-0 font-bold text-xs text-gray-600">
-                                  {answer.show_order}
-                                </span>
-                              ) : (
-                                <span
-                                  className={`flex items-center justify-center w-5 h-5 rounded-full border-2 flex-shrink-0 ${
-                                    isSelected ? "border-[#874FFF]" : "border-gray-400"
-                                  }`}
-                                >
-                                  <span
-                                    className={`w-3 h-3 rounded-full ${
-                                      isSelected ? "bg-[#874FFF]" : "bg-transparent"
-                                    }`}
-                                  />
-                                </span>
-                              )}
-                              <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
-                                {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
-                              </span>
-                              {question.questionTypeId === "QT007" && (
-                                <span className="ml-auto text-xs text-gray-500" style={{fontFamily: "Nunito"}}>(Click để chọn)</span>
-                              )}
-                            </label>
-                          );
-                    })
-                  ) : (
-                    <p className="text-gray-500">Không có đáp án</p>
-                  )}
-                </div>
-              </div>
-            ));
+                ));
               }
             })()}
           </div>
@@ -1419,39 +964,33 @@ export default function ExamPage() {
 
       {/* === COMPONENT OVERLAY === */}
       <TimeUpModal
-        show={showReadingTimeUpModal} // <-- Lấy từ hook
-        onClose={() => setShowReadingTimeUpModal(false)} // <-- LRouteấy từ hook
+        show={showReadingTimeUpModal} 
+        onClose={() => setShowReadingTimeUpModal(false)} 
         onAction={() => {
           setShowReadingTimeUpModal(false);
-          navigate('/listening-intro'); // (Logic này có thể cần xem lại)
+          navigate('/listening-intro'); 
         }}
       />
       <ExamCertificateOverlay
         show={showCertificate}
         onHide={() => {
           setShowCertificate(false);
-          // === SỬA DUY NHẤT Ở ĐÂY ===
-          // Chuyển trang SAU KHI đóng overlay
-          // Dùng 'finalResultData.id' (là submission_id)
-          // navigate(`/exam-result/${finalResultData.id}`, { 
           navigate(`/student-dashboard`, {
             state: { 
-              resultData: finalResultData // Vẫn gửi state để load nhanh
+              resultData: finalResultData 
             } 
           });
-          // ==========================
         }}
         resultData={finalResultData}
-        examData={examData} // Truyền cả examData để lấy level, điểm đỗ...
+        examData={examData} 
       />
-      {/* ======================================= */}
-
       
       {/* Toast notifications */}
       <Toaster 
         position="top-right"
         toastOptions={{
-          duration: 6000, 
+          duration: 2000,
+          className: 'toast-custom',
           style: {
             background: '#ef4444', 
             color: '#fff', 
@@ -1459,7 +998,8 @@ export default function ExamPage() {
             padding: '12px 24px', 
             fontSize: '14px',
             fontWeight: '500',
-            minWidth: '300px', 
+            minWidth: '300px',
+            fontFamily: 'Nunito, sans-serif',
           },
         }}
       />

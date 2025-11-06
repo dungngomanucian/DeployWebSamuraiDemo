@@ -9,9 +9,6 @@ import TimeUpModal from "../../../components/Exam/TimeUpModal";
 
 // 1. IMPORT CÁC HÀM RENDER (Giữ nguyên)
 import {
-  renderPassageContent,
-  renderFramedPassageBlocks,
-  PassageBorderBox,
   Underline,
   formatAnswerText
 } from "../../../components/Exam/ExamRenderUtils"; // Đảm bảo đường dẫn này đúng
