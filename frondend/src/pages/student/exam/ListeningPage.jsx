@@ -214,6 +214,10 @@ export default function ListeningPage() {
     setCurrentQuestionPage(0);
     setCurrentQuestionIndex(0);
     resetQuestionToast();
+    // Scroll to top when switching question type to avoid landing on last viewed question
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {}
   };
 
   // Hàm: Nộp bài (Cập nhật: Dùng hook)
@@ -362,7 +366,7 @@ export default function ListeningPage() {
                 const bucket = getAudioBucketFromLevel();
                 const audioUrl = audioPath && bucket ? `${supabaseUrl}/storage/v1/object/public/${bucket}/${audioPath}` : null;
                 if (!audioUrl) return null;
-                return <AudioPlayer audioUrl={audioUrl} />;
+                return <AudioPlayer audioUrl={audioUrl} sharedKey={`listening-${examId}`} />;
               })()}
             </div>
           </div>
@@ -441,7 +445,7 @@ export default function ListeningPage() {
                   );
                 }
 
-                return <AudioPlayer audioUrl={audioUrl} />;
+                return <AudioPlayer audioUrl={audioUrl} sharedKey={`listening-${examId}`} />;
               })()}
             </div>
           </div>

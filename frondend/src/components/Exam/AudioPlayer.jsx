@@ -1,53 +1,134 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause } from 'lucide-react';
 
-const AudioPlayer = ({ audioUrl }) => {
+// Simple registry to share a single HTMLAudioElement across multiple renderers by key
+const sharedAudioRegistry = {};
+
+const AudioPlayer = ({ audioUrl, sharedKey }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const audioRef = useRef(null);
+  const localIsSharedOwnerRef = useRef(false);
 
+  // Setup shared or local audio element and bind events
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
+    let audio;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
-    const updateDuration = () => setDuration(audio.duration);
-    const handleEnded = () => setIsPlaying(false);
+    if (sharedKey) {
+      // Ensure a shared audio exists for this key
+      if (!sharedAudioRegistry[sharedKey]) {
+        const sharedAudio = new Audio(audioUrl || undefined);
+        sharedAudio.preload = 'metadata';
+        sharedAudioRegistry[sharedKey] = {
+          audio: sharedAudio,
+          subscribers: new Set(),
+          src: audioUrl || ''
+        };
+        localIsSharedOwnerRef.current = true;
+      }
 
-    audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('loadedmetadata', updateDuration);
-    audio.addEventListener('ended', handleEnded);
+      const entry = sharedAudioRegistry[sharedKey];
+      audio = entry.audio;
 
-    return () => {
-      audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('loadedmetadata', updateDuration);
-      audio.removeEventListener('ended', handleEnded);
-    };
-  }, []);
+      // If URL changes, update shared audio src
+      if (audioUrl && entry.src !== audioUrl) {
+        entry.src = audioUrl;
+        audio.src = audioUrl;
+        audio.load();
+      }
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (audio) {
+      // Apply current volume to the shared audio
       audio.volume = volume;
+
+      const updateFromAudio = () => {
+        setCurrentTime(audio.currentTime || 0);
+        setDuration(isFinite(audio.duration) ? audio.duration : 0);
+        setIsPlaying(!audio.paused);
+      };
+
+      const handlePlay = () => setIsPlaying(true);
+      const handlePause = () => setIsPlaying(false);
+      const handleEnded = () => setIsPlaying(false);
+      const handleTime = () => setCurrentTime(audio.currentTime || 0);
+      const handleLoaded = () => setDuration(isFinite(audio.duration) ? audio.duration : 0);
+
+      // Subscribe to events
+      audio.addEventListener('play', handlePlay);
+      audio.addEventListener('pause', handlePause);
+      audio.addEventListener('ended', handleEnded);
+      audio.addEventListener('timeupdate', handleTime);
+      audio.addEventListener('loadedmetadata', handleLoaded);
+
+      // Keep a subscriber record for cleanup and initial sync
+      entry.subscribers.add(updateFromAudio);
+      // Initial sync
+      updateFromAudio();
+
+      return () => {
+        audio.removeEventListener('play', handlePlay);
+        audio.removeEventListener('pause', handlePause);
+        audio.removeEventListener('ended', handleEnded);
+        audio.removeEventListener('timeupdate', handleTime);
+        audio.removeEventListener('loadedmetadata', handleLoaded);
+        entry.subscribers.delete(updateFromAudio);
+        // If no more subscribers, clean up the shared audio
+        if (entry.subscribers.size === 0) {
+          try { audio.pause(); } catch {}
+          delete sharedAudioRegistry[sharedKey];
+        }
+      };
+    } else {
+      // Local standalone audio element mode
+      audio = audioRef.current;
+      if (!audio) return;
+
+      const updateTime = () => setCurrentTime(audio.currentTime || 0);
+      const updateDuration = () => setDuration(isFinite(audio.duration) ? audio.duration : 0);
+      const handleEnded = () => setIsPlaying(false);
+      const handlePlay = () => setIsPlaying(true);
+      const handlePause = () => setIsPlaying(false);
+
+      audio.addEventListener('timeupdate', updateTime);
+      audio.addEventListener('loadedmetadata', updateDuration);
+      audio.addEventListener('ended', handleEnded);
+      audio.addEventListener('play', handlePlay);
+      audio.addEventListener('pause', handlePause);
+
+      return () => {
+        audio.removeEventListener('timeupdate', updateTime);
+        audio.removeEventListener('loadedmetadata', updateDuration);
+        audio.removeEventListener('ended', handleEnded);
+        audio.removeEventListener('play', handlePlay);
+        audio.removeEventListener('pause', handlePause);
+      };
     }
-  }, [volume]);
+  }, [audioUrl, sharedKey]);
+
+  useEffect(() => {
+    // Apply volume to either shared or local audio
+    if (sharedKey && sharedAudioRegistry[sharedKey]) {
+      sharedAudioRegistry[sharedKey].audio.volume = volume;
+    } else {
+      const audio = audioRef.current;
+      if (audio) audio.volume = volume;
+    }
+  }, [volume, sharedKey]);
 
   const togglePlayPause = () => {
-    const audio = audioRef.current;
+    const audio = sharedKey ? sharedAudioRegistry[sharedKey]?.audio : audioRef.current;
     if (!audio) return;
 
-    if (isPlaying) {
+    if (!audio.paused) {
       audio.pause();
     } else {
       audio.play();
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleSeek = (e) => {
-    const audio = audioRef.current;
+    const audio = sharedKey ? sharedAudioRegistry[sharedKey]?.audio : audioRef.current;
     if (!audio) return;
 
     const seekBar = e.currentTarget;
@@ -125,8 +206,10 @@ const AudioPlayer = ({ audioUrl }) => {
         </div>
       </div>
 
-      {/* Hidden Audio Element */}
-      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+      {/* Hidden Audio Element (only in local mode) */}
+      {!sharedKey && (
+        <audio ref={audioRef} src={audioUrl} preload="metadata" />
+      )}
       
       <style dangerouslySetInnerHTML={{__html: `
         .volume-slider::-webkit-slider-thumb {
