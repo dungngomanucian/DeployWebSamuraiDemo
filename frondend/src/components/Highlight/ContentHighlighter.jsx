@@ -118,10 +118,11 @@ const ContentHighlighter = ({ children }) => {
 
     const applyAction = useCallback((actionType, color, note = '') => {
         if (!selectedRange) return;
-        
+
+        // 1. GÁN ID VÀ THIẾT LẬP STYLE (Giống hệt code cũ)
         const range = selectedRange.cloneRange(); 
         const highlightId = generateTempId(); 
-        
+
         let classNames = `highlighted relative cursor-pointer transition-all duration-300 ease-in-out`;
         let inlineStyle = {}; 
         let noteText = (actionType === 'note' && note) ? note : '';
@@ -132,60 +133,75 @@ const ContentHighlighter = ({ children }) => {
             inlineStyle.backgroundColor = 'rgb(253, 224, 71)'; 
             finalColor = 'yellow';
         } else if (actionType === 'note') {
-            // 🌟 NOTE: GẠCH CHÂN ĐỎ NÉT LIỀN 🌟
             classNames += ` underline decoration-red-500 decoration-solid underline-offset-4 tooltip tooltip-hover text-red-500`; 
             finalColor = 'red-note'; 
         }
 
+        // 2. LOGIC "SPLIT AND WRAP" AN TOÀN (Đây là phần thay đổi)
         try {
-            const fragment = range.extractContents();
+            // Lấy tất cả các TextNode giao với vùng bôi đen
+            const allTextNodes = [];
             const walker = document.createTreeWalker(
-                fragment,
-                NodeFilter.SHOW_TEXT, 
-                null,
-                false
+                range.commonAncestorContainer,
+                NodeFilter.SHOW_TEXT,
+                (node) => {
+                    // Lọc: Chỉ chấp nhận các node giao với Range
+                    return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                }
             );
 
-            let node;
-            const nodesToWrap = [];
-
-            // 1. Thu thập tất cả các Text Node cần bọc
-            while (node = walker.nextNode()) {
-                if (node.textContent.length > 0) { 
-                     nodesToWrap.push(node);
+            while (walker.nextNode()) {
+                // Bỏ qua các node chỉ có khoảng trắng (giống logic cũ của bạn)
+                if (walker.currentNode.textContent.trim().length > 0) { 
+                    allTextNodes.push(walker.currentNode);
                 }
             }
 
-            // 2. Bọc từng Text Node đã thu thập
-            nodesToWrap.forEach(nodeToWrap => {
-                const textContent = nodeToWrap.textContent;
+            // Tách (split) và Bọc (wrap) các node đã tìm thấy
+            allTextNodes.forEach((node) => {
+                const isStartNode = (node === range.startContainer);
+                const isEndNode = (node === range.endContainer);
                 
-                // Nếu node chỉ là khoảng trắng, KHÔNG BỌC, chèn lại nguyên trạng
-                if (textContent.trim().length === 0) {
-                    return; // Bỏ qua node chỉ là khoảng trắng
+                let nodeToWrap = node;
+
+                // Tách (split) node nếu nó bị chọn 1 phần
+                
+                // Case 1: Chọn 1 phần bên trong 1 node duy nhất (ví dụ: "Hello [World]!")
+                if (isStartNode && isEndNode) {
+                    nodeToWrap = node.splitText(range.startOffset);
+                    nodeToWrap.splitText(range.endOffset - range.startOffset);
+                } 
+                // Case 2: Đây là node đầu tiên, bị chọn 1 phần (ví dụ: "[Hello] World")
+                else if (isStartNode) {
+                    nodeToWrap = node.splitText(range.startOffset);
+                } 
+                // Case 3: Đây là node cuối cùng, bị chọn 1 phần (ví dụ: "Hello [World]")
+                else if (isEndNode) {
+                    node.splitText(range.endOffset); // Tách phần "sau", nodeToWrap vẫn là node gốc (giờ đã bị cắt ngắn)
                 }
+                // Case 4 (ngầm định): Node nằm hoàn toàn bên trong, không cần split.
                 
+
+                // 3. BỌC (WRAP) NODE
+                // Tạo span mới cho MỖI text node (để click handler hoạt động)
                 const newSpan = document.createElement('span');
-                    
                 newSpan.className = classNames;
                 Object.assign(newSpan.style, inlineStyle);
                 newSpan.dataset.id = highlightId;
                 newSpan.dataset.actionType = actionType;
                 newSpan.dataset.color = finalColor; 
-                
                 if (noteText) { newSpan.setAttribute('data-tip', noteText); }
-                
                 newSpan.addEventListener('click', handleAnnotatedClick);
-                
-                // Bọc Text Node vào Span
-                newSpan.appendChild(document.createTextNode(textContent));
-                nodeToWrap.parentNode.replaceChild(newSpan, nodeToWrap);
+
+                // Thao tác DOM an toàn: Dùng insertBefore + appendChild
+                // Bọc nodeToWrap bằng newSpan
+                if (nodeToWrap.parentNode) {
+                    nodeToWrap.parentNode.insertBefore(newSpan, nodeToWrap);
+                    newSpan.appendChild(nodeToWrap);
+                }
             });
-            
-            // 3. Chèn Fragment đã được bọc trở lại vào vị trí Range cũ
-            range.insertNode(fragment);
-            
-            // 4. LƯU METADATA VÀO CONTEXT CHỈ KHI LÀ NOTE (Có Ghi chú)
+
+            // 4. LƯU METADATA (Giống hệt code cũ)
             if (actionType === 'note') {
                 addAnnotation({ 
                     id: highlightId, 
@@ -197,7 +213,8 @@ const ContentHighlighter = ({ children }) => {
             }
 
         } catch (error) {
-            console.error("Lỗi khi áp dụng Highlight/Note vào vùng phức tạp:", error);
+            console.error("Lỗi khi áp dụng Highlight/Note:", error);
+            // Ngay cả khi lỗi, chúng ta không "cắt" gì cả, nên DOM vẫn an toàn
         }
 
         clearSelection();
