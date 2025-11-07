@@ -62,3 +62,27 @@ export const deleteStudent = async (studentId) => {
 };
 
 // ... Thêm các hàm update, getById tương tự ...
+
+export const bulkUploadStudents = async (file) => {
+    try {
+        const formData = new FormData();
+        formData.append('excel_file', file);
+        
+        const response = await axiosAdmin.post(
+            `${MANAGE_STUDENT_BASE_ENDPOINT}/bulk-upload/`,
+            formData,
+            {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            }
+        );
+        return { data: response.data, error: null };
+    } catch (error) {
+        console.error(`API Lỗi [bulkUploadStudents]:`, error.response?.data || error.message);
+        return { 
+            data: null, 
+            error: error.response?.data?.error || error.response?.data?.detail || error.message || 'Upload file Excel thất bại' 
+        };
+    }
+};

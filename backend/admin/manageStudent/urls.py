@@ -9,6 +9,8 @@ urlpatterns = [
     path('', views.get_all_students, name='admin-student-list'),
     path('create/', views.create_student, name='admin-student-create'),
     path('get-classrooms-active/', views.get_active_classrooms_view, name='admin-active-classroom-list'),
+    path('bulk-upload/', views.bulk_upload_students, name='admin-student-bulk-upload'),
+    path('bulk-upload/template/', views.bulk_upload_template, name='admin-student-bulk-upload-template'),
     
     # Individual student operations
     path('<str:student_id>/', views.get_student_by_id, name='admin-student-detail'),
