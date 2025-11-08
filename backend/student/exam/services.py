@@ -225,15 +225,23 @@ class ExamService:
             if not exam_result['success']:
                 return exam_result
             
-            # 2. Get sections
-            sections_result = ExamService.get_exam_sections(exam_id)
-            if not sections_result['success']:
-                return sections_result
+            # 2. Get sections (chỉ lấy các section không có audio_path)
+            try:
+                sections_response = supabase.table('jlpt_exam_sections')\
+                    .select('*')\
+                    .eq('exam_id', exam_id)\
+                    .is_('audio_path', 'null')\
+                    .order('position')\
+                    .execute()
+                sections_data = sections_response.data
+            except Exception as se:
+                return {'success': False, 'error': f"Error fetching sections: {str(se)}"}
+
             
             sections_with_data = []
             
             # 3. Get question types for each section
-            for section in sections_result['data']:
+            for section in sections_data:
                 qt_result = ExamService.get_question_types(section['id'])
                 if not qt_result['success']:
                     continue
@@ -560,7 +568,3 @@ class ExamService:
                 'error': str(e)
             }
         
-
-
-
-
