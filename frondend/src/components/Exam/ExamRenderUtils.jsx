@@ -15,7 +15,7 @@ export const Underline = ({ children, weight = 1, offset = 4, colorClass = '' })
 // Helper: Border Box
 export const PassageBorderBox = ({ isTimeUp, children }) => (
   <div className={`border-2 border-black p-6 rounded-lg ${isTimeUp ? 'bg-red-100' : 'bg-white'}`}>
-    <div className="text-lg md:text-xl leading-relaxed text-gray-800">
+    <div className="text-lg md:text-xl leading-relaxed text-gray-800 font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
       {children}
     </div>
   </div>
@@ -223,7 +223,7 @@ export const renderPassageContent = (text, options = {}) => {
   if (!text) return null;
 
   const parts = [];
-  const frameRegex = /<frame_start>([\s\S]*?)<frame_end>/g;
+  const frameRegex = /<frame>([\s\S]*?)<\/frame>/g;
   let lastIndex = 0;
   let match;
   let idx = 0;
@@ -232,7 +232,7 @@ export const renderPassageContent = (text, options = {}) => {
       const before = text.slice(lastIndex, match.index);
       if (before.trim().length > 0) {
         parts.push(
-          <div key={`nf-${idx++}`}>
+          <div key={`nf-${idx++}`} className="font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
             {renderInlineBlock(before, `nf-${idx}`, options)}
           </div>
         );
@@ -241,7 +241,7 @@ export const renderPassageContent = (text, options = {}) => {
     const frameContent = match[1];
     parts.push(
       <div key={`fr-${idx++}`} className="mt-4 border-2 border-black p-4 bg-white rounded-lg">
-        <div className="text-lg leading-relaxed text-gray-800">
+        <div className="text-lg leading-relaxed text-gray-800 font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
           {renderInlineBlock(frameContent, `frc-${idx}`, options)}
         </div>
       </div>
@@ -252,7 +252,7 @@ export const renderPassageContent = (text, options = {}) => {
     const remaining = text.slice(lastIndex);
     if (remaining.trim().length > 0) {
       parts.push(
-        <div key={`nf-${idx++}`}>
+        <div key={`nf-${idx++}`} className="font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
           {renderInlineBlock(remaining, `nf-${idx}`, options)}
         </div>
       );
@@ -267,7 +267,7 @@ export const renderFramedPassageBlocks = (passageText, isTimeUp) => {
 
     const parts = [];
     let currentIndex = 0;
-    const frameRegex = /<frame_start>(.*?)<frame_end>/gs;
+    const frameRegex = /<frame>([\s\S]*?)<\/frame>/g;
     let match;
 
     while ((match = frameRegex.exec(passageText)) !== null) {
@@ -275,35 +275,14 @@ export const renderFramedPassageBlocks = (passageText, isTimeUp) => {
         const beforeText = passageText.slice(currentIndex, match.index);
         parts.push({
           type: 'text',
-          content: beforeText.split('<enter>').map((part, index, arr) => (
-            <span key={index}>
-              {part}
-              {index < arr.length - 1 && <br />}
-            </span>
-          )),
+          content: renderInlineBlock(beforeText, `pre-${currentIndex}`)
         });
       }
 
       const frameContent = match[1];
       parts.push({
         type: 'frame',
-        content: frameContent.split('<enter>').map((part, index, arr) => {
-          if (part.includes('<right>')) {
-            const rightContent = part.replace('<right>', '');
-            return (
-              <div key={index} className="text-right">
-                {rightContent}
-                {index < arr.length - 1 && <br />}
-              </div>
-            );
-          }
-          return (
-            <span key={index}>
-              {part}
-              {index < arr.length - 1 && <br />}
-            </span>
-          );
-        }),
+        content: renderInlineBlock(frameContent, `frame-${match.index}`)
       });
       currentIndex = match.index + match[0].length;
     }
@@ -312,24 +291,14 @@ export const renderFramedPassageBlocks = (passageText, isTimeUp) => {
       const remainingText = passageText.slice(currentIndex);
       parts.push({
         type: 'text',
-        content: remainingText.split('<enter>').map((part, index, arr) => (
-          <span key={index}>
-            {part}
-            {index < arr.length - 1 && <br />}
-          </span>
-        )),
+        content: renderInlineBlock(remainingText, `post-${currentIndex}`)
       });
     }
 
     if (parts.length === 0) {
       parts.push({
         type: 'text',
-        content: passageText.split('<enter>').map((part, index, arr) => (
-          <span key={index}>
-            {part}
-            {index < arr.length - 1 && <br />}
-          </span>
-        )),
+        content: renderInlineBlock(passageText, `all-0`)
       });
     }
 
@@ -337,13 +306,13 @@ export const renderFramedPassageBlocks = (passageText, isTimeUp) => {
       if (part.type === 'frame') {
         return (
           <div key={index} className={`mt-4 border-2 border-black p-4 rounded-lg ${isTimeUp ? 'bg-red-100' : 'bg-white'}`}>
-            <div className="text-lg md:text-xl leading-relaxed text-gray-800">
+            <div className="text-lg md:text-xl leading-relaxed text-gray-800 font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
               {part.content}
             </div>
           </div>
         );
       }
-      return <div key={index}>{part.content}</div>;
+      return <div key={index} className="font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>{part.content}</div>;
     });
 };
 

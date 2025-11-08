@@ -371,8 +371,34 @@ export default function ExamPage() {
         [activeSection]: prev[activeSection] === questionTypeId ? null : questionTypeId
       }));
       
-      setCurrentQuestionPage(0);
-      setCurrentQuestionIndex(0);
+      // Kiểm tra và reset index nếu vượt quá số lượng câu hỏi của question type mới
+      const newQuestions = groupedQuestions[questionTypeId]?.questions || [];
+      const uniqueNewQuestions = newQuestions.filter((question, index, self) => 
+        index === self.findIndex(q => q.id === question.id)
+      );
+      
+      if (uniqueNewQuestions.length > 0) {
+        const shouldUsePaginationNew = 
+          groupedQuestions[questionTypeId]?.type?.duration &&
+          (uniqueNewQuestions[0].passage || uniqueNewQuestions[0].jlpt_question_passages);
+        
+        if (shouldUsePaginationNew) {
+          // Nếu dùng pagination, reset về page 0 nếu page hiện tại vượt quá
+          if (currentQuestionPage >= uniqueNewQuestions.length) {
+            setCurrentQuestionPage(0);
+          }
+        } else {
+          // Nếu không dùng pagination, reset về index 0 nếu index hiện tại vượt quá
+          if (currentQuestionIndex >= uniqueNewQuestions.length) {
+            setCurrentQuestionIndex(0);
+          }
+        }
+      } else {
+        // Nếu không có câu hỏi, reset về 0
+        setCurrentQuestionPage(0);
+        setCurrentQuestionIndex(0);
+      }
+      
       resetQuestionToast(); 
     }
   };
@@ -596,7 +622,7 @@ export default function ExamPage() {
                   {groupedQuestions[activeQuestionType].type.passages.map((passage, passageIndex) => (
                     <div key={passageIndex}>
                       {passage.content && (
-                        <div className="whitespace-pre-line text-lg md:text-xl">
+                        <div className="whitespace-pre-line text-lg md:text-xl font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                           {renderPassageContent(passage.content, { 
                             questions: groupedQuestions[activeQuestionType]?.questions || [], 
                             questionTypeId: activeQuestionType,
@@ -634,7 +660,7 @@ export default function ExamPage() {
                     {/* ... (Code render câu hỏi phân trang giữ nguyên) ... */}
                     {currentQuestion.passage && (
                       <div className="mb-6 p-6 bg-gray-50 rounded-lg">
-                        <div className="text-lg md:text-xl leading-relaxed text-gray-800">
+                        <div className="text-lg md:text-xl leading-relaxed text-gray-800 font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                           {renderFramedPassageBlocks(
                             currentQuestion.passage,
                             (questionTimeRemaining[currentQuestion?.id] !== undefined && questionTimeRemaining[currentQuestion?.id] <= 0)
@@ -648,7 +674,7 @@ export default function ExamPage() {
                           {currentQuestion.jlpt_question_passages.map((passage, passageIndex) => (
                             <div key={passageIndex}>
                               {passage.content && (
-                                <div className="whitespace-pre-line text-lg md:text-xl">
+                                <div className="whitespace-pre-line text-lg md:text-xl font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                                   {renderPassageContent(passage.content, { questions: filteredQuestions, questionTypeId: activeQuestionType })}
                                 </div>
                               )}
@@ -772,7 +798,7 @@ export default function ExamPage() {
                     {/* ... (Code render toàn bộ câu hỏi giữ nguyên) ... */}
                     {question.passage && (
                       <div className="mb-6 p-6 bg-gray-50 rounded-lg">
-                        <div className="text-lg md:text-xl leading-relaxed text-gray-800">
+                        <div className="text-lg md:text-xl leading-relaxed text-gray-800 font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                           {renderFramedPassageBlocks(
                             question.passage,
                             (questionTimeRemaining[question?.id] !== undefined && questionTimeRemaining[question?.id] <= 0)
@@ -786,7 +812,7 @@ export default function ExamPage() {
                           {question.jlpt_question_passages.map((passage, passageIndex) => (
                             <div key={passageIndex}>
                               {passage.content && (
-                                <div className="whitespace-pre-line text-lg md:text-xl">
+                                <div className="whitespace-pre-line text-lg md:text-xl font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                                   {renderPassageContent(passage.content, { questions: groupedQuestions[activeQuestionType]?.questions || [], questionTypeId: activeQuestionType })}
                                 </div>
                               )}
@@ -968,8 +994,9 @@ export default function ExamPage() {
         onClose={() => setShowReadingTimeUpModal(false)} 
         onAction={() => {
           setShowReadingTimeUpModal(false);
-          navigate('/listening-intro'); 
+          handleSubmitExam();
         }}
+        bothButtonsSubmit={true}
       />
       <ExamCertificateOverlay
         show={showCertificate}
