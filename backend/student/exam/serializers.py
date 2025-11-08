@@ -139,3 +139,11 @@ class ExamSubmissionSerializer(serializers.Serializer):
     duration = serializers.IntegerField(min_value=0)
     # allow_empty=False để đảm bảo học sinh phải nộp ít nhất 1 câu
     answers = SubmittedAnswerSerializer(many=True, allow_empty=False)
+
+class ListeningExamSubmissionSerializer(serializers.Serializer):
+    """
+    Serializer cho bài nộp phần nghe, cho phép nộp bài không có đáp án nào (mặc định 0 điểm).
+    """
+    duration = serializers.IntegerField(min_value=0)
+    # allow_empty=True để cho phép nộp bài không có đáp án nào (mặc định 0 điểm)
+    answers = SubmittedAnswerSerializer(many=True, allow_empty=True)

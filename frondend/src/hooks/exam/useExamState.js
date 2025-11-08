@@ -8,17 +8,23 @@ export const useExamState = () => {
   // State chính lưu trữ đáp án (dạng { q1: "a1", q2: "a3" })
   const [studentAnswers, setStudentAnswers] = useState({});
   
-  // State RÊNG BIỆT cho câu hỏi sắp xếp (QT007)
+  // State RÊNG BIỆT cho câu hỏi sắp xếp (is_Sort_Question = true)
   // Dạng { q_sort_1: ["a2", "a1", "a4"] }
   const [answerOrder, setAnswerOrder] = useState({});
 
   /**
    * Hàm xử lý chính khi chọn một đáp án.
-   * Tự động phân loại logic cho trắc nghiệm hoặc sắp xếp (QT007).
+   * Tự động phân loại logic cho trắc nghiệm hoặc sắp xếp (dựa trên isSortQuestion).
+   * @param {string} questionId - ID của câu hỏi
+   * @param {string} answerId - ID của đáp án
+   * @param {string} questionTypeId - ID của loại câu hỏi (để tương thích ngược)
+   * @param {boolean} isSortQuestion - Flag cho biết có phải câu hỏi sắp xếp không (ưu tiên hơn questionTypeId)
    */
-  const handleAnswerSelect = (questionId, answerId, questionTypeId) => {
+  const handleAnswerSelect = (questionId, answerId, questionTypeId, isSortQuestion = false) => {
+    // Kiểm tra isSortQuestion trước, nếu không có thì fallback về QT007 (tương thích ngược)
+    const isSort = isSortQuestion || questionTypeId === "QT007";
     
-    if (questionTypeId === "QT007") {
+    if (isSort) {
       // --- Logic cho câu hỏi SẮP XẾP ---
       setAnswerOrder((prev) => {
         const currentOrder = prev[questionId] || [];
@@ -69,9 +75,16 @@ export const useExamState = () => {
 
   /**
    * Helper: Kiểm tra một đáp án đã được chọn hay chưa.
+   * @param {string} questionId - ID của câu hỏi
+   * @param {string} answerId - ID của đáp án
+   * @param {string} questionTypeId - ID của loại câu hỏi (để tương thích ngược)
+   * @param {boolean} isSortQuestion - Flag cho biết có phải câu hỏi sắp xếp không (ưu tiên hơn questionTypeId)
    */
-  const isAnswerSelected = (questionId, answerId, questionTypeId) => {
-    if (questionTypeId === "QT007") {
+  const isAnswerSelected = (questionId, answerId, questionTypeId, isSortQuestion = false) => {
+    // Kiểm tra isSortQuestion trước, nếu không có thì fallback về QT007 (tương thích ngược)
+    const isSort = isSortQuestion || questionTypeId === "QT007";
+    
+    if (isSort) {
       const order = answerOrder[questionId] || [];
       return order.includes(answerId);
     } else {

@@ -265,12 +265,13 @@ export default function ExamPage() {
                 (a, b) => Number(a.show_order) - Number(b.show_order)
               );
               return normalizedAnswers.map((ans) => {
-                const selected = isAnswerSelected(q.id, ans.id, q.question_type_id);
+                const sortQuestion = isSortQuestion(q.question_type_id);
+                const selected = isAnswerSelected(q.id, ans.id, q.question_type_id, sortQuestion);
                 return (
                   <button
                     key={ans.id}
                     type="button"
-                    onClick={() => handleAnswerSelect(q.id, ans.id, q.question_type_id)}
+                    onClick={() => handleAnswerSelect(q.id, ans.id, q.question_type_id, sortQuestion)}
                     className={`text-left w-full px-3 py-2.5 transition-colors ${selected ? 'bg-[#DDE5FF]' : 'bg-white hover:bg-gray-50'}`}
                   >
                     <div className="flex items-start text-gray-900 leading-6">
@@ -743,7 +744,8 @@ export default function ExamPage() {
                               }
                               return true;
                             }).map((answer) => {
-                              const isSelected = isAnswerSelected(currentQuestion.id, answer.id, currentQuestion.questionTypeId);
+                              const sortQuestion = isSortQuestion(currentQuestion.questionTypeId);
+                              const isSelected = isAnswerSelected(currentQuestion.id, answer.id, currentQuestion.questionTypeId, sortQuestion);
                               const orderNumber = getAnswerOrder(currentQuestion.id, answer.id);
                               
                               return (
@@ -760,7 +762,7 @@ export default function ExamPage() {
                                     name={`question-${currentQuestion.id}`}
                                     value={answer.id}
                                     checked={isSelected}
-                                    onChange={() => handleAnswerSelect(currentQuestion.id, answer.id, currentQuestion.questionTypeId)}
+                                    onChange={() => handleAnswerSelect(currentQuestion.id, answer.id, currentQuestion.questionTypeId, sortQuestion)}
                                     className="hidden"
                                   />
                                   <span
@@ -880,7 +882,7 @@ export default function ExamPage() {
                                   <div
                                     key={answerId}
                                     className="flex items-center gap-2 bg-white px-4 py-3 rounded-lg border-2 border-[#874FFF] cursor-pointer hover:bg-purple-50 transition-all"
-                                    onClick={() => handleAnswerSelect(question.id, answerId, question.questionTypeId)}
+                                    onClick={() => handleAnswerSelect(question.id, answerId, question.questionTypeId, true)}
                                   >
                                     <span className="w-8 h-8 bg-[#874FFF] text-white rounded-full flex items-center justify-center font-bold text-sm">
                                       {index + 1}
@@ -920,7 +922,8 @@ export default function ExamPage() {
                               }
                               return true;
                             }).map((answer) => {
-                              const isSelected = isAnswerSelected(question.id, answer.id, question.questionTypeId);
+                              const sortQuestion = isSortQuestion(question.questionTypeId);
+                              const isSelected = isAnswerSelected(question.id, answer.id, question.questionTypeId, sortQuestion);
                               const orderNumber = getAnswerOrder(question.id, answer.id);
                               
                               return (
@@ -929,23 +932,23 @@ export default function ExamPage() {
                                   className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all ${
                                     activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4
                                       ? "flex-row"
-                                      : isSortQuestion(question.questionTypeId)
+                                      : sortQuestion
                                       ? "flex-row"
                                       : "flex-row"
                                   } ${
                                     isSelected
-                                      ? isSortQuestion(question.questionTypeId)
+                                      ? sortQuestion
                                         ? "border-[#874FFF] bg-purple-50 opacity-60"
                                         : "border-[#874FFF] bg-purple-50"
                                       : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50"
                                   }`}
                                 >
                                   <input
-                                    type={isSortQuestion(question.questionTypeId) ? "checkbox" : "radio"}
+                                    type={sortQuestion ? "checkbox" : "radio"}
                                     name={`question-${question.id}`}
                                     value={answer.id}
                                     checked={isSelected}
-                                    onChange={() => handleAnswerSelect(question.id, answer.id, question.questionTypeId)}
+                                    onChange={() => handleAnswerSelect(question.id, answer.id, question.questionTypeId, sortQuestion)}
                                     className="hidden"
                                   />
                                   {isSortQuestion(question.questionTypeId) ? (
