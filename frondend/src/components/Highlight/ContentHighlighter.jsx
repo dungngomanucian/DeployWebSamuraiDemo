@@ -1,16 +1,17 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import useSelectionHandler from '../../hooks/exam/useSelectionHandler';
 import HighlightAndAnnotationPopup from './HighlightAndAnnotationPopup';
 import RemoveAnnotationPopup from './RemoveAnnotationPopup';
 // 🌟 THAY ĐỔI: Lấy setter mới từ Context 🌟
 import { useAnnotationContext } from '../../context/AnnotationContext'; 
+
 // Giữ nguyên hàm tạo ID ngẫu nhiên
 const generateTempId = () => {
     return 'temp-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
 };
 
 
-const ContentHighlighter = ({ children }) => {
+const ContentHighlighter = forwardRef(({ children }, ref) => {
     // 🌟 Cập nhật để lấy setter mới 🌟
     const { addAnnotation, removeAnnotation, setScrollHandler, setRemoveAnnotationHandler } = useAnnotationContext(); 
 
@@ -115,6 +116,24 @@ const ContentHighlighter = ({ children }) => {
         }
     }, []);
 
+    // Helper function để tạo span wrapper, tránh lặp code
+    const createWrapperSpan = (id, classNames, style, actionType, color, note) => {
+        const span = document.createElement('span');
+        span.className = classNames;
+        Object.assign(span.style, style);
+        span.dataset.id = id;
+        span.dataset.actionType = actionType;
+        span.dataset.color = color;
+        if (note) {
+            span.setAttribute('data-tip', note);
+        }
+        span.addEventListener('click', handleAnnotatedClick);
+        return span;
+    };
+
+    const CONTEXT_LENGTH = 20; // Độ dài của prefix/suffix
+
+
 
     const applyAction = useCallback((actionType, color, note = '') => {
         if (!selectedRange) return;
@@ -139,76 +158,92 @@ const ContentHighlighter = ({ children }) => {
 
         // 2. LOGIC "SPLIT AND WRAP" AN TOÀN (Đây là phần thay đổi)
         try {
-            // Lấy tất cả các TextNode giao với vùng bôi đen
-            const allTextNodes = [];
+            const nodesToWrap = [];
             const walker = document.createTreeWalker(
                 range.commonAncestorContainer,
                 NodeFilter.SHOW_TEXT,
-                (node) => {
-                    // Lọc: Chỉ chấp nhận các node giao với Range
-                    return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-                }
+                (node) => range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
             );
 
             while (walker.nextNode()) {
                 // Bỏ qua các node chỉ có khoảng trắng (giống logic cũ của bạn)
                 if (walker.currentNode.textContent.trim().length > 0) { 
-                    allTextNodes.push(walker.currentNode);
+                    nodesToWrap.push(walker.currentNode);
                 }
             }
 
-            // Tách (split) và Bọc (wrap) các node đã tìm thấy
-            allTextNodes.forEach((node) => {
-                const isStartNode = (node === range.startContainer);
-                const isEndNode = (node === range.endContainer);
-                
-                let nodeToWrap = node;
+            // Duyệt ngược để việc split không ảnh hưởng đến các node chưa xử lý
+            for (let i = nodesToWrap.length - 1; i >= 0; i--) {
+                const node = nodesToWrap[i];
+                const isStartNode = node === range.startContainer;
+                const isEndNode = node === range.endContainer;
 
-                // Tách (split) node nếu nó bị chọn 1 phần
-                
-                // Case 1: Chọn 1 phần bên trong 1 node duy nhất (ví dụ: "Hello [World]!")
+                let middlePart = node;
+
+                // Case 1: Vùng chọn nằm hoàn toàn trong 1 TextNode
                 if (isStartNode && isEndNode) {
-                    nodeToWrap = node.splitText(range.startOffset);
-                    nodeToWrap.splitText(range.endOffset - range.startOffset);
-                } 
-                // Case 2: Đây là node đầu tiên, bị chọn 1 phần (ví dụ: "[Hello] World")
-                else if (isStartNode) {
-                    nodeToWrap = node.splitText(range.startOffset);
-                } 
-                // Case 3: Đây là node cuối cùng, bị chọn 1 phần (ví dụ: "Hello [World]")
-                else if (isEndNode) {
-                    node.splitText(range.endOffset); // Tách phần "sau", nodeToWrap vẫn là node gốc (giờ đã bị cắt ngắn)
+                    // Tách phần sau ra trước
+                    const endPart = node.splitText(range.endOffset);
+                    // Tách phần đầu, phần còn lại chính là phần giữa cần bọc
+                    const middlePart = node.splitText(range.startOffset);
+
+                    // Bọc phần giữa
+                    const span = createWrapperSpan(highlightId, classNames, inlineStyle, actionType, finalColor, noteText);
+                    span.appendChild(middlePart);
+                    endPart.parentNode.insertBefore(span, endPart);
+
+                } else if (isEndNode) { // Case 2: Đây là node cuối của vùng chọn
+                    // Chỉ cần tách phần sau ra
+                    middlePart = node.splitText(range.endOffset);
+                    // Bọc phần đầu (phần còn lại của node gốc)
+                    const span = createWrapperSpan(highlightId, classNames, inlineStyle, actionType, finalColor, noteText);
+                    node.parentNode.insertBefore(span, middlePart);
+                    span.appendChild(node);
+
+                } else if (isStartNode) { // Case 3: Đây là node đầu của vùng chọn
+                    // Tách phần đầu ra, phần còn lại là phần cần bọc
+                    middlePart = node.splitText(range.startOffset);
+                    const span = createWrapperSpan(highlightId, classNames, inlineStyle, actionType, finalColor, noteText);
+                    middlePart.parentNode.insertBefore(span, middlePart);
+                    span.appendChild(middlePart);
+                } else { // Case 4: Node nằm hoàn toàn trong vùng chọn
+                    const span = createWrapperSpan(highlightId, classNames, inlineStyle, actionType, finalColor, noteText);
+                    node.parentNode.insertBefore(span, node);
+                    span.appendChild(node);
                 }
-                // Case 4 (ngầm định): Node nằm hoàn toàn bên trong, không cần split.
+            }
+
+            // 4. LƯU METADATA VỚI NGỮ CẢNH (PREFIX/SUFFIX)
+            const fullText = contentRef.current.textContent || '';
+            const startIndex = fullText.indexOf(selectedText);
+            
+            if (startIndex !== -1) {
+                const prefixStart = Math.max(0, startIndex - CONTEXT_LENGTH);
+                const suffixEnd = Math.min(fullText.length, startIndex + selectedText.length + CONTEXT_LENGTH);
                 
+                const prefix = fullText.substring(prefixStart, startIndex);
+                const suffix = fullText.substring(startIndex + selectedText.length, suffixEnd);
 
-                // 3. BỌC (WRAP) NODE
-                // Tạo span mới cho MỖI text node (để click handler hoạt động)
-                const newSpan = document.createElement('span');
-                newSpan.className = classNames;
-                Object.assign(newSpan.style, inlineStyle);
-                newSpan.dataset.id = highlightId;
-                newSpan.dataset.actionType = actionType;
-                newSpan.dataset.color = finalColor; 
-                if (noteText) { newSpan.setAttribute('data-tip', noteText); }
-                newSpan.addEventListener('click', handleAnnotatedClick);
-
-                // Thao tác DOM an toàn: Dùng insertBefore + appendChild
-                // Bọc nodeToWrap bằng newSpan
-                if (nodeToWrap.parentNode) {
-                    nodeToWrap.parentNode.insertBefore(newSpan, nodeToWrap);
-                    newSpan.appendChild(nodeToWrap);
-                }
-            });
-
-            // 4. LƯU METADATA (Giống hệt code cũ)
-            if (actionType === 'note') {
                 addAnnotation({ 
+                    id: highlightId, 
+                    text: selectedText, 
+                    note: noteText,
+                    type: actionType, 
+                    date: new Date().toLocaleTimeString(),
+                    // Dữ liệu ngữ cảnh mới
+                    prefix: prefix,
+                    suffix: suffix,
+                });
+            } else {
+                 // Fallback nếu không tìm thấy, lưu không có ngữ cảnh
+                 addAnnotation({ 
                     id: highlightId, 
                     text: selectedText, 
                     note: noteText, 
                     type: actionType, 
-                    date: new Date().toLocaleTimeString()
+                    date: new Date().toLocaleTimeString(),
+                    prefix: '',
+                    suffix: '',
                 });
             }
 
@@ -218,7 +253,7 @@ const ContentHighlighter = ({ children }) => {
         }
 
         clearSelection();
-    }, [selectedRange, selectedText, clearSelection, addAnnotation, handleAnnotatedClick]);
+    }, [selectedRange, selectedText, clearSelection, addAnnotation, handleAnnotatedClick, contentRef]);
 
     
     // 🌟 ĐẢM BẢO CHUYỂN noteText ĐẾN applyAction 🌟
@@ -233,9 +268,90 @@ const ContentHighlighter = ({ children }) => {
         }
     };
 
+    // HÀM "VẼ LẠI" ANNOTATION
+    const reapplyAnnotations = useCallback((annotationsToApply) => {
+        if (!contentRef.current || annotationsToApply.length === 0) return;
+
+        const container = contentRef.current;
+        const fullText = container.textContent || '';
+
+        annotationsToApply.forEach(ann => {
+            const { id, text, note, type, prefix, suffix } = ann;
+            
+            // Tìm vị trí chính xác bằng ngữ cảnh
+            const searchTerm = prefix + text + suffix;
+            const searchIndex = fullText.indexOf(searchTerm);
+
+            if (searchIndex === -1) {
+                // console.warn(`Không thể vẽ lại annotation ID ${id}: không tìm thấy ngữ cảnh.`);
+                return;
+            }
+
+            const targetStartIndex = searchIndex + prefix.length;
+            const targetEndIndex = targetStartIndex + text.length;
+
+            // Tạo range để bọc lại
+            const range = document.createRange();
+            let charCount = 0;
+            let startNode, startOffset, endNode, endOffset;
+
+            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+            while (walker.nextNode()) {
+                const node = walker.currentNode;
+                const nodeLength = node.textContent.length;
+
+                if (!startNode && targetStartIndex < charCount + nodeLength) {
+                    startNode = node;
+                    startOffset = targetStartIndex - charCount;
+                }
+                if (!endNode && targetEndIndex <= charCount + nodeLength) {
+                    endNode = node;
+                    endOffset = targetEndIndex - charCount;
+                    break; // Đã tìm thấy cả điểm đầu và cuối
+                }
+                charCount += nodeLength;
+            }
+
+            if (startNode && endNode) {
+                range.setStart(startNode, startOffset);
+                range.setEnd(endNode, endOffset);
+
+                // Logic bọc lại, tương tự applyAction nhưng không lưu metadata
+                let classNames = `highlighted relative cursor-pointer transition-all duration-300 ease-in-out`;
+                let inlineStyle = {};
+                let finalColor = '';
+
+                if (type === 'highlight') {
+                    classNames += ` opacity-70`;
+                    inlineStyle.backgroundColor = 'rgb(253, 224, 71)';
+                    finalColor = 'yellow';
+                } else if (type === 'note') {
+                    classNames += ` underline decoration-red-500 decoration-solid underline-offset-4 tooltip tooltip-hover text-red-500`;
+                    finalColor = 'red-note';
+                }
+
+                const span = createWrapperSpan(id, classNames, inlineStyle, type, finalColor, note);
+                
+                try {
+                    // Bọc nội dung của range bằng span
+                    range.surroundContents(span);
+                } catch (e) {
+                    // Lỗi có thể xảy ra nếu range cắt ngang qua các thẻ không hợp lệ.
+                    // Trong trường hợp này, chúng ta có thể chọn không vẽ lại thay vì làm crash app.
+                    console.error("Lỗi khi surroundContents, có thể do range không hợp lệ:", e, ann);
+                }
+            }
+        });
+    }, [contentRef, handleAnnotatedClick]);
+
+    // Expose hàm reapplyAnnotations ra bên ngoài để ExamPage có thể gọi
+    useImperativeHandle(ref, () => ({
+        reapplyAnnotations
+    }));
+
 
     return (
-        <div ref={contentRef} className="relative"> 
+        <div ref={contentRef} className="relative">
             {children} 
             
             <HighlightAndAnnotationPopup
@@ -251,6 +367,6 @@ const ContentHighlighter = ({ children }) => {
             />
         </div>
     );
-};
+});
 
 export default ContentHighlighter;

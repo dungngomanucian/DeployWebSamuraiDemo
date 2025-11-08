@@ -57,6 +57,7 @@ function ExamPageContent() {
   const passageQuestionRefs = useRef({});
   const nonStickyHeaderRef = useRef(null); 
   const [scrollOffset, setScrollOffset] = useState(180); 
+  const highlighterRef = useRef(null); // <-- REF MỚI CHO CONTENT HIGHLIGHTER
   
   // === 4. ĐƯA STATE TỪ CON LÊN CHA (NÂNG CẤP) ===
   const [expandedQuestionType, setExpandedQuestionType] = useState({});
@@ -213,6 +214,16 @@ function ExamPageContent() {
     }
   }, [showStickyProgress, examData, loading]);
 
+  // useEffect: VẼ LẠI ANNOTATION KHI NỘI DUNG THAY ĐỔI
+  useEffect(() => {
+    // Dùng setTimeout để đảm bảo DOM đã được cập nhật hoàn toàn sau khi React render
+    const timer = setTimeout(() => {
+      if (highlighterRef.current && annotations.length > 0) {
+        highlighterRef.current.reapplyAnnotations(annotations);
+      }
+    }, 100); // 100ms là một khoảng trễ an toàn
+    return () => clearTimeout(timer);
+  }, [currentQuestion, activeQuestionType, annotations]); // Phụ thuộc vào câu hỏi và annotations
 
   // === 7. CÁC HÀM LOGIC GỐC ===
 
@@ -527,7 +538,7 @@ function ExamPageContent() {
           
           {/* Questions Container (Chưa tách) */}
           <div id="questions-container" className="bg-white rounded-2xl shadow-md px-6 md:px-8 py-8">
-          <ContentHighlighter>
+          <ContentHighlighter ref={highlighterRef}>
             {/* Question Header */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-4">
@@ -654,30 +665,22 @@ function ExamPageContent() {
                         <div className="w-9 h-9 border-2 border-gray-300 rounded-md flex items-center justify-center text-base font-semibold text-gray-700 select-none">
                           {currentQuestion.position}
                         </div>
-                        <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
-                          {currentQuestion.underline_text ? (
-                            <>
-                              {currentQuestion.question_text.split(currentQuestion.underline_text)[0].split('<enter>').map((part, index) => (
-                                <span key={index}>
-                                  {part}
-                                  {index < currentQuestion.question_text.split(currentQuestion.underline_text)[0].split('<enter>').length - 1 && <br />}
-                                </span>
-                              ))}
-                          <Underline weight={1}>
-                                {currentQuestion.underline_text.split('<enter>').map((part, index) => (
-                                  <span key={index}>
+                        <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>                          {currentQuestion.underline_text && currentQuestion.question_text.includes(currentQuestion.underline_text) ? (
+                            currentQuestion.question_text.split('<enter>').map((line, lineIndex, lineArr) => (
+                              <React.Fragment key={lineIndex}>
+                                {line.split(currentQuestion.underline_text).map((part, partIndex, partArr) => (
+                                  <React.Fragment key={partIndex}>
                                     {part}
-                                    {index < currentQuestion.underline_text.split('<enter>').length - 1 && <br />}
-                                  </span>
+                                    {partIndex < partArr.length - 1 && (
+                                      <u className="decoration-black decoration-1 underline-offset-4">
+                                        {currentQuestion.underline_text}
+                                      </u>
+                                    )}
+                                  </React.Fragment>
                                 ))}
-                          </Underline>
-                              {currentQuestion.question_text.split(currentQuestion.underline_text)[1].split('<enter>').map((part, index) => (
-                                <span key={index}>
-                                  {part}
-                                  {index < currentQuestion.question_text.split(currentQuestion.underline_text)[1].split('<enter>').length - 1 && <br />}
-                                </span>
-                              ))}
-                            </>
+                                {lineIndex < lineArr.length - 1 && <br />}
+                              </React.Fragment>
+                            ))
                           ) : (
                             (currentQuestion?.question_text ?? '')
                               .split('<enter>')
@@ -792,30 +795,22 @@ function ExamPageContent() {
                         <div className="w-9 h-9 border-2 border-gray-300 rounded-md flex items-center justify-center text-base font-semibold text-gray-700 select-none">
                           {question.position}
                         </div>
-                        <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
-                          {question.underline_text ? (
-                            <>
-                              {question.question_text.split(question.underline_text)[0].split('<enter>').map((part, index) => (
-                                <span key={index}>
-                                  {part}
-                                  {index < question.question_text.split(question.underline_text)[0].split('<enter>').length - 1 && <br />}
-                                </span>
-                              ))}
-                              <Underline weight={1}>
-                                {question.underline_text.split('<enter>').map((part, index) => (
-                                  <span key={index}>
+                        <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>                          {question.underline_text && question.question_text.includes(question.underline_text) ? (
+                            question.question_text.split('<enter>').map((line, lineIndex, lineArr) => (
+                              <React.Fragment key={lineIndex}>
+                                {line.split(question.underline_text).map((part, partIndex, partArr) => (
+                                  <React.Fragment key={partIndex}>
                                     {part}
-                                    {index < question.underline_text.split('<enter>').length - 1 && <br />}
-                                  </span>
+                                    {partIndex < partArr.length - 1 && (
+                                      <u className="decoration-black decoration-1 underline-offset-4">
+                                        {question.underline_text}
+                                      </u>
+                                    )}
+                                  </React.Fragment>
                                 ))}
-                              </Underline>
-                              {question.question_text.split(question.underline_text)[1].split('<enter>').map((part, index) => (
-                                <span key={index}>
-                                  {part}
-                                  {index < question.question_text.split(question.underline_text)[1].split('<enter>').length - 1 && <br />}
-                                </span>
-                              ))}
-                            </>
+                                {lineIndex < lineArr.length - 1 && <br />}
+                              </React.Fragment>
+                            ))
                           ) : (
                             (question?.question_text ?? '')
                               .split('<enter>')
