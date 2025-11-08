@@ -43,23 +43,27 @@ export default function ExamHeader({
   const navigate = useNavigate();
 
   // TẠO COMPONENT CON CHO NÚT NOTEPAD ĐỂ TÁI SỬ DỤNG
-  const NotepadButton = ({ className = '' }) => (
-    <button
-      onClick={(e) => {
-        e.preventDefault();
-        if (onNotepadOpen) onNotepadOpen();
-      }}
-      className={`px-4 py-2 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-semibold hover:bg-[#5427B4] hover:text-white transition-all relative text-sm ${className}`}
-      style={{ fontFamily: "Nunito" }}
-    >
-      📝 Notepad
-      {annotations && annotations.length > 0 && (
-        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-          {annotations.length}
-        </span>
-      )}
-    </button>
-  );
+  const NotepadButton = ({ className = '' }) => {
+    const noteCount = annotations?.filter(a => a.type === 'note').length || 0;
+
+    return (
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          if (onNotepadOpen) onNotepadOpen();
+        }}
+        className={`px-4 py-2 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-semibold hover:bg-[#5427B4] hover:text-white transition-all relative text-sm ${className}`}
+        style={{ fontFamily: "Nunito" }}
+      >
+        📝 Notepad
+        {noteCount > 0 && (
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+            {noteCount}
+          </span>
+        )}
+      </button>
+    );
+  };
   // JSX cho phần nội dung (sẽ được bọc bởi 1 trong 2 div dưới)
   const headerContent = (
     <>

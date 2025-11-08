@@ -22,17 +22,20 @@ const NotepadModal = ({ isVisible, onClose }) => {
     // -------------------------------------------------------------
 
     const filteredAnnotations = useMemo(() => {
+        // 1. Lọc chỉ lấy những mục là 'note'
+        const notesOnly = annotations.filter(ann => ann.type === 'note');
+
+        // 2. Nếu không có từ khóa tìm kiếm, trả về tất cả các note
         if (!searchTerm) {
-            return [...annotations].reverse();
+            return [...notesOnly].reverse(); // Hiển thị note mới nhất lên trước
         }
+
+        // 3. Nếu có từ khóa, tìm kiếm bên trong các note đã lọc
         const lowerCaseSearch = searchTerm.toLowerCase();
-        
-        return [...annotations]
-            .filter(ann => 
-                ann.text.toLowerCase().includes(lowerCaseSearch) || // Tìm trong đoạn văn bản bôi đen
-                (ann.note && ann.note.toLowerCase().includes(lowerCaseSearch)) // Tìm trong ghi chú
-            )
-            .reverse(); // Hiển thị mới nhất lên trước
+        return notesOnly.filter(ann => 
+            ann.text.toLowerCase().includes(lowerCaseSearch) || // Tìm trong đoạn văn bản gốc
+            (ann.note && ann.note.toLowerCase().includes(lowerCaseSearch)) // Tìm trong nội dung ghi chú
+        ).reverse();
     }, [annotations, searchTerm]);
     
 
