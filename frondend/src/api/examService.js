@@ -96,3 +96,15 @@ export const submitExam = async (examId, submissionData) => {
     body: JSON.stringify(submissionData),
   });
 };
+
+/**
+ * Nộp bài thi listening - cập nhật điểm vào exam_result đã tồn tại
+ * @param {string} examId - ID của bài thi
+ * @param {object} submissionData - Dữ liệu nộp bài { exam_result_id: 'xxx', duration: 123, answers: [...] }
+ */
+export const submitListeningExam = async (examId, submissionData) => {
+  return apiRequest(`${EXAM_BASE_ENDPOINT}/exams/${examId}/submit-listening/`, {
+    method: 'POST',
+    body: JSON.stringify(submissionData),
+  });
+};
