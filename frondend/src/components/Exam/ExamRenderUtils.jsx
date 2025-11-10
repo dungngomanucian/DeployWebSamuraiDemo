@@ -29,6 +29,43 @@ export const formatTime = (seconds, padMinutes = false) => {
   return `${m}:${String(secs).padStart(2, "0")}`;
 };
 
+// Helper: Render text với <tab> (thay bằng khoảng trắng 0.5cm)
+const renderTextWithTabs = (text, keyBase) => {
+  if (!text) return null;
+  
+  const tabRegex = /<tab>/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  let tabIndex = 0;
+  
+  while ((match = tabRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <span key={`${keyBase}-tab-${tabIndex++}`} style={{ display: 'inline-block', width: '0.5cm' }} />
+    );
+    lastIndex = match.index + match[0].length;
+  }
+  
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  
+  // Nếu không có <tab>, trả về text gốc
+  if (parts.length === 0) {
+    return text;
+  }
+  
+  // Nếu chỉ có 1 phần tử và không phải là React element, trả về text
+  if (parts.length === 1 && typeof parts[0] === 'string') {
+    return parts[0];
+  }
+  
+  return parts;
+};
+
 // Helper: Render text với <underline>
 const renderWithUnderline = (text, keyBase) => {
   const underlineRegex = /<underline>([\s\S]*?)<\/underline>/g;
@@ -36,20 +73,33 @@ const renderWithUnderline = (text, keyBase) => {
   let lastIndex = 0;
   let match;
   
+  const addTabProcessedText = (processedText) => {
+    if (Array.isArray(processedText)) {
+      parts.push(...processedText);
+    } else if (processedText !== null && processedText !== undefined) {
+      parts.push(processedText);
+    }
+  };
+  
   while ((match = underlineRegex.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index));
+      const beforeText = text.slice(lastIndex, match.index);
+      const processedBefore = renderTextWithTabs(beforeText, `${keyBase}-before-${match.index}`);
+      addTabProcessedText(processedBefore);
     }
+    const processedContent = renderTextWithTabs(match[1], `${keyBase}-ul-content-${match.index}`);
     parts.push(
       <Underline key={`${keyBase}-ul-${match.index}`} weight={2}>
-        {match[1]}
+        {processedContent}
       </Underline>
     );
     lastIndex = match.index + match[0].length;
   }
   
   if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
+    const remainingText = text.slice(lastIndex);
+    const processedRemaining = renderTextWithTabs(remainingText, `${keyBase}-after-${lastIndex}`);
+    addTabProcessedText(processedRemaining);
   }
   
   return parts.length > 0 ? parts : text;
@@ -76,7 +126,9 @@ const renderTextWithTables = (rawText, keyBase) => {
       const cellRegex = /<c\d+>([\s\S]*?)<\/c\d+>/g;
       let cMatch;
       while ((cMatch = cellRegex.exec(rowHtml)) !== null) {
-        cells.push(cMatch[1] || '');
+        // Xử lý <tab> và <underline> trong cell content
+        const cellContent = cMatch[1] || '';
+        cells.push(renderWithUnderline(cellContent, `${keyBase}-cell-${rMatch.index}-${cMatch.index}`));
       }
       rows.push(cells);
     }

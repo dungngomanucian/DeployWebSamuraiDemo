@@ -118,8 +118,11 @@ export default function ExamPage() {
         return;
       }
       setExamData(data);
-      const totalMinutesFromSections = Array.isArray(data?.sections)
-        ? data.sections.slice(0, 2).reduce((sum, section) => sum + (Number(section?.duration) || 0), 0)
+      
+      // Lọc các sections không phải listening (is_listening = false)
+      const nonListeningSections = data?.sections?.filter(section => section.is_listening === false) || [];
+      const totalMinutesFromSections = nonListeningSections.length > 0
+        ? nonListeningSections.reduce((sum, section) => sum + (Number(section?.duration) || 0), 0)
         : 0;
       const totalSeconds = totalMinutesFromSections * 60;
       setTotalTime(totalSeconds); 

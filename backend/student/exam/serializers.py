@@ -12,9 +12,12 @@ class LevelSerializer(serializers.Serializer):
 
 
 class SectionDurationSerializer(serializers.Serializer):
-    """Serializer for section duration only"""
+    """Serializer for section duration and metadata"""
     id = serializers.CharField()
     duration = serializers.IntegerField(required=False, allow_null=True)
+    position = serializers.IntegerField(required=False, allow_null=True)
+    is_listening = serializers.BooleanField(required=False, allow_null=True)
+    type = serializers.CharField(required=False, allow_null=True)
 
 class ExamSerializer(serializers.Serializer):
     """Serializer for exam details"""

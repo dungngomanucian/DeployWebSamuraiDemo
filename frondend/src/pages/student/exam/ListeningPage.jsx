@@ -305,12 +305,13 @@ export default function ListeningPage() {
         }
 
         const listeningSections = data.sections?.filter(section => section.is_listening === true) || [];
+        // Chỉ lấy section listening (nên chỉ có 1 section is_listening = true)
         const filteredData = { ...data, sections: listeningSections };
         
         if (isMountedRef.current && !abortController.signal.aborted) {
           setExamData(filteredData);
           
-          const totalMinutesFromSections = Array.isArray(listeningSections)
+          const totalMinutesFromSections = listeningSections.length > 0
             ? listeningSections.reduce((sum, section) => sum + (Number(section?.duration) || 0), 0)
             : 0;
           const totalSeconds = totalMinutesFromSections * 60;

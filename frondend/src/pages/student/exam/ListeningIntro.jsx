@@ -54,10 +54,9 @@ export default function ListeningIntro() {
     );
   }
 
-  // Lấy duration từ section thứ 3 (index 2). Không dùng bất kỳ fallback nào
-  const listeningDuration = (examData.sections && examData.sections.length >= 3)
-    ? examData.sections[2]?.duration
-    : undefined;
+  // Lấy duration từ section có is_listening = true
+  const listeningSection = examData.sections?.find(section => section.is_listening === true);
+  const listeningDuration = listeningSection?.duration;
   const isN3 = examData?.level?.title === "N3";
 
   return (
