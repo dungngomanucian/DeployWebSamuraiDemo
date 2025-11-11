@@ -21,8 +21,8 @@ export const useExamState = () => {
    * @param {boolean} isSortQuestion - Flag cho biết có phải câu hỏi sắp xếp không (ưu tiên hơn questionTypeId)
    */
   const handleAnswerSelect = (questionId, answerId, questionTypeId, isSortQuestion = false) => {
-    // Kiểm tra isSortQuestion trước, nếu không có thì fallback về QT007 (tương thích ngược)
-    const isSort = isSortQuestion || questionTypeId === "QT007";
+    // Kiểm tra isSortQuestion (được truyền từ nơi gọi, dựa trên is_Sort_Question của question type)
+    const isSort = isSortQuestion;
     
     if (isSort) {
       // --- Logic cho câu hỏi SẮP XẾP ---
@@ -81,8 +81,8 @@ export const useExamState = () => {
    * @param {boolean} isSortQuestion - Flag cho biết có phải câu hỏi sắp xếp không (ưu tiên hơn questionTypeId)
    */
   const isAnswerSelected = (questionId, answerId, questionTypeId, isSortQuestion = false) => {
-    // Kiểm tra isSortQuestion trước, nếu không có thì fallback về QT007 (tương thích ngược)
-    const isSort = isSortQuestion || questionTypeId === "QT007";
+    // Kiểm tra isSortQuestion (được truyền từ nơi gọi, dựa trên is_Sort_Question của question type)
+    const isSort = isSortQuestion;
     
     if (isSort) {
       const order = answerOrder[questionId] || [];

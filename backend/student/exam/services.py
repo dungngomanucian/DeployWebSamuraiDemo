@@ -220,14 +220,16 @@ class ExamService:
                 
                 # 4. Get questions for each question type
                 for qt in qt_result['data']:
-                    # Attach passages only for specific question type QT008
+                    # Attach passages only for question types with is_perforated_question = true
                     try:
-                        if qt.get('id') == 'QT008':
+                        if qt.get('is_perforated_question') == True:
                             passages_response = supabase.table('jlpt_question_passages')\
                                 .select('id, question_type_id, content, underline_text')\
                                 .eq('question_type_id', qt['id'])\
                                 .execute()
                             qt['passages'] = passages_response.data
+                        else:
+                            qt['passages'] = []
                     except Exception:
                         # If passages query fails, keep proceeding without blocking
                         qt['passages'] = []

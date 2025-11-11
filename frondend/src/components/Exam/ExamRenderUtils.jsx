@@ -369,8 +369,8 @@ export const renderFramedPassageBlocks = (passageText, isTimeUp) => {
 };
 
 // 3. HÀM FORMAT TEXT (Được export)
-export const formatAnswerText = (answerText, questionText, questionTypeId) => {
-    if (questionTypeId !== "QT005" || !answerText || !questionText) {
+export const formatAnswerText = (answerText, questionText, questionTypeId, isCorrectUsage = false) => {
+    if (!isCorrectUsage || !answerText || !questionText) {
       return answerText;
     }
 

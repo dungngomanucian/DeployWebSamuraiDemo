@@ -140,7 +140,7 @@ export default function ExamQuestionTypeTabs({
         const answeredCount = Array.from({ length: tab.questionCount }, (_, index) => {
           const question = groupedQuestions[tab.id]?.questions[index];
           return question ? (
-            question.questionTypeId === "QT007" 
+            groupedQuestions[question.questionTypeId]?.type?.is_Sort_Question === true
               ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
               : studentAnswers[question.id]
           ) : false;

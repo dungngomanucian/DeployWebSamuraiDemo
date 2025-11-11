@@ -279,7 +279,12 @@ export default function ExamPage() {
                   >
                     <div className="flex items-start text-gray-900 leading-6">
                       <span className="whitespace-pre-wrap break-words">
-                        {formatAnswerText(ans?.answer_text || ans?.content || '', q?.question_text || '', q?.questionTypeId || q?.question_type_id)}
+                        {formatAnswerText(
+                          ans?.answer_text || ans?.content || '', 
+                          q?.question_text || '', 
+                          q?.questionTypeId || q?.question_type_id,
+                          groupedQuestions[q?.questionTypeId || q?.question_type_id]?.type?.is_correct_usage === true
+                        )}
                       </span>
                     </div>
                   </button>
@@ -780,7 +785,12 @@ export default function ExamPage() {
                                     />
                                   </span>
                                   <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
-                                    {formatAnswerText(answer.answer_text, currentQuestion.question_text, currentQuestion.questionTypeId)}
+                                    {formatAnswerText(
+                                      answer.answer_text, 
+                                      currentQuestion.question_text, 
+                                      currentQuestion.questionTypeId,
+                                      groupedQuestions[currentQuestion.questionTypeId]?.type?.is_correct_usage === true
+                                    )}
                                   </span>
                                 </label>
                               );
@@ -972,7 +982,12 @@ export default function ExamPage() {
                                     </span>
                                   )}
                                   <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
-                                    {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
+                                    {formatAnswerText(
+                                      answer.answer_text, 
+                                      question.question_text, 
+                                      question.questionTypeId,
+                                      groupedQuestions[question.questionTypeId]?.type?.is_correct_usage === true
+                                    )}
                                   </span>
                                   {isSortQuestion(question.questionTypeId) && (
                                     <span className="ml-auto text-xs text-gray-500" style={{fontFamily: "Nunito"}}>(Click để chọn)</span>
