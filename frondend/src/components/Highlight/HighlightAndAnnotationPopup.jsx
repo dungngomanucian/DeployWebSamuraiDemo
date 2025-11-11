@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 // Giả định bạn đang sử dụng thư viện icon như Lucide hoặc Feather
 const NoteIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>; 
 const HighlightIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/><path d="M15 5l4 4"/></svg>; 
+// 🌟 ICON MỚI: Icon cho chức năng dịch 🌟
+const TranslateIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>;
 
-const HighlightAndAnnotationPopup = ({ position, onAction, onClosePopup }) => { 
+const HighlightAndAnnotationPopup = ({ position, onAction, onClosePopup, showTranslateButton }) => { 
     if (!position) return null;
 
     const [isNoteInputVisible, setIsNoteInputVisible] = useState(false);
@@ -70,6 +72,20 @@ const HighlightAndAnnotationPopup = ({ position, onAction, onClosePopup }) => {
                     <HighlightIcon />
                     <span className="text-xs font-semibold mt-1">Highlight</span>
                 </button>
+
+                {/* 🌟 NÚT TRA CỨU (MỚI) 🌟 */}
+                {showTranslateButton && (
+                    <button
+                        className="btn btn-ghost btn-sm flex-col p-1 h-auto min-h-0 text-gray-700 hover:text-green-600 transition-colors"
+                        onClick={() => {
+                            onAction('translate');
+                            onClosePopup(); // Đóng popup ngay sau khi nhấn
+                        }}
+                    >
+                        <TranslateIcon />
+                        <span className="text-xs font-semibold mt-1">Tra cứu</span>
+                    </button>
+                )}
             </div>
 
             {/* 2. Modal/Popover Input Note */}

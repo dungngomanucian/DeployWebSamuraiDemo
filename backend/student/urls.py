@@ -16,6 +16,8 @@ urlpatterns = [
     
     path('login/', include('student.login.urls')),
 
+    path('AISearch/', include('student.AISearch.urls')),
+
     path('dashboard/', include('student.dashboard.urls'))
 
 

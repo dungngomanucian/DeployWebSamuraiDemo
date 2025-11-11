@@ -11,7 +11,7 @@ const generateTempId = () => {
 };
 
 
-const ContentHighlighter = forwardRef(({ children }, ref) => {
+const ContentHighlighter = forwardRef(({ children, showTranslateButton = false, onTranslate }, ref) => {
     // 🌟 Cập nhật để lấy setter mới 🌟
     const { addAnnotation, removeAnnotation, setScrollHandler, setRemoveAnnotationHandler } = useAnnotationContext(); 
 
@@ -257,15 +257,20 @@ const ContentHighlighter = forwardRef(({ children }, ref) => {
 
     
     // 🌟 ĐẢM BẢO CHUYỂN noteText ĐẾN applyAction 🌟
-    const handleAction = (actionType, color = null, noteText = '') => {
-        if (actionType === 'highlight') {
-            applyAction('highlight', 'yellow');
-        } else if (actionType === 'note') {
-            // Dữ liệu noteText được truyền từ Popover khi nhấn Save
-            if (noteText) { 
-                applyAction('note', 'gray', noteText); 
+    const handleAction = (actionType, color = null, noteText = '') => { // 🌟 CẬP NHẬT: Xử lý action 'translate'
+        switch (actionType) {
+            case 'highlight':
+                applyAction('highlight', 'yellow');
+                break;
+            case 'note':
+                if (noteText) applyAction('note', 'gray', noteText);
+                break;
+            case 'translate':
+                if (onTranslate && selectedText) onTranslate(selectedText);
+                break;
+            default:
+                break;
             }
-        }
     };
 
     // HÀM "VẼ LẠI" ANNOTATION
@@ -357,6 +362,7 @@ const ContentHighlighter = forwardRef(({ children }, ref) => {
             <HighlightAndAnnotationPopup
                 position={popupPos}
                 onAction={handleAction}
+                showTranslateButton={showTranslateButton}
                 onClosePopup={clearSelection} // 🌟 TRUYỀN HÀM ẨN POPUP CHO POPUP NOTE 🌟
             />
 

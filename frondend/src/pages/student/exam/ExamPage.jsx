@@ -538,7 +538,7 @@ function ExamPageContent() {
           
           {/* Questions Container (Chưa tách) */}
           <div id="questions-container" className="bg-white rounded-2xl shadow-md px-6 md:px-8 py-8">
-          <ContentHighlighter ref={highlighterRef}>
+          <ContentHighlighter  ref={highlighterRef}>
             {/* Question Header */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-4">
