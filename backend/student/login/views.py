@@ -61,11 +61,13 @@ class StudentLoginAPIView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        email = serializer.validated_data['email']
+        student_id = serializer.validated_data.get('student_id')
+        email = serializer.validated_data.get('email')
         password = serializer.validated_data['password']
         # Lấy trạng thái Ghi nhớ Đăng nhập (Mặc định là False nếu không có)
-        remember_me = serializer.validated_data.get('rememberMe', False) 
+        remember_me = serializer.validated_data.get('remember_me', False) 
         
+        print(f"DEBUG: Mã học viên: {student_id}")
         print(f"DEBUG: Email đang đăng nhập: {email}")
         print(f"DEBUG: Mật khẩu (KHÔNG NÊN IN TRONG MÔI TRƯỜNG PRODUCTION!): {password}")
         print(f"DEBUG: Ghi nhớ Đăng nhập: {remember_me}") 
@@ -81,19 +83,53 @@ class StudentLoginAPIView(APIView):
         
         # --- 2. XÁC THỰC VỚI SUPABASE API ---
         try:
-            # 1. Truy vấn bảng 'account'
-            response = supabase.table('account') \
-                .select('id, email, password,user_name') \
-                .eq('email', email) \
-                .limit(1) \
-                .execute()
-            user_records = response.data
+            # Xác định cách đăng nhập: mã học viên hoặc email
+            if student_id:
+                # Đăng nhập bằng mã học viên
+                # 1. Tìm student trong bảng students
+                student_response = supabase.table('students') \
+                    .select('id, account_id') \
+                    .eq('id', student_id) \
+                    .limit(1) \
+                    .execute()
+                
+                student_records = student_response.data
+                
+                if not student_records:
+                    return Response({"error": "Mã học viên hoặc mật khẩu không chính xác."}, 
+                                    status=status.HTTP_401_UNAUTHORIZED)
+                
+                student = student_records[0]
+                account_id = student.get('account_id')
+                
+                if not account_id:
+                    return Response({"error": "Tài khoản chưa được liên kết với học viên này."}, 
+                                    status=status.HTTP_401_UNAUTHORIZED)
+                
+                # 2. Lấy thông tin account từ account_id
+                account_response = supabase.table('account') \
+                    .select('id, email, password, user_name') \
+                    .eq('id', account_id) \
+                    .limit(1) \
+                    .execute()
+                
+                user_records = account_response.data
+                
+                if not user_records:
+                    return Response({"error": "Không tìm thấy tài khoản."}, 
+                                    status=status.HTTP_401_UNAUTHORIZED)
+            else:
+                # Đăng nhập bằng email (logic cũ)
+                response = supabase.table('account') \
+                    .select('id, email, password, user_name') \
+                    .eq('email', email) \
+                    .limit(1) \
+                    .execute()
+                user_records = response.data
 
-            # 2. Kiểm tra kết quả
-            if not user_records:
-                # Nếu không tìm thấy email
-                return Response({"error": "Email hoặc mật khẩu không chính xác."}, 
-                                status=status.HTTP_401_UNAUTHORIZED)
+                if not user_records:
+                    return Response({"error": "Email hoặc mật khẩu không chính xác."}, 
+                                    status=status.HTTP_401_UNAUTHORIZED)
             
             user = user_records[0]  
             stored_password_hash = user.get('password') # Lấy hash từ DB
@@ -114,7 +150,8 @@ class StudentLoginAPIView(APIView):
                 print(f"✅ Đăng nhập thành công. ID: {id}, Dữ liệu: {user_data}")
             else:
                 # Mật khẩu không khớp
-                return Response({"error": "Email hoặc mật khẩu không chính xác."}, 
+                error_msg = "Mã học viên hoặc mật khẩu không chính xác." if student_id else "Email hoặc mật khẩu không chính xác."
+                return Response({"error": error_msg}, 
                                 status=status.HTTP_401_UNAUTHORIZED)
 
         # Bắt các lỗi API (mạng, cấu hình...)
@@ -122,7 +159,8 @@ class StudentLoginAPIView(APIView):
             # Supabase thường ném lỗi nếu email/mật khẩu sai hoặc người dùng không tồn tại
             error_message = str(e)
             if 'Invalid login credentials' in error_message or 'not confirmed' in error_message:
-                 return Response({"error": "Email hoặc mật khẩu không chính xác."}, 
+                 error_msg = "Mã học viên hoặc mật khẩu không chính xác." if student_id else "Email hoặc mật khẩu không chính xác."
+                 return Response({"error": error_msg}, 
                                  status=status.HTTP_401_UNAUTHORIZED)
             
             return Response({"error": "Lỗi hệ thống: Không thể kết nối dịch vụ xác thực."}, 

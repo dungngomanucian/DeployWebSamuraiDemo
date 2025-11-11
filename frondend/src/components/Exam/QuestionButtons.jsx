@@ -18,7 +18,7 @@ export default function QuestionButtons({
       {Array.from({ length: tab.questionCount }, (_, index) => {
         const question = groupedQuestions[tab.id]?.questions[index];
         const isAnswered = question
-          ? question.questionTypeId === "QT007"
+          ? groupedQuestions[question.questionTypeId]?.type?.is_Sort_Question === true
             ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
             : studentAnswers[question.id]
           : false;
@@ -35,8 +35,10 @@ export default function QuestionButtons({
 
         return (
           <button
+            type="button"
             key={index}
-            onClick={() => {
+            onClick={(e) => {
+              e.preventDefault();
               if (tab.id !== activeQuestionType) {
                 handleQuestionTypeChange(tab.id);
               }
@@ -54,17 +56,20 @@ export default function QuestionButtons({
                 setTimeout(() => {
                   const el = document.getElementById(`question-${question?.id}`);
                   if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    // Scroll với offset để tránh bị che bởi sticky header
+                    const yOffset = -150; // Offset để tránh sticky header và có khoảng trống phía trên
+                    const y = el.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                    window.scrollTo({ top: y, behavior: 'smooth' });
                   }
                 }, 100);
               }
             }}
             className={`w-10 h-10 text-sm font-semibold rounded transition-all ${
               isCurrent
-                ? "bg-[#4169E1] text-white"
+                ? "bg-gray-400 text-gray-700"
                 : isAnswered
-                ? "bg-green-500 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                ? "bg-[#4169E1] text-white"
+                : "bg-gray-200 text-gray-700"
             }`}
             style={{fontFamily: "Inter"}}
           >

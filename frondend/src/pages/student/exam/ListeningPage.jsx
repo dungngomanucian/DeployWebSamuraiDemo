@@ -1,37 +1,31 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "../../../components/Navbar";
 import Footer from "../../../components/Footer";
-import { getFullExamData, submitListeningExam } from "../../../api/examService";
+import { submitListeningExam } from "../../../api/examService";
 import ExamCertificateOverlay from "../../../components/JLPTCertificateOverlay";
 import { Toaster } from "react-hot-toast";
 import TimeUpModal from "../../../components/Exam/TimeUpModal";
+import { API_BASE_URL } from "../../../config/apiConfig";
 
-// 1. IMPORT CÁC HÀM RENDER (Giữ nguyên)
 import {
   Underline,
-  formatAnswerText
-} from "../../../components/Exam/ExamRenderUtils"; // Đảm bảo đường dẫn này đúng
-
-// 2. IMPORT 2 HOOK MỚI (Giả sử nằm trong 'src/hooks/exam/')
+  formatAnswerText,
+  formatTime
+} from "../../../components/Exam/ExamRenderUtils";
 import { useExamTimers } from "../../../hooks/exam/useExamTimers";
 import { useExamState } from "../../../hooks/exam/useExamState";
-// IMPORT components AudioPlayer
-import AudioPlayer from "../../../components/Exam/AudioPlayer";
+import ExamHeader from "../../../components/Exam/ExamHeader";
 
 export default function ListeningPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const examId = params.get("examId");
 
-  // === CÁC STATE GỐC CÒN GIỮ LẠI ===
-  // (State liên quan đến tải dữ liệu)
   const [examData, setExamData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [totalTime, setTotalTime] = useState(0); // Chỉ giữ lại state tổng thời gian
+  const [totalTime, setTotalTime] = useState(0);
   const [groupedQuestions, setGroupedQuestions] = useState({});
-
-  // (State liên quan đến UI)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [activeSection, setActiveSection] = useState(null);
   const [activeQuestionType, setActiveQuestionType] = useState(null);
@@ -39,18 +33,140 @@ export default function ListeningPage() {
   const [showStickyProgress, setShowStickyProgress] = useState(false);
   const [hideHeader, setHideHeader] = useState(false);
   const [currentQuestionPage, setCurrentQuestionPage] = useState(0);
-  
-  // (State liên quan đến nộp bài)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCertificate, setShowCertificate] = useState(false);
   const [finalResultData, setFinalResultData] = useState(null);
   
-  // (Refs)
   const userSelectedSectionRef = useRef(false);
-  const activeSectionRef = useRef(null);
   
-  // === 3. GỌI CÁC HOOK MỚI ===
-  // Helper: Lấy câu hỏi hiện tại (Cần cho hook timer)
+  const audioRef = useRef(null);
+  const audioUrlRef = useRef(null);
+  const audioBlobUrlRef = useRef(null);
+  const audioSetupDoneRef = useRef(false);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [hasStartedListening, setHasStartedListening] = useState(false);
+  const [isAudioLoading, setIsAudioLoading] = useState(false);
+  const [audioLoadingProgress, setAudioLoadingProgress] = useState(0);
+  const [volume, setVolume] = useState(0.5);
+  const [postAudioCountdown, setPostAudioCountdown] = useState(null);
+  const countdownIntervalRef = useRef(null);
+  const hasAutoSubmittedRef = useRef(false);
+  const isSubmittingRef = useRef(false);
+  const savedAudioTimeRef = useRef(null);
+  const hasCheckedResumeRef = useRef(false);
+  const [hasSavedTime, setHasSavedTime] = useState(false);
+  const isMountedRef = useRef(true);
+  const examDataAbortControllerRef = useRef(null);
+  
+  const clearCountdownInterval = useCallback(() => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+  }, []);
+
+  const clearPostAudioCountdown = useCallback(() => {
+    clearCountdownInterval();
+    setPostAudioCountdown(null);
+  }, [clearCountdownInterval]);
+
+  const startPostAudioCountdownRef = useRef(() => {});
+  
+  const startPostAudioCountdown = useCallback(() => {
+    if (isSubmittingRef.current || hasAutoSubmittedRef.current) {
+      return;
+    }
+
+    setPostAudioCountdown((prev) => {
+      if (prev !== null) return prev;
+
+      clearCountdownInterval();
+
+      countdownIntervalRef.current = setInterval(() => {
+        setPostAudioCountdown((count) => {
+          if (count === null) return count;
+          if (count <= 1) {
+            clearCountdownInterval();
+            return 0;
+          }
+          return count - 1;
+        });
+      }, 1000);
+
+      return 30;
+    });
+  }, [clearCountdownInterval]);
+
+  useEffect(() => {
+    startPostAudioCountdownRef.current = startPostAudioCountdown;
+  }, [startPostAudioCountdown]);
+
+  useEffect(() => {
+    isSubmittingRef.current = isSubmitting;
+  }, [isSubmitting]);
+
+  useEffect(() => {
+    return () => {
+      clearCountdownInterval();
+    };
+  }, [clearCountdownInterval]);
+
+  // Lưu mốc thời gian audio vào localStorage
+  useEffect(() => {
+    if (!examId || !audioRef.current || !hasStartedListening) return;
+
+    const storageKey = `listening_audio_time_${examId}`;
+    
+    const saveAudioTime = () => {
+      if (audioRef.current && !audioRef.current.ended && !isSubmitting) {
+        const currentTime = audioRef.current.currentTime;
+        localStorage.setItem(storageKey, JSON.stringify({
+          currentTime,
+          timestamp: Date.now()
+        }));
+      }
+    };
+
+    // Lưu mỗi giây
+    const interval = setInterval(saveAudioTime, 1000);
+
+    // Lưu khi component unmount
+    return () => {
+      clearInterval(interval);
+      saveAudioTime();
+    };
+  }, [examId, hasStartedListening, isSubmitting]);
+
+  // Khôi phục mốc thời gian khi load lại trang
+  useEffect(() => {
+    if (!examId || !audioRef.current || hasStartedListening || loading || isAudioLoading || audioDuration === 0 || hasCheckedResumeRef.current) {
+      return;
+    }
+
+    hasCheckedResumeRef.current = true;
+    const storageKey = `listening_audio_time_${examId}`;
+    const savedData = localStorage.getItem(storageKey);
+    
+    if (!savedData) return;
+    
+    try {
+      const { currentTime, timestamp } = JSON.parse(savedData);
+      const isValid = timestamp && (Date.now() - timestamp) < 3600000;
+      
+      if (isValid && currentTime > 0 && currentTime < audioDuration) {
+        savedAudioTimeRef.current = currentTime;
+        setHasSavedTime(true);
+        setAudioCurrentTime(currentTime);
+      } else {
+        localStorage.removeItem(storageKey);
+      }
+    } catch (error) {
+      console.error('Error parsing saved audio time:', error);
+      localStorage.removeItem(storageKey);
+    }
+  }, [examId, hasStartedListening, loading, isAudioLoading, audioDuration]);
+
   const getFilteredQuestions = () => {
     if (!activeQuestionType || !groupedQuestions[activeQuestionType]) return [];
     const questions = groupedQuestions[activeQuestionType].questions;
@@ -65,15 +181,13 @@ export default function ListeningPage() {
     (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
   const currentQuestion = shouldUsePagination ? 
     filteredQuestions[currentQuestionPage] : 
-    (filteredQuestions[currentQuestionIndex] || null); // Thêm || null để tránh lỗi
+    (filteredQuestions[currentQuestionIndex] || null);
   
-  // Hook quản lý Timer
   const {
     timeRemaining,
     showReadingTimeUpModal,
     setShowReadingTimeUpModal,
     stopGlobalTimer,
-    questionTimeRemaining,
     resetQuestionToast,
     stopQuestionTimer
   } = useExamTimers(
@@ -84,89 +198,193 @@ export default function ListeningPage() {
     activeQuestionType
   );
 
-  // Hook quản lý State (Câu trả lời)
   const {
     studentAnswers,
-    handleAnswerSelect, // <-- Hàm xử lý logic chính
+    handleAnswerSelect,
     isAnswerSelected
   } = useExamState();
 
-  // === 5. CÁC HÀM VÀ useEffect GỐC CÒN GIỮ LẠI ===
-  // useEffect: Tải dữ liệu thi (Cập nhật: Chỉ set totalTime)
   useEffect(() => {
+    isMountedRef.current = true;
+    
     const loadExamData = async () => {
       if (!examId) {
-        navigate("/mock-exam-jlpt");
+        if (isMountedRef.current) {
+          navigate("/mock-exam-jlpt");
+        }
         return;
       }
 
-      setLoading(true);
-      const { data, error } = await getFullExamData(examId);
-
-      if (error) {
-        console.error("Error loading exam:", error);
-        alert("Không thể tải dữ liệu đề thi. Vui lòng thử lại!");
-        navigate(-1);
-        return;
+      // Hủy request trước đó nếu có
+      if (examDataAbortControllerRef.current) {
+        examDataAbortControllerRef.current.abort();
       }
 
-      // Xử lý chỉ lấy thông tin của section nghe này (is_listening == true)
-      const listeningSections = data.sections.filter(section => section.is_listening === true);
-      const filteredData = { ...data, sections: listeningSections };
-      setExamData(filteredData);
-      
-      // TÍNH TOÁN VÀ SET totalTime (Hook timer sẽ tự bắt theo - chỉ từ listening sections)
-      const totalMinutesFromSections = Array.isArray(listeningSections)
-        ? listeningSections.reduce((sum, section) => sum + (Number(section?.duration) || 0), 0)
-        : 0;
-      const totalSeconds = totalMinutesFromSections * 60;
-      setTotalTime(totalSeconds); 
-      
-      // Group questions by question type (chỉ lấy từ listening sections)
-      const grouped = {};
-      listeningSections.forEach((section) => {
-        section.question_types.forEach((qt) => {
-          if (!grouped[qt.id]) {
-            grouped[qt.id] = {
-              type: qt,
-              questions: [],
-              sectionType: section.type,
-              sectionId: section.id
-            };
+      // Tạo AbortController mới cho request này
+      const abortController = new AbortController();
+      examDataAbortControllerRef.current = abortController;
+
+      // Reset các ref khi load exam mới
+      hasCheckedResumeRef.current = false;
+      savedAudioTimeRef.current = null;
+      if (isMountedRef.current) {
+        setHasSavedTime(false);
+      }
+
+      if (isMountedRef.current) {
+        setLoading(true);
+      }
+
+      try {
+        // Tạo một wrapper để hỗ trợ AbortController
+        const fetchWithAbort = async () => {
+          const token = localStorage.getItem('auth_token');
+          const endpoint = `/student/exam/exams/${examId}/full_data/`;
+          
+          const headers = {
+            'Content-Type': 'application/json',
+          };
+          
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
           }
-          qt.questions.forEach((q) => {
-            const existingQuestion = grouped[qt.id].questions.find(existing => existing.id === q.id);
-            if (!existingQuestion) {
-              grouped[qt.id].questions.push({
-                ...q,
-                sectionType: section.type,
-                sectionId: section.id,
-                questionTypeId: qt.id,
-                taskInstructions: qt.task_instructions,
+
+          const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            headers,
+            signal: abortController.signal,
+          });
+
+          if (!response.ok) {
+            let errorDetails = 'API request failed';
+            try {
+              const errorBody = await response.json();
+              errorDetails = errorBody.error || errorBody.detail || errorBody.message || JSON.stringify(errorBody);
+            } catch (e) {
+              errorDetails = `HTTP Error ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorDetails);
+          }
+
+          const contentLength = response.headers.get('content-length');
+          if (response.status === 204 || (contentLength !== null && parseInt(contentLength) === 0)) {
+            return { data: null, error: null };
+          }
+
+          const data = await response.json();
+          return { data, error: null };
+        };
+
+        const { data, error } = await fetchWithAbort();
+
+        // Kiểm tra xem component còn mount và request chưa bị hủy
+        if (!isMountedRef.current || abortController.signal.aborted) {
+          return;
+        }
+
+        if (error) {
+          // Bỏ qua nếu request bị hủy
+          if (abortController.signal.aborted) {
+            return;
+          }
+          console.error("Error loading exam:", error);
+          if (isMountedRef.current) {
+            setLoading(false);
+            alert("Không thể tải dữ liệu đề thi. Vui lòng thử lại!");
+            navigate(-1);
+          }
+          return;
+        }
+
+        if (!data) {
+          if (isMountedRef.current) {
+            setLoading(false);
+            alert("Không thể tải dữ liệu đề thi. Vui lòng thử lại!");
+            navigate(-1);
+          }
+          return;
+        }
+
+        const listeningSections = data.sections?.filter(section => section.is_listening === true) || [];
+        // Chỉ lấy section listening (nên chỉ có 1 section is_listening = true)
+        const filteredData = { ...data, sections: listeningSections };
+        
+        if (isMountedRef.current && !abortController.signal.aborted) {
+          setExamData(filteredData);
+          
+          const totalMinutesFromSections = listeningSections.length > 0
+            ? listeningSections.reduce((sum, section) => sum + (Number(section?.duration) || 0), 0)
+            : 0;
+          const totalSeconds = totalMinutesFromSections * 60;
+          setTotalTime(totalSeconds);
+          
+          const grouped = {};
+          listeningSections.forEach((section) => {
+            section.question_types?.forEach((qt) => {
+              if (!grouped[qt.id]) {
+                grouped[qt.id] = {
+                  type: qt,
+                  questions: [],
+                  sectionType: section.type,
+                  sectionId: section.id
+                };
+              }
+              qt.questions?.forEach((q) => {
+                const existingQuestion = grouped[qt.id].questions.find(existing => existing.id === q.id);
+                if (!existingQuestion) {
+                  grouped[qt.id].questions.push({
+                    ...q,
+                    sectionType: section.type,
+                    sectionId: section.id,
+                    questionTypeId: qt.id,
+                    taskInstructions: qt.task_instructions,
+                  });
+                }
+              });
+            });
+          });
+          setGroupedQuestions(grouped);
+          
+          if (listeningSections && listeningSections.length > 0 && !userSelectedSectionRef.current) {
+            const firstSectionType = listeningSections[0].type;
+            setActiveSection(firstSectionType);
+            const firstQuestionType = listeningSections[0].question_types?.[0];
+            if (firstQuestionType) {
+              setActiveQuestionType(firstQuestionType.id);
+              setExpandedQuestionType({
+                [firstSectionType]: firstQuestionType.id
               });
             }
-          });
-        });
-      });
-      setGroupedQuestions(grouped);
-      
-      // Set active section and question type (chỉ từ listening sections)
-      if (listeningSections && listeningSections.length > 0 && !userSelectedSectionRef.current) {
-        const firstSectionType = listeningSections[0].type;
-        setActiveSection(firstSectionType);
-        activeSectionRef.current = firstSectionType;
-        const firstQuestionType = listeningSections[0].question_types?.[0];
-        if (firstQuestionType) {
-          setActiveQuestionType(firstQuestionType.id);
+          }
+          
+          setLoading(false);
+        }
+      } catch (err) {
+        // Bỏ qua lỗi nếu request bị hủy hoặc component đã unmount
+        if (err.name === 'AbortError' || !isMountedRef.current) {
+          return;
+        }
+        
+        console.error("Unexpected error loading exam:", err);
+        if (isMountedRef.current) {
+          setLoading(false);
+          alert("Không thể tải dữ liệu đề thi. Vui lòng thử lại!");
+          navigate(-1);
         }
       }
-      
-      setLoading(false);
     };
+    
     loadExamData();
+
+    // Cleanup: hủy request và đánh dấu component đã unmount
+    return () => {
+      isMountedRef.current = false;
+      if (examDataAbortControllerRef.current) {
+        examDataAbortControllerRef.current.abort();
+        examDataAbortControllerRef.current = null;
+      }
+    };
   }, [examId, navigate]);
 
-  // useEffect: Xử lý cuộn trang (Giữ nguyên)
   useEffect(() => {
     const handleScroll = () => {
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
@@ -177,8 +395,6 @@ export default function ListeningPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // === 6. CÁC HÀM LOGIC GỐC (Giữ lại hoặc cập nhật) ===
-  // Helper: Lấy các tab loại câu hỏi (Giữ nguyên)
   const getQuestionTypeTabs = () => {
     if (!activeSection || !examData) return [];
     const tabs = [];
@@ -198,47 +414,439 @@ export default function ListeningPage() {
     return tabs;
   };
   const questionTypeTabs = getQuestionTypeTabs();
+  const autoSubmitCountdownDisplay = postAudioCountdown !== null ? formatTime(postAudioCountdown, true) : null;
 
-  // Xử lý đường dẫn file audio, lấy theo trường level_id của bảng jlpt_exams
-  const getAudioBucketFromLevel = () => {
+  const getQuestionImageUrl = (questionImagePath) => {
+    if (!questionImagePath || !examData) return null;
+    
     const levelId = examData?.exam?.level_id || '';
     const match = /^level0([1-5])$/.exec(levelId);
-    return match ? `N${match[1]}` : null;
+    const bucket = match ? `N${match[1]}` : null;
+    
+    if (!bucket) return null;
+    
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://oreasnlyzhaeteipyylw.supabase.co';
+    return `${supabaseUrl}/storage/v1/object/public/${bucket}/${questionImagePath}`;
+  };
+
+  const hasPictures = () => {
+    if (!activeQuestionType || !groupedQuestions[activeQuestionType]) return false;
+    return groupedQuestions[activeQuestionType]?.type?.have_pictures === true;
+  };
+
+  const QuestionImage = ({ question }) => {
+    if (!hasPictures() || !question?.question_image) return null;
+    return (
+      <div className="mb-6 flex justify-center">
+        <img
+          src={getQuestionImageUrl(question.question_image)}
+          alt={`Question ${question.id}`}
+          className="max-w-full h-auto rounded-lg shadow-md"
+          style={{ maxHeight: '400px' }}
+          onError={(e) => {
+            console.error('Error loading question image:', question.question_image);
+            e.target.style.display = 'none';
+          }}
+        />
+      </div>
+    );
+  };
+
+  const AnswerOption = ({ question, answer }) => {
+    const isSelected = isAnswerSelected(question.id, answer.id, question.questionTypeId);
+    return (
+      <label
+        className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all ${
+          isSelected
+            ? "border-[#874FFF] bg-purple-50"
+            : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50"
+        }`}
+      >
+        <input
+          type="radio"
+          name={`question-${question.id}`}
+          value={answer.id}
+          checked={isSelected}
+          onChange={() => handleAnswerSelect(question.id, answer.id, question.questionTypeId)}
+          className="hidden"
+        />
+        <span
+          className={`flex items-center justify-center w-5 h-5 rounded-full border-2 flex-shrink-0 ${
+            isSelected ? "border-[#874FFF]" : "border-gray-400"
+          }`}
+        >
+          <span
+            className={`w-3 h-3 rounded-full ${
+              isSelected ? "bg-[#874FFF]" : "bg-transparent"
+            }`}
+          />
+        </span>
+        <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
+          {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
+        </span>
+      </label>
+    );
   };
   
-  // Hàm: Đổi Loại câu hỏi (Cập nhật: Thêm reset toast)
+  useEffect(() => {
+    if (audioSetupDoneRef.current || !examData || loading) {
+      return;
+    }
+    
+    const listeningSection = examData.sections?.find(s => s.is_listening === true);
+    const audioPath = listeningSection?.audio_path;
+    
+    if (!audioPath) {
+      audioSetupDoneRef.current = true;
+      return;
+    }
+    
+    const levelId = examData?.exam?.level_id || '';
+    const match = /^level0([1-5])$/.exec(levelId);
+    const bucket = match ? `N${match[1]}` : null;
+    
+    if (!bucket) {
+      audioSetupDoneRef.current = true;
+      return;
+    }
+    
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://oreasnlyzhaeteipyylw.supabase.co';
+    const audioUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${audioPath}`;
+    
+    if (audioUrlRef.current === audioUrl && audioRef.current) {
+      return;
+    }
+    
+    audioUrlRef.current = audioUrl;
+    audioSetupDoneRef.current = true;
+    setIsAudioLoading(true);
+    setAudioLoadingProgress(0);
+    
+    const controller = new AbortController();
+    
+    fetch(audioUrl, { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const contentLength = response.headers.get('content-length');
+        const total = contentLength ? parseInt(contentLength, 10) : 0;
+        
+        if (!response.body) {
+          throw new Error('ReadableStream not supported');
+        }
+        
+        const reader = response.body.getReader();
+        const chunks = [];
+        let receivedLength = 0;
+        
+        const pump = () => {
+          return reader.read().then(({ done, value }) => {
+            if (done) {
+              const blob = new Blob(chunks, { type: 'audio/mpeg' });
+              const blobUrl = URL.createObjectURL(blob);
+              audioBlobUrlRef.current = blobUrl;
+              
+              const audio = new Audio(blobUrl);
+              audio.preload = 'auto';
+              audio.volume = 0.5;
+
+              const handleLoadedMetadata = () => {
+                setAudioDuration(audio.duration);
+                setIsAudioLoading(false);
+                setAudioLoadingProgress(100);
+              };
+
+              const handleTimeUpdate = () => {
+                setAudioCurrentTime(audio.currentTime);
+              };
+
+              const handleEnded = () => {
+                // Xóa mốc thời gian đã lưu khi audio kết thúc
+                if (examId) {
+                  const storageKey = `listening_audio_time_${examId}`;
+                  localStorage.removeItem(storageKey);
+                }
+                startPostAudioCountdownRef.current();
+              };
+
+              const handleError = (e) => {
+                console.error('Audio error:', e);
+                setIsAudioLoading(false);
+              };
+              
+              audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+              audio.addEventListener('timeupdate', handleTimeUpdate);
+              audio.addEventListener('ended', handleEnded);
+              audio.addEventListener('error', handleError);
+              
+              audioRef.current = audio;
+              
+              return;
+            }
+            
+            chunks.push(value);
+            receivedLength += value.length;
+            
+            if (total > 0) {
+              const progress = Math.round((receivedLength / total) * 100);
+              setAudioLoadingProgress(progress);
+            }
+            
+            return pump();
+          });
+        };
+        
+        return pump();
+      })
+      .catch(error => {
+        if (error.name === 'AbortError') {
+          console.log('Audio loading aborted');
+        } else {
+          console.error('Error loading audio:', error);
+          setIsAudioLoading(false);
+          setAudioLoadingProgress(0);
+          audioSetupDoneRef.current = false;
+        }
+      });
+
+    return () => {
+      controller.abort();
+      if (audioBlobUrlRef.current) {
+        URL.revokeObjectURL(audioBlobUrlRef.current);
+        audioBlobUrlRef.current = null;
+      }
+      if (audioRef.current) {
+        const currentAudio = audioRef.current;
+        currentAudio.pause();
+        currentAudio.src = '';
+        audioRef.current = null;
+      }
+      audioUrlRef.current = null;
+      audioSetupDoneRef.current = false;
+      setIsAudioLoading(false);
+      setAudioLoadingProgress(0);
+    };
+  }, [loading]);
+  
+  useEffect(() => {
+    // Không auto-play nếu đã có mốc thời gian đã lưu
+    if (!audioRef.current || hasStartedListening || loading || isAudioLoading || hasSavedTime) {
+      return;
+    }
+    
+    const autoPlayTimer = setTimeout(() => {
+      if (!hasStartedListening && audioRef.current && !isAudioLoading && !hasSavedTime) {
+        audioRef.current.play().catch(err => {
+          console.error('Error auto-playing audio:', err);
+        });
+        setHasStartedListening(true);
+      }
+    }, 10000);
+    
+    return () => clearTimeout(autoPlayTimer);
+  }, [hasStartedListening, loading, isAudioLoading, hasSavedTime]);
+
+  useEffect(() => {
+    if (!audioRef.current || !hasStartedListening || isSubmitting || hasAutoSubmittedRef.current) {
+      return;
+    }
+
+    const checkAudio = setInterval(() => {
+      if (isSubmitting || hasAutoSubmittedRef.current) {
+        return;
+      }
+      
+      if (audioRef.current && hasStartedListening && audioRef.current.paused && !audioRef.current.ended) {
+        if (audioRef.current.currentTime > 0) {
+          audioRef.current.play().catch(err => {
+            console.error('Error resuming audio:', err);
+          });
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(checkAudio);
+  }, [hasStartedListening, isSubmitting]);
+  
+  const handleSectionChange = (sectionType) => {
+    return;
+  };
+
   const handleQuestionTypeChange = (questionTypeId) => {
     if (!examData) return;
     
     setActiveQuestionType(questionTypeId);
-    setCurrentQuestionPage(0);
-    setCurrentQuestionIndex(0);
+    
+    setExpandedQuestionType(prev => ({
+      ...prev,
+      [activeSection]: prev[activeSection] === questionTypeId ? null : questionTypeId
+    }));
+    
+    const newQuestions = groupedQuestions[questionTypeId]?.questions || [];
+    const uniqueNewQuestions = newQuestions.filter((question, index, self) => 
+      index === self.findIndex(q => q.id === question.id)
+    );
+    
+    if (uniqueNewQuestions.length > 0) {
+      const shouldUsePaginationNew = 
+        groupedQuestions[questionTypeId]?.type?.duration &&
+        (uniqueNewQuestions[0].passage || uniqueNewQuestions[0].jlpt_question_passages);
+      
+      if (shouldUsePaginationNew) {
+        if (currentQuestionPage >= uniqueNewQuestions.length) {
+          setCurrentQuestionPage(0);
+        }
+      } else {
+        if (currentQuestionIndex >= uniqueNewQuestions.length) {
+          setCurrentQuestionIndex(0);
+        }
+      }
+    } else {
+      setCurrentQuestionPage(0);
+      setCurrentQuestionIndex(0);
+    }
+    
     resetQuestionToast();
-    // Scroll to top when switching question type to avoid landing on last viewed question
-    try {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch {}
   };
 
-  // Hàm: Nộp bài (Cập nhật: Dùng hook)
-  const handleSubmitExam = async () => {
+  const handleStartListening = () => {
+    if (!audioRef.current) return;
+    
+    const savedTime = savedAudioTimeRef.current;
+    const startTime = savedTime !== null ? savedTime : 0;
+    
+    // Xóa mốc thời gian đã lưu nếu bắt đầu từ đầu
+    if (startTime === 0 && examId) {
+      localStorage.removeItem(`listening_audio_time_${examId}`);
+    }
+    
+    savedAudioTimeRef.current = null;
+    setHasSavedTime(false);
+    
+    audioRef.current.currentTime = startTime;
+    setAudioCurrentTime(startTime);
+    
+    audioRef.current.play().then(() => {
+      setHasStartedListening(true);
+    }).catch(err => {
+      console.error('Error playing audio:', err);
+      setHasStartedListening(true);
+    });
+  };
+
+  const handleVolumeChange = (e) => {
+    const newVolume = parseFloat(e.target.value);
+    setVolume(newVolume);
+    if (audioRef.current) {
+      audioRef.current.volume = newVolume;
+    }
+  };
+
+  const TimerProgressBar = () => { 
+    const remainingTime = audioDuration > 0 ? audioDuration - audioCurrentTime : 0;
+    const progressPercentage = audioDuration > 0 ? (audioCurrentTime / audioDuration) * 100 : 0;
+    
+    return (
+      <div className="flex items-center justify-center gap-4 w-full">
+        {isAudioLoading && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#4169E1] border-t-transparent"></div>
+            <span className="text-sm font-semibold text-[#4169E1]" style={{fontFamily: "Nunito"}}>
+              Đang tải audio... {audioLoadingProgress}%
+            </span>
+          </div>
+        )}
+        
+        {!hasStartedListening && !isAudioLoading && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              handleStartListening();
+            }}
+            disabled={!audioRef.current || isAudioLoading}
+            className="flex-shrink-0 px-4 h-5 rounded-lg bg-[#4169E1] text-white text-sm font-semibold hover:bg-[#3558C9] transition-all disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
+            style={{fontFamily: "Nunito"}}
+          >
+            {hasSavedTime ? 'Tiếp tục phát' : 'Bắt đầu nghe'}
+          </button>
+        )}
+        
+        <div className="relative" style={{ width: '400px' }}>
+          <div className="w-full h-5 rounded-full bg-gray-200 overflow-hidden relative">
+            <div
+              className="h-5 transition-all duration-300 relative"
+              style={{ width: `${100 - progressPercentage}%`, backgroundColor: '#66D575' }}
+            >
+              <div className="absolute left-1 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 pointer-events-none">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="#006C0F" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M10 1.667a8.333 8.333 0 1 0 0 16.666A8.333 8.333 0 0 0 10 1.667z"/>
+                  <path fillRule="evenodd" clipRule="evenodd" fill="#ffffff" d="M10.625 5.5a.625.625 0 1 0-1.25 0v4.208c0 .166.066.325.184.442l2.5 2.5a.625.625 0 1 0 .884-.884l-2.318-2.318V5.5z"/>
+                </svg>
+                <span className="text-sm font-semibold" style={{ color: '#00620D', fontFamily: "Nunito" }}>
+                  {formatTime(Math.floor(remainingTime))}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex flex-col items-start gap-1 ml-2">
+          <span className="text-xs font-semibold whitespace-nowrap" style={{ fontFamily: 'Nunito', color: '#000000' }}>
+            Âm lượng
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={volume}
+            onInput={handleVolumeChange}
+            onChange={handleVolumeChange}
+            className="volume-slider w-20 h-1 rounded-full appearance-none cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, #969696 0%, #969696 ${volume * 100}%, #D9D9D9 ${volume * 100}%, #D9D9D9 100%)`
+            }}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const handleSubmitExam = useCallback(async () => {
     if (isSubmitting) return;
 
+    hasAutoSubmittedRef.current = true;
+    clearPostAudioCountdown();
+
+    // Xóa mốc thời gian đã lưu khi submit
+    if (examId) {
+      const storageKey = `listening_audio_time_${examId}`;
+      localStorage.removeItem(storageKey);
+    }
+
+    savedAudioTimeRef.current = null;
+    setHasSavedTime(false);
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setHasStartedListening(false);
+    }
+
     setIsSubmitting(true);
-    // Dừng tất cả timer
     stopGlobalTimer(); 
     stopQuestionTimer();
     
-    // 1. Tính toán thời gian
-    const duration_taken = totalTime - timeRemaining; // 'timeRemaining' từ hook
+    const duration_taken = totalTime - timeRemaining;
 
-    // 2. Chuyển đổi state (dùng 'studentAnswers' từ hook)
     const answersList = [];
-    Object.keys(studentAnswers).forEach(qId => { // 'studentAnswers' từ hook
+    Object.keys(studentAnswers).forEach(qId => {
       const answerData = studentAnswers[qId];
       
       if (Array.isArray(answerData)) {
-        // Câu sắp xếp
         answerData.forEach((answerId, index) => {
           answersList.push({
             exam_question_id: qId,
@@ -247,7 +855,6 @@ export default function ListeningPage() {
           });
         });
       } else if (answerData) {
-        // Câu trắc nghiệm
         answersList.push({
           exam_question_id: qId,
           chosen_answer_id: answerData,
@@ -256,7 +863,6 @@ export default function ListeningPage() {
       }
     });
 
-    // 3. Lấy exam_result_id từ localStorage
     const exam_result_id = localStorage.getItem('exam_result_id');
     if (!exam_result_id) {
       alert('Không tìm thấy exam_result_id. Vui lòng làm lại phần thi đọc trước.');
@@ -264,32 +870,42 @@ export default function ListeningPage() {
       return;
     }
 
-    // 4. Chuẩn bị data nộp bài listening
     const submissionData = {
       exam_result_id: exam_result_id,
       duration: duration_taken,
       answers: answersList
     };
 
-    // 5. Gọi API listening submission
     const { data: resultData, error } = await submitListeningExam(examId, submissionData);
 
     setIsSubmitting(false);
 
-    // 6. Xử lý kết quả
     if (error) {
       console.error("Lỗi khi nộp bài listening:", error);
       alert(`Nộp bài listening thất bại: ${error}`);
     } else {
       setFinalResultData(resultData);
-      // Xóa exam_result_id khỏi localStorage
       localStorage.removeItem('exam_result_id');
-      // Hiển thị certificate overlay
       setShowCertificate(true);
     }
-  };
+  }, [
+    isSubmitting,
+    clearPostAudioCountdown,
+    stopGlobalTimer,
+    stopQuestionTimer,
+    totalTime,
+    timeRemaining,
+    studentAnswers,
+    examId
+  ]);
 
-  // === PHẦN JSX (RETURN) ===
+  useEffect(() => {
+    if (postAudioCountdown === 0 && !isSubmitting && !hasAutoSubmittedRef.current) {
+      hasAutoSubmittedRef.current = true;
+      handleSubmitExam();
+    }
+  }, [postAudioCountdown, isSubmitting, handleSubmitExam]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#E9EFFC]">
@@ -322,142 +938,68 @@ export default function ListeningPage() {
       <Navbar />
       </div>
 
-      {/* Sticky Progress Bar - Shows when scrolling */}
       {showStickyProgress && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-lg border-b border-gray-200 px-6 py-4" style={{fontFamily: "Nunito"}}>
-          <div className="max-w-7xl mx-auto">
-            {/* Question Type Tabs and Submit Button */}
-            <div className="flex items-center justify-between gap-4">
-              {/* Question Type Tabs */}
-              <div className="flex items-center gap-2 flex-1 justify-center">
-                {questionTypeTabs.map((tab) => {
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => handleQuestionTypeChange(tab.id)}
-                      className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
-                        tab.id === activeQuestionType
-                          ? "bg-[#FFD24D] text-[#1E1E1E]"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                    >
-                      {tab?.question_guides?.name || tab.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || tab.name}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Submit Button */}
-              <button
-                onClick={handleSubmitExam}
-                disabled={isSubmitting}
-                className="px-5 py-2 rounded-lg border-2 border-red-500 text-red-500 font-bold hover:bg-red-500 hover:text-white transition-all whitespace-nowrap"
-              >
-                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-              </button>
-            </div>
-
-            {/* Audio Player (sticky) */}
-            <div className="mt-3">
-              {(() => {
-                const currentSection = examData?.sections?.find(s => s.type === activeSection);
-                const audioPath = currentSection?.audio_path;
-                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
-                const bucket = getAudioBucketFromLevel();
-                const audioUrl = audioPath && bucket ? `${supabaseUrl}/storage/v1/object/public/${bucket}/${audioPath}` : null;
-                if (!audioUrl) return null;
-                return <AudioPlayer audioUrl={audioUrl} sharedKey={`listening-${examId}`} />;
-              })()}
-            </div>
-          </div>
-        </div>
+        <>
+          <ExamHeader
+            isSticky={true}
+            examData={examData}
+            activeSection={activeSection}
+            activeQuestionType={activeQuestionType}
+            questionTypeTabs={questionTypeTabs}
+            groupedQuestions={groupedQuestions}
+            studentAnswers={studentAnswers}
+            answerOrder={{}}
+            currentQuestionIndex={currentQuestionIndex}
+            currentQuestionPage={currentQuestionPage}
+            isSubmitting={isSubmitting}
+            onSectionChange={handleSectionChange}
+            onQuestionTypeChange={handleQuestionTypeChange}
+            onSubmitExam={handleSubmitExam}
+            setCurrentQuestionIndex={setCurrentQuestionIndex}
+            setCurrentQuestionPage={setCurrentQuestionPage}
+            TimerProgressBarComponent={TimerProgressBar}
+            expandedQuestionType={expandedQuestionType}
+            showSectionTabs={false}
+            titleInFirstRow={false}
+            stickyBackButton={true}
+            autoSubmitCountdownDisplay={autoSubmitCountdownDisplay}
+          />
+        </>
       )}
 
-      <main className={`flex-1 py-8 ${showStickyProgress ? 'pt-20' : ''} ${hideHeader ? 'pt-0' : ''}`}>
+      <main className={`flex-1 py-8 ${showStickyProgress ? 'pt-44' : ''} ${hideHeader ? 'pt-0' : ''}`}>
         <div className="max-w-7xl mx-auto px-6">
-          {/* Header - Exam Info */}
-          <div className="bg-white rounded-2xl shadow-md px-6 md:px-8 py-5 mb-6">
-            {/* Top row: back, title, submit */}
-            <div className="flex items-center justify-between gap-4">
-              <button
-                style={{fontFamily: "Nunito"}}
-                onClick={() => navigate(-1)}
-                className="px-4 py-2 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-extrabold hover:bg-[#5427B4] hover:text-white transition-all"
-              >
-                Quay lại
-              </button>
+          {!showStickyProgress && (
+            <ExamHeader
+              isSticky={false}
+              examData={examData}
+              activeSection={activeSection}
+              activeQuestionType={activeQuestionType}
+              questionTypeTabs={questionTypeTabs}
+              groupedQuestions={groupedQuestions}
+              studentAnswers={studentAnswers}
+              answerOrder={{}}
+              currentQuestionIndex={currentQuestionIndex}
+              currentQuestionPage={currentQuestionPage}
+              isSubmitting={isSubmitting}
+              onSectionChange={handleSectionChange}
+              onQuestionTypeChange={handleQuestionTypeChange}
+              onSubmitExam={handleSubmitExam}
+              setCurrentQuestionIndex={setCurrentQuestionIndex}
+              setCurrentQuestionPage={setCurrentQuestionPage}
+              TimerProgressBarComponent={TimerProgressBar}
+              expandedQuestionType={expandedQuestionType}
+              showSectionTabs={false}
+              titleInFirstRow={true}
+              autoSubmitCountdownDisplay={autoSubmitCountdownDisplay}
+            />
+          )}
 
-              {/* Title */}
-              <h1 className="text-3xl md:text-4xl font-extrabold text-[#3563E9] leading-tight">
-                {activeSection}
-              </h1>
-
-              <button
-                style={{fontFamily: "Nunito"}}
-                onClick={handleSubmitExam}
-                disabled={isSubmitting}
-                className="px-5 py-2.5 rounded-lg border-2 border-red-500 text-red-500 font-extrabold hover:bg-red-500 hover:text-white transition-all"
-              >
-                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-              </button>
-            </div>
-
-            {/* Question Type Tabs - Header (Cái này mới so với ExamPage)*/}
-            {!showStickyProgress && questionTypeTabs.length > 0 && (
-              <div className="mt-4 flex items-center justify-center gap-2">
-                {questionTypeTabs.map((tab) => {
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => handleQuestionTypeChange(tab.id)}
-                      className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
-                        tab.id === activeQuestionType
-                          ? "bg-[#FFD24D] text-[#1E1E1E]"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                    >
-                      {tab?.question_guides?.name || tab.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || tab.name}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Audio Player */}
-            <div className="mt-6">
-              {(() => {
-                // Get audio_path from current section
-                const currentSection = examData?.sections?.find(s => s.type === activeSection);
-                const audioPath = currentSection?.audio_path;
-                
-                // Construct Supabase storage URL
-                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://oreasnlyzhaeteipyylw.supabase.co';
-                const bucket = getAudioBucketFromLevel();
-                const audioUrl = audioPath && bucket
-                  ? `${supabaseUrl}/storage/v1/object/public/${bucket}/${audioPath}`
-                  : null;
-
-                if (!audioUrl) {
-                  return (
-                    <div className="py-8 text-center">
-                      <p className="text-gray-500">Không tìm thấy file audio cho phần thi này.</p>
-                    </div>
-                  );
-                }
-
-                return <AudioPlayer audioUrl={audioUrl} sharedKey={`listening-${examId}`} />;
-              })()}
-            </div>
-          </div>
-
-          {/* Questions Container */}
           <div id="questions-container" className="bg-white rounded-2xl shadow-md px-6 md:px-8 py-8 mt-6">
-            {/* Question Header */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-start gap-4">
                 <div className="px-4 py-2 rounded-xl bg-[#FFD24D] text-[#1E1E1E] font-bold text-lg whitespace-nowrap">
                   {(() => {
-                    // Find the current active question type tab
                     const currentTab = questionTypeTabs.find(tab => tab.id === activeQuestionType);
                     return currentTab?.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || `問題 ${currentQuestionIndex + 1}`;
                   })()} 
@@ -466,13 +1008,11 @@ export default function ListeningPage() {
                 <p 
                   className="text-xl font-normal text-[#0B1320] leading-relaxed cursor-pointer hover:text-[#4169E1] transition-colors break-words hyphens-auto"
                   onClick={() => {
-                    // Toggle expand/collapse for current question type
                     setExpandedQuestionType(prev => ({
                       ...prev,
                       [activeSection]: expandedQuestionType[activeSection] === currentQuestion.questionTypeId ? null : currentQuestion.questionTypeId
                     }));
                     
-                    // Auto scroll to questions section
                     setTimeout(() => {
                       const questionsSection = document.getElementById('questions-container');
                       if (questionsSection) {
@@ -491,55 +1031,8 @@ export default function ListeningPage() {
               </div>
             </div>
 
-            {/* Question Number Circles (Phần này mới so với ExamPage)*/}
-            {filteredQuestions.length > 0 && (
-              <div className="flex items-center gap-2 mt-4">
-                {filteredQuestions.map((question, index) => {
-                  const isAnswered = question.answers?.some(answer => 
-                    isAnswerSelected(question.id, answer.id, question.questionTypeId)
-                  ) || false;
-                  
-                  const handleQuestionClick = () => {
-                    if (shouldUsePagination) {
-                      setCurrentQuestionPage(index);
-                    } else {
-                      setCurrentQuestionIndex(index);
-                    }
-                    
-                    // Scroll to question
-                    setTimeout(() => {
-                      const questionElement = document.getElementById(`question-${question.id}`);
-                      if (questionElement) {
-                        questionElement.scrollIntoView({ 
-                          behavior: 'smooth', 
-                          block: 'center' 
-                        });
-                      }
-                    }, 100);
-                  };
-
-                  return (
-                    <button
-                      key={question.id}
-                      onClick={handleQuestionClick}
-                      className="w-8 h-8 rounded-full flex items-center justify-center font-semibold text-xs transition-colors"
-                      style={{
-                        backgroundColor: isAnswered ? '#FFD24D' : '#D9D9D9',
-                        color: '#000000'
-                      }}
-                    >
-                      {question.position || index + 1}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Display questions - paginated for reading comprehension types */}
             {(() => {
-              
               if (shouldUsePagination) {
-                // Show only current question for pagination
                 const safePageIndex = Math.min(currentQuestionPage, filteredQuestions.length - 1);
                 const currentQuestion = filteredQuestions[safePageIndex];
                 
@@ -548,12 +1041,11 @@ export default function ListeningPage() {
                 }
                 
                 return (
-                  <div key={currentQuestion.id} id={`question-${currentQuestion.id}`} className="scroll-mt-30" style={{ scrollMarginTop: '120px' }}>
+                  <div key={currentQuestion.id} id={`question-${currentQuestion.id}`} className="scroll-mt-30" style={{ scrollMarginTop: '90px' }}>
+                    <QuestionImage question={currentQuestion} />
                     
-                    {/* Answer Options */}
                     <div className="space-y-2">
                       {currentQuestion.answers && currentQuestion.answers.length > 0 ? (
-                        // Normalize answers: unique by show_order, sorted asc
                         (() => {
                               const byOrder = new Map();
                               currentQuestion.answers.forEach((a) => {
@@ -563,44 +1055,9 @@ export default function ListeningPage() {
                               return Array.from(byOrder.values()).sort(
                                 (a, b) => Number(a.show_order) - Number(b.show_order)
                               );
-                            }).map((answer) => {
-                              const isSelected = isAnswerSelected(currentQuestion.id, answer.id, currentQuestion.questionTypeId);
-                              
-                              return (
-                                <label
-                                  key={answer.id}
-                                  className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all ${
-                                    isSelected
-                                      ? "border-[#874FFF] bg-purple-50"
-                                      : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50"
-                                  }`}
-                                >
-                                  {/* custom radio */}
-                                  <input
-                                    type="radio"
-                                    name={`question-${currentQuestion.id}`}
-                                    value={answer.id}
-                                    checked={isSelected}
-                                    onChange={() => handleAnswerSelect(currentQuestion.id, answer.id, currentQuestion.questionTypeId)}
-                                    className="hidden"
-                                  />
-                                  <span
-                                    className={`flex items-center justify-center w-5 h-5 rounded-full border-2 flex-shrink-0 ${
-                                      isSelected ? "border-[#874FFF]" : "border-gray-400"
-                                    }`}
-                                  >
-                                    <span
-                                      className={`w-3 h-3 rounded-full ${
-                                        isSelected ? "bg-[#874FFF]" : "bg-transparent"
-                                      }`}
-                                    />
-                                  </span>
-                                  <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
-                                    {formatAnswerText(answer.answer_text, currentQuestion.question_text, currentQuestion.questionTypeId)}
-                                  </span>
-                                </label>
-                              );
-                        })
+                            }).map((answer) => (
+                              <AnswerOption key={answer.id} question={currentQuestion} answer={answer} />
+                            ))
                       ) : (
                         <p className="text-gray-500">Không có đáp án</p>
                       )}
@@ -608,7 +1065,6 @@ export default function ListeningPage() {
                   </div>
                 );
               } else {
-                // Show all questions for non-pagination types
                 return filteredQuestions.map((question, questionIndex) => (
               <div 
                 key={question.id} 
@@ -616,8 +1072,8 @@ export default function ListeningPage() {
                 className={`${questionIndex > 0 ? 'mt-8' : ''} scroll-mt-30`}
                 style={{ scrollMarginTop: '10px' }}
               >
+                <QuestionImage question={question} />
 
-                {/* Hiển thị Question Text */}
                 <div className="mb-8">
                   <div className="flex items-start gap-3">
                     <div className="text-3xl font-medium text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-B", fontWeight: 300 }}>
@@ -658,10 +1114,8 @@ export default function ListeningPage() {
                   </div>
                 </div>
 
-                {/* Hiển thị Answer Options */}
                 <div className="space-y-2">
                   {question.answers && question.answers.length > 0 ? (
-                    // Normalize answers: unique by show_order, sorted asc
                     (() => {
                           const byOrder = new Map();
                           question.answers.forEach((a) => {
@@ -671,46 +1125,9 @@ export default function ListeningPage() {
                           return Array.from(byOrder.values()).sort(
                             (a, b) => Number(a.show_order) - Number(b.show_order)
                           );
-                        })().filter(() => {
-                          return true;
-                        }).map((answer) => {
-                          const isSelected = isAnswerSelected(question.id, answer.id, question.questionTypeId);
-   
-                          return (
-                            <label
-                              key={answer.id}
-                              className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all flex-row ${
-                                isSelected
-                                  ? "border-[#874FFF] bg-purple-50"
-                                  : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50"
-                              }`}
-                            >
-                              {/* custom radio */}
-                              <input
-                                type="radio"
-                                name={`question-${question.id}`}
-                                value={answer.id}
-                                checked={isSelected}
-                                onChange={() => handleAnswerSelect(question.id, answer.id, question.questionTypeId)}
-                                className="hidden"
-                              />
-                              <span
-                                className={`flex items-center justify-center w-5 h-5 rounded-full border-2 flex-shrink-0 ${
-                                  isSelected ? "border-[#874FFF]" : "border-gray-400"
-                                }`}
-                              >
-                                <span
-                                  className={`w-3 h-3 rounded-full ${
-                                    isSelected ? "bg-[#874FFF]" : "bg-transparent"
-                                  }`}
-                                />
-                              </span>
-                              <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
-                                {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
-                              </span>
-                            </label>
-                          );
-                    })
+                        })().map((answer) => (
+                          <AnswerOption key={answer.id} question={question} answer={answer} />
+                        ))
                   ) : (
                     <p className="text-gray-500">Không có đáp án</p>
                   )}
@@ -725,37 +1142,28 @@ export default function ListeningPage() {
 
       <Footer />
 
-      {/* === COMPONENT OVERLAY === */}
       <TimeUpModal
-        show={showReadingTimeUpModal} // <-- Lấy từ hook
-        onClose={() => setShowReadingTimeUpModal(false)} // <-- Routeấy từ hook
+        show={showReadingTimeUpModal}
+        onClose={() => setShowReadingTimeUpModal(false)}
         onAction={() => {
           setShowReadingTimeUpModal(false);
-          navigate('/listening-intro'); // (Logic này có thể cần xem lại)
+          navigate('/listening-intro');
         }}
       />
       <ExamCertificateOverlay
         show={showCertificate}
         onHide={() => {
           setShowCertificate(false);
-          // === SỬA DUY NHẤT Ở ĐÂY ===
-          // Chuyển trang SAU KHI đóng overlay
-          // Dùng 'finalResultData.id' (là submission_id)
-          // navigate(`/exam-result/${finalResultData.id}`, { 
           navigate(`/student-dashboard`, {
             state: { 
-              resultData: finalResultData // Vẫn gửi state để load nhanh
+              resultData: finalResultData
             } 
           });
-          // ==========================
         }}
         resultData={finalResultData}
-        examData={examData} // Truyền cả examData để lấy level, điểm đỗ...
+        examData={examData}
       />
-      {/* ======================================= */}
-
       
-      {/* Toast notifications */}
       <Toaster 
         position="top-right"
         toastOptions={{

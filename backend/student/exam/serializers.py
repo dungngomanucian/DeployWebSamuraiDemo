@@ -12,9 +12,12 @@ class LevelSerializer(serializers.Serializer):
 
 
 class SectionDurationSerializer(serializers.Serializer):
-    """Serializer for section duration only"""
+    """Serializer for section duration and metadata"""
     id = serializers.CharField()
     duration = serializers.IntegerField(required=False, allow_null=True)
+    position = serializers.IntegerField(required=False, allow_null=True)
+    is_listening = serializers.BooleanField(required=False, allow_null=True)
+    type = serializers.CharField(required=False, allow_null=True)
 
 class ExamSerializer(serializers.Serializer):
     """Serializer for exam details"""
@@ -139,3 +142,11 @@ class ExamSubmissionSerializer(serializers.Serializer):
     duration = serializers.IntegerField(min_value=0)
     # allow_empty=False để đảm bảo học sinh phải nộp ít nhất 1 câu
     answers = SubmittedAnswerSerializer(many=True, allow_empty=False)
+
+class ListeningExamSubmissionSerializer(serializers.Serializer):
+    """
+    Serializer cho bài nộp phần nghe, cho phép nộp bài không có đáp án nào (mặc định 0 điểm).
+    """
+    duration = serializers.IntegerField(min_value=0)
+    # allow_empty=True để cho phép nộp bài không có đáp án nào (mặc định 0 điểm)
+    answers = SubmittedAnswerSerializer(many=True, allow_empty=True)

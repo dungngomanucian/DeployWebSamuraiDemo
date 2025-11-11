@@ -16,8 +16,8 @@ from .serializers import (
     FullExamDataSerializer,
     ExamResultSerializer,
     StudentAnswerSerializer,
-    ExamSubmissionSerializer
-
+    ExamSubmissionSerializer,
+    ListeningExamSubmissionSerializer
 )
 
 
@@ -198,8 +198,8 @@ def submit_listening_exam(request, exam_id):
     except Exception as e:
         return Response({"error": f"Lỗi không xác định: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    # Validate data
-    serializer = ExamSubmissionSerializer(data=request.data)
+    # Validate data - sử dụng ListeningExamSubmissionSerializer cho phép answers rỗng
+    serializer = ListeningExamSubmissionSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         

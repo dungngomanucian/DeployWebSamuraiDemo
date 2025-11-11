@@ -140,7 +140,7 @@ export default function ExamQuestionTypeTabs({
         const answeredCount = Array.from({ length: tab.questionCount }, (_, index) => {
           const question = groupedQuestions[tab.id]?.questions[index];
           return question ? (
-            question.questionTypeId === "QT007" 
+            groupedQuestions[question.questionTypeId]?.type?.is_Sort_Question === true
               ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
               : studentAnswers[question.id]
           ) : false;
@@ -183,7 +183,9 @@ export default function ExamQuestionTypeTabs({
               
               {/* Tab text */}
                <button
-                 onClick={() => {
+                 type="button"
+                 onClick={(e) => {
+                   e.preventDefault();
                    const targetSection = examData.sections.find(section => 
                      section.question_types.some(qt => qt.id === tab.id)
                    );
@@ -198,8 +200,8 @@ export default function ExamQuestionTypeTabs({
                    // setExpandedQuestionType(prev => ({ ... })); // <--- ĐÃ XÓA
                    
                    // Chỉ cần gọi hàm của cha, cha sẽ tự set state
-                   handleQuestionTypeChange(tab.id); 
-                   setCurrentQuestionIndex(0);
+                   // Không set currentQuestionIndex ở đây để tránh auto scroll
+                   handleQuestionTypeChange(tab.id);
                  
                  }}
                 className={`text-sm font-medium whitespace-nowrap transition-all ${
