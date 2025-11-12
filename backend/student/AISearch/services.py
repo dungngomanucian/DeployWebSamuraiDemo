@@ -1,6 +1,7 @@
 import os
 import google.generativeai as genai
 from typing import Dict
+import json
 
 class TranslationService:
     """
@@ -22,21 +23,38 @@ class TranslationService:
     @staticmethod
     def translate_text(text_to_translate: str) -> Dict:
         """
-        Gửi văn bản đến Gemini để dịch sang tiếng Việt.
+        Gửi văn bản đến Gemini để phân tích và trả về kết quả dưới dạng JSON.
         """
         try:
             TranslationService.configure_gemini()
             
-            # Chọn model, 'gemini-2.5-flash-lite' là một lựa chọn tốt cho các tác vụ văn bản
-            model = genai.GenerativeModel('gemini-2.5-flash-lite')
+            # 1. Tách riêng System Prompt để "dạy" model vai trò và quy tắc
+            system_prompt = """Nhiệm vụ: Bạn là một chuyên gia phân tích ngôn ngữ Nhật-Việt. Hãy phân tích văn bản tiếng Nhật được cung cấp và trả về CHỈ một đối tượng JSON.
             
-            # Tạo prompt rõ ràng để Gemini chỉ trả về kết quả dịch
-            prompt = f"Hãy dịch đoạn văn bản sau sang tiếng Anh . Chỉ trả về duy nhất phần văn bản đã được dịch, không thêm bất kỳ lời dẫn  nào. Đoạn văn bản cần dịch là: '{text_to_translate}'"
+Nếu đầu vào là câu dài, dùng cấu trúc: {{"type": "sentence", "translation": "[Bản dịch tiếng Việt]"}}
+
+Nếu đầu vào là từ ngắn (Kanji/từ vựng/ngữ pháp ngắn), dùng cấu trúc: {{"type": "word", "kanji": "[Kanji]", "reading": "[Cách đọc Hiragana/Katakana]", "sino_vietnamese": "[Hán-Việt]", "meaning": "[Nghĩa tiếng Việt]", "usage": "[Giải thích cách dùng/ví dụ từ vựng. Nếu không có, dùng null]", "grammar": "[Giải thích cấu trúc ngữ pháp đặc biệt nếu có. Nếu không, dùng null]"}}
+
+QUY TẮC TUYỆT ĐỐI: Không thêm bất kỳ giải thích, lời chào, hay văn bản nào khác ngoài đối tượng JSON được yêu cầu."""
+
+           
+
+            model = genai.GenerativeModel(
+                'gemini-2.5-flash-lite',
+                system_instruction=system_prompt,
+                generation_config=genai.types.GenerationConfig(
+                    response_mime_type="application/json"
+                )
+            )
             
-            response = model.generate_content(prompt)
+            # 3. Prompt chính giờ chỉ cần chứa nội dung cần phân tích
+            response = model.generate_content(text_to_translate)
             
-            # Trả về kết quả dưới dạng dictionary mà frontend mong đợi
-            return {'success': True, 'translatedText': response.text}
+            # 4. Không cần làm sạch nữa, parse trực tiếp vì đã có JSON mode
+            json_data = json.loads(response.text)
+            
+            # Trả về dữ liệu JSON đã được parse
+            return {'success': True, 'translatedText': json_data}
 
         except Exception as e:
             # Ghi lại lỗi để debug

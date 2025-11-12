@@ -496,7 +496,7 @@ export default function HomePage() {
       <section id="hoc-bai" className="w-full bg-[#E9EFFC] pt-14 pb-24 md:pb-28">
         <div className="max-w-6xl mx-auto px-4">
           <p className="text-base md:text-lg font-semibold text-[#5B6476] text-center">Giới thiệu tính năng</p>
-          <h3 className="text-3xl md:text-4xl font-bold text-[#0B1320] text-center mt-2 uppercase">HỌC BÀI</h3>
+          <h3 className="text-3xl md:text-4xl font-bold text-[#0B1320] text-center mt-2 uppercase">勉強する</h3>
           <TabsGallery />
         </div>
       </section>
