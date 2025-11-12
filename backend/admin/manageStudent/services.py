@@ -17,17 +17,6 @@ class StudentService:
     
     @staticmethod
     def get_all_students(page: int = 1, limit: int = 10) -> Dict[str, any]:
-        """
-        Get a paginated list of students.
-
-        Args:
-            page (int): The current page number (starting from 1).
-            limit (int): The number of items per page.
-
-        Returns:
-            Dict: A dictionary containing 'success', 'data' (list of students), 
-                  and 'total_count' (total number of students).
-        """
         try:
             # 1. Tính toán range cho Supabase
             from_index = (page - 1) * limit
@@ -420,6 +409,62 @@ class StudentService:
             }
     
     @staticmethod
+    def _generate_student_id(classroom_code: str) -> str:
+        """
+        Tạo ID học viên dựa trên classroom_code.
+        Logic: Tìm học viên có cùng classroom_code, lấy ID lớn nhất và +1.
+        Nếu không có học viên nào, bắt đầu từ 01.
+        
+        Args:
+            classroom_code: Mã lớp học
+            
+        Returns:
+            str: ID học viên mới (ví dụ: "2025N112-01")
+        """
+        if not classroom_code:
+            raise ValueError("classroom_code không được để trống")
+        
+        try:
+            # Tìm tất cả học viên có cùng classroom_code và chưa bị xóa
+            response = supabase.table('students')\
+                .select('id')\
+                .eq('classroom_code', classroom_code)\
+                .is_('deleted_at', 'null')\
+                .execute()
+            
+            if not response.data or len(response.data) == 0:
+                # Không có học viên nào trong lớp, bắt đầu từ 01
+                seq_number = 1
+            else:
+                # Tìm số thứ tự lớn nhất
+                max_seq = 0
+                for student in response.data:
+                    student_id = student.get('id', '')
+                    if student_id and '-' in student_id:
+                        # Tách phần số sau dấu '-'
+                        parts = student_id.split('-')
+                        if len(parts) >= 2:
+                            try:
+                                seq = int(parts[-1])  # Lấy phần cuối cùng
+                                if seq > max_seq:
+                                    max_seq = seq
+                            except ValueError:
+                                # Nếu không parse được, bỏ qua
+                                pass
+                
+                # +1 để tạo số thứ tự mới
+                seq_number = max_seq + 1
+            
+            # Tạo ID mới: classroom_code-XX (XX là số có 2 chữ số)
+            new_id = f"{classroom_code}-{str(seq_number).zfill(2)}"
+            return new_id
+            
+        except Exception as e:
+            print(f"DEBUG: Lỗi khi tạo student ID: {e}")
+            # Nếu có lỗi, vẫn tạo ID với số 01
+            return f"{classroom_code}-01"
+    
+    @staticmethod
     def _check_samurai_student_id_exists(samurai_student_id: str) -> bool:
         """
         Kiểm tra xem samurai_student_id đã tồn tại trong database chưa.
@@ -470,42 +515,23 @@ class StudentService:
         for index, student_data in enumerate(students_data, start=2):  # start=2 vì Excel bắt đầu từ row 2
             account_id = None  # Khai báo trước để có thể dùng trong except
             try:
-                
-                # Kiểm tra samurai_student_id đã tồn tại chưa
-                samurai_id = student_data.get('samurai_student_id')
-                if samurai_id:
-                    if StudentService._check_samurai_student_id_exists(samurai_id):
-                        error_msg = f"Mã học viên '{samurai_id}' đã tồn tại trong hệ thống."
-                        print(f"DEBUG: {error_msg}")  # Debug log
-                        results['errors'].append({
-                            'row': index,
-                            'samurai_student_id': samurai_id,
-                            'error': error_msg
-                        })
-                        results['error_count'] += 1
-                        continue
-                
-                # 1. Tạo tài khoản trước
+                # 1. Tạo tài khoản trước (chỉ cần password, các trường khác sẽ tự động tạo)
                 account_data = {
-                    'user_name': student_data.get('user_name'),
                     'password': student_data.get('password', ''),
-                    'email': student_data.get('email'),
-                    'phone_number': student_data.get('phone_number'),
                 }
                 # Lấy tên đầy đủ để tạo username (ghép first_name và last_name)
                 full_name = f"{student_data.get('last_name', '')} {student_data.get('first_name', '')}".strip()
                 if not full_name:
                     full_name = student_data.get('first_name') or student_data.get('last_name') or ''
-                samurai_id = student_data.get('samurai_student_id')
                 
-                account_result = StudentService.create_account_for_student(account_data, full_name, samurai_id)
+                account_result = StudentService.create_account_for_student(account_data, full_name, None)
                 
                 if not account_result['success']:
                     error_msg = f"Tạo tài khoản thất bại: {account_result['error']}"
                     print(f"DEBUG: {error_msg}")  # Debug log
                     results['errors'].append({
                         'row': index,
-                        'samurai_student_id': student_data.get('samurai_student_id', 'N/A'),
+                        'student_name': f"{student_data.get('last_name', '')} {student_data.get('first_name', '')}".strip(),
                         'error': error_msg
                     })
                     results['error_count'] += 1
@@ -513,36 +539,47 @@ class StudentService:
                 
                 account_id = account_result['data']['account_id']
                 
-                # 2. Tạo học viên (id sẽ được trigger tự động sinh)
+                # 2. Tạo ID học viên dựa trên classroom_code
+                classroom_code = student_data.get('classroom_code')
+                if not classroom_code:
+                    error_msg = 'classroom_code không được để trống'
+                    print(f"DEBUG: {error_msg}")  # Debug log
+                    results['errors'].append({
+                        'row': index,
+                        'student_name': f"{student_data.get('last_name', '')} {student_data.get('first_name', '')}".strip(),
+                        'error': error_msg
+                    })
+                    results['error_count'] += 1
+                    # Xóa account đã tạo
+                    try:
+                        supabase.table('account').delete().eq('id', account_id).execute()
+                    except:
+                        pass
+                    continue
+                
+                student_id = StudentService._generate_student_id(classroom_code)
+                
+                # 3. Tạo học viên với ID đã tạo
                 student_insert_data = {
-                    'classroom_code': student_data.get('classroom_code'),
+                    'id': student_id,
+                    'classroom_code': classroom_code,
                     'account_id': account_id,
                     'first_name': student_data.get('first_name'),
                     'last_name': student_data.get('last_name'),
-                    'samurai_student_id': student_data.get('samurai_student_id'),
-                    'date_of_birth': student_data.get('date_of_birth'),
-                    'gender': student_data.get('gender'),
-                    'address': student_data.get('address'),
-                    'parent_phone_number': student_data.get('parent_phone_number'),
+                    'samurai_student_id': student_id,  # samurai_student_id = id
                 }
-                
-                # Loại bỏ các trường None hoặc rỗng
-                student_insert_data = {k: v for k, v in student_insert_data.items() if v is not None and v != ''}
-
-                # Chuyển kiểu ngày sang ISO string để JSON serializable
-                if 'date_of_birth' in student_insert_data and isinstance(student_insert_data['date_of_birth'], (date, datetime)):
-                    student_insert_data['date_of_birth'] = student_insert_data['date_of_birth'].isoformat()
 
                 now_iso = datetime.now(timezone.utc).isoformat()
                 student_insert_data['created_at'] = now_iso
                 student_insert_data['updated_at'] = now_iso
                 
-                # Insert vào bảng students (id sẽ được trigger tự động sinh)
+                # Insert vào bảng students với ID đã tạo
                 student_response = supabase.table('students')\
                     .insert(student_insert_data)\
                     .execute()
                 if student_response.data and len(student_response.data) > 0:
-                    results['data'].append(student_response.data[0])
+                    created_student = student_response.data[0]
+                    results['data'].append(created_student)
                     results['success_count'] += 1
                 else:
                     # Nếu tạo student thất bại, cần xóa account đã tạo
@@ -556,7 +593,7 @@ class StudentService:
                     print(f"DEBUG: {error_msg}")  # Debug log
                     results['errors'].append({
                         'row': index,
-                        'samurai_student_id': student_data.get('samurai_student_id', 'N/A'),
+                        'student_name': f"{student_data.get('last_name', '')} {student_data.get('first_name', '')}".strip(),
                         'error': error_msg
                     })
                     results['error_count'] += 1
@@ -575,7 +612,7 @@ class StudentService:
                 
                 results['errors'].append({
                     'row': index,
-                    'samurai_student_id': student_data.get('samurai_student_id', 'N/A'),
+                    'student_name': f"{student_data.get('last_name', '')} {student_data.get('first_name', '')}".strip(),
                     'error': str(e)
                 })
                 results['error_count'] += 1
