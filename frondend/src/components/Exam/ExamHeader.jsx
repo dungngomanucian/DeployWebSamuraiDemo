@@ -1,18 +1,13 @@
-// src/components/Exam/ExamHeader.jsx
+// src/components/Exam/ExamHeader.jsx (ĐÃ SỬA VỚI isReviewMode)
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bold } from 'lucide-react';
-import ExamQuestionTypeTabs from './ExamQuestionTypeTabs'; // Import component tab
+import ExamQuestionTypeTabs from './ExamQuestionTypeTabs'; 
 
-/**
- * Component Header (cho cả bản dính và bản thường)
- * - isSticky (boolean): Quyết định style render
- * - TimerProgressBarComponent (React.Component): Nhận component TimerProgressBar từ cha
- * - ...props: Nhận tất cả các state và hàm xử lý từ ExamPage
- */
 export default function ExamHeader({
   // === Props trạng thái ===
   isSticky = false,
+  isReviewMode = false, // <-- THÊM PROP MỚI VỚI GIÁ TRỊ MẶC ĐỊNH
   examData,
   activeSection,
   activeQuestionType,
@@ -23,8 +18,6 @@ export default function ExamHeader({
   currentQuestionIndex,
   currentQuestionPage,
   isSubmitting,
-  
-  // === 1. NHẬN STATE MỚI TỪ EXAMPAGE ===
   expandedQuestionType,
   
   // === Props sự kiện ===
@@ -35,7 +28,7 @@ export default function ExamHeader({
   setCurrentQuestionPage,
 
   // === Component Props ===
-  TimerProgressBarComponent, // Nhận component TimerProgressBar từ cha
+  TimerProgressBarComponent, 
 }) {
   const navigate = useNavigate();
 
@@ -44,14 +37,25 @@ export default function ExamHeader({
     <>
       {/* HÀNG 1:
         - Bản thường: [Quay lại] [Tab Section] [Nộp bài]
-        - Bản dính: [Timer] [Tab Section] [Nộp bài]
+        - Bản dính: [Timer/Quay lại] [Tab Section] [Nộp bài]
       */}
       <div className={`flex items-center justify-between gap-4 ${isSticky ? 'mb-4' : ''}`}>
         {isSticky ? (
           <>
-            {/* 1. Progress Bar (Bản Sticky) */}
-            {TimerProgressBarComponent && <TimerProgressBarComponent />}
+            {/* 1. HIỂN THỊ CÓ ĐIỀU KIỆN */}
+            {!isReviewMode && TimerProgressBarComponent && <TimerProgressBarComponent />}
             
+            {/* Nút quay lại (chỉ cho Review mode bản sticky) */}
+            {isReviewMode && (
+              <button
+                style={{ fontFamily: "Nunito" }}
+                onClick={() => navigate(-1)}
+                className="px-4 h-8 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-semibold hover:bg-[#5427B4] hover:text-white transition-all text-sm w-24 justify-center flex items-center"
+              >
+                Quay lại
+              </button>
+            )}
+
             {/* 2. Section Tabs (Bản Sticky) */}
             <div className="flex items-center justify-center gap-2 flex-1">
               {examData?.sections?.map((section) => (
@@ -70,14 +74,18 @@ export default function ExamHeader({
               ))}
             </div>
             
-            {/* 3. Submit Button (Bản Sticky) */}
-            <button
-              onClick={onSubmitExam}
-              disabled={isSubmitting}
-              className="px-4 h-8 rounded-lg border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all text-sm flex items-center"
-            >
-              {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-            </button>
+            {/* 3. HIỂN THỊ CÓ ĐIỀU KIỆN */}
+            {!isReviewMode ? (
+              <button
+                onClick={onSubmitExam}
+                disabled={isSubmitting}
+                className="w-24 px-4 h-8 rounded-lg border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all text-sm flex items-center justify-center"
+              >
+                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
+              </button>
+            ) : (
+              <div className="w-24"></div> // Giữ layout cho cân bằng
+            )}
           </>
         ) : (
           <>
@@ -108,23 +116,26 @@ export default function ExamHeader({
               ))}
             </div>
 
-            {/* 3. Submit Button (Bản Thường) */}
-            <div className="flex items-center gap-3">
-              <button
-                style={{ fontFamily: "Nunito", font: Bold }}
-                onClick={onSubmitExam}
-                disabled={isSubmitting}
-                className="px-5 py-2.5 rounded-lg border-2 border-red-500 text-red-500 font-extrabold hover:bg-red-500 hover:text-white transition-all"
-              >
-                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-              </button>
-            </div>
+            {/* 3. HIỂN THỊ CÓ ĐIỀU KIỆN */}
+            {!isReviewMode ? (
+              <div className="flex items-center gap-3">
+                <button
+                  style={{ fontFamily: "Nunito", font: Bold }}
+                  onClick={onSubmitExam}
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 rounded-lg border-2 border-red-500 text-red-500 font-extrabold hover:bg-red-500 hover:text-white transition-all"
+                >
+                  {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
+                </button>
+              </div>
+            ) : (
+              <div className="w-32"></div> // Giữ layout
+            )}
           </>
         )}
       </div>
 
-      {/* HÀNG 2: Tiêu đề (Chỉ cho bản Thường)
-      */}
+      {/* HÀNG 2: Tiêu đề (Chỉ cho bản Thường) */}
       {!isSticky && (
         <div className="mt-4 flex items-center justify-center">
           <div className="text-center">
@@ -135,20 +146,19 @@ export default function ExamHeader({
         </div>
       )}
 
-      {/* HÀNG 3: Timer (Chỉ cho bản Thường)
-      */}
-      {!isSticky && (
+      {/* HÀNG 3: Timer (Chỉ cho bản Thường & KHÔNG phải review) */}
+      {!isSticky && !isReviewMode && (
         <div className="mt-4 flex justify-center">
           {TimerProgressBarComponent && <TimerProgressBarComponent />}
         </div>
       )}
 
-      {/* HÀNG 4: Thanh Tabs câu hỏi (Chung cho cả hai)
-      */}
+      {/* HÀNG 4: Thanh Tabs câu hỏi (Chung cho cả hai) */}
       {questionTypeTabs.length > 0 && (
         <div className={`${isSticky ? 'mt-4' : 'mt-6'} w-full`}>
           <ExamQuestionTypeTabs
-            // === 2. TRUYỀN TIẾP XUỐNG TABS ===
+            isReviewMode={isReviewMode} // <-- TRUYỀN XUỐNG
+            // ... (tất cả các props khác)
             examData={examData}
             questionTypeTabs={questionTypeTabs}
             activeSection={activeSection}
@@ -158,9 +168,7 @@ export default function ExamHeader({
             answerOrder={answerOrder}
             currentQuestionIndex={currentQuestionIndex}
             currentQuestionPage={currentQuestionPage}
-            
-            expandedQuestionType={expandedQuestionType} // <--- TRUYỀN XUỐNG
-            
+            expandedQuestionType={expandedQuestionType}
             handleQuestionTypeChange={onQuestionTypeChange}
             handleSectionChange={onSectionChange}
             setCurrentQuestionIndex={setCurrentQuestionIndex}
@@ -187,4 +195,4 @@ export default function ExamHeader({
       {headerContent}
     </div>
   );
-} 
+}

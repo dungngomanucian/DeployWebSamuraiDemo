@@ -1,4 +1,4 @@
-// src/components/Exam/ExamQuestionTypeTabs.jsx
+// src/components/Exam/ExamQuestionTypeTabs.jsx (ĐÃ SỬA VỚI isReviewMode)
 import React, { useState, useEffect, useRef } from 'react';
 import QuestionButtons from './QuestionButtons'; // Import component con
 
@@ -8,6 +8,7 @@ import QuestionButtons from './QuestionButtons'; // Import component con
  */
 export default function ExamQuestionTypeTabs({
   // === Dữ liệu truyền vào ===
+  isReviewMode, // <-- NHẬN PROP MỚI
   examData,
   questionTypeTabs,
   activeSection,
@@ -27,9 +28,6 @@ export default function ExamQuestionTypeTabs({
   // === 1. NHẬN STATE MỚI TỪ CHA ===
   expandedQuestionType, // Nhận state 'expanded' từ cha
 }) {
-
-  // === 2. XÓA STATE NỘI BỘ ===
-  // const [expandedQuestionType, setExpandedQuestionType] = useState({}); // <--- ĐÃ XÓA
 
   // === (Tất cả logic state/ref/useEffect tính toán độ rộng giữ nguyên) ===
   const [barWidths, setBarWidths] = useState({});
@@ -237,6 +235,7 @@ export default function ExamQuestionTypeTabs({
                     style={{ width: barWidths[tab.id] || '100%' }}
                   ></div>
                   <QuestionButtons
+                    isReviewMode={isReviewMode} // <-- TRUYỀN XUỐNG
                     tab={tab}
                     groupedQuestions={groupedQuestions}
                     activeQuestionType={activeQuestionType}

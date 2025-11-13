@@ -8,10 +8,6 @@ from typing import Dict, List, Optional
 try:
     from exam.services import ExamService
 except ImportError:
-    # Xử lý nếu cấu trúc thư mục của bạn khác
-    print("Lỗi: Không thể import ExamService. Hãy đảm bảo 'exam' là một package.")
-    # Bạn có thể cần điều chỉnh 'exam.services' thành '..exam.services' 
-    # tùy thuộc vào cách bạn chạy dự án
     from ..exam.services import ExamService
 
 class ResultService:

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "../../../components/Navbar";
 import Footer from "../../../components/Footer";
 import { getFullExamData, submitExam } from "../../../api/examService";
-import ExamCertificateOverlay from "../../../components/JLPTCertificateOverlay";
+// import ExamCertificateOverlay from "../../../components/JLPTCertificateOverlay"; // <-- ĐÃ XÓA
 import toast, { Toaster } from "react-hot-toast";
 import TimeUpModal from "../../../components/Exam/TimeUpModal";
 
@@ -22,7 +22,6 @@ import { useExamTimers } from "../../../hooks/exam/useExamTimers";
 import { useExamState } from "../../../hooks/exam/useExamState";
 
 // 3. IMPORT CÁC COMPONENT UI ĐÃ TÁCH
-// (Không cần import ExamQuestionTypeTabs nữa, vì ExamHeader đã gọi nó)
 import ExamHeader from "../../../components/Exam/ExamHeader";
 
 export default function ExamPage() {
@@ -43,8 +42,8 @@ export default function ExamPage() {
   const [currentQuestionPage, setCurrentQuestionPage] = useState(0);
   const [openPassageQuestions, setOpenPassageQuestions] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showCertificate, setShowCertificate] = useState(false);
-  const [finalResultData, setFinalResultData] = useState(null);
+  // const [showCertificate, setShowCertificate] = useState(false); // <-- ĐÃ XÓA
+  // const [finalResultData, setFinalResultData] = useState(null); // <-- ĐÃ XÓA
   
   // (Refs)
   const userSelectedSectionRef = useRef(false);
@@ -439,7 +438,7 @@ export default function ExamPage() {
       alert(`Nộp bài thất bại: ${error}`);
     } else {
       console.log("Nộp bài thành công, kết quả:", resultData);
-      setFinalResultData(resultData); // Lưu kết quả (chứa submission_id)
+      // setFinalResultData(resultData); // <-- ĐÃ XÓA
       // Lưu exam_result_id vào localStorage để listening page sử dụng
       localStorage.setItem('exam_result_id', resultData.id);
       // Chuyển sang trang ListeningIntro thay vì hiển thị overlay
@@ -485,6 +484,7 @@ export default function ExamPage() {
       {showStickyProgress && (
         <ExamHeader
           isSticky={true}
+          isReviewMode={false}
           examData={examData}
           activeSection={activeSection}
           activeQuestionType={activeQuestionType}
@@ -513,6 +513,7 @@ export default function ExamPage() {
             <div ref={nonStickyHeaderRef}> {/* (SỬA LỖI CUỘN) Gắn Ref vào đây */}
               <ExamHeader
                 isSticky={false}
+                isReviewMode={false}
                 examData={examData}
                 activeSection={activeSection}
                 activeQuestionType={activeQuestionType}
@@ -968,21 +969,9 @@ export default function ExamPage() {
         onClose={() => setShowReadingTimeUpModal(false)} 
         onAction={() => {
           setShowReadingTimeUpModal(false);
-          navigate('/listening-intro'); 
+          // (Logic nộp bài đã xử lý, chỉ cần chuyển trang)
+          navigate(`/listening-intro?examId=${examId}`); 
         }}
-      />
-      <ExamCertificateOverlay
-        show={showCertificate}
-        onHide={() => {
-          setShowCertificate(false);
-          navigate(`/student-dashboard`, {
-            state: { 
-              resultData: finalResultData 
-            } 
-          });
-        }}
-        resultData={finalResultData}
-        examData={examData} 
       />
       
       {/* Toast notifications */}

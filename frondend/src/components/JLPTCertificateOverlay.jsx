@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // <-- 1. IMPORT THÊM
 
 // Component con để bọc card, giống OnboardingModal
 const ModalCard = ({ children, onHide }) => (
@@ -24,6 +25,8 @@ const ModalCard = ({ children, onHide }) => (
 const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [contentVisible, setContentVisible] = useState(false);
+  
+  const navigate = useNavigate(); // <-- 2. THÊM HOOK NAVIGATE
 
   useEffect(() => {
     if (show) {
@@ -40,7 +43,6 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
   // Đóng modal sau khi animation kết thúc
   const handleAnimationEnd = () => {
     if (!isVisible) {
-      // Thực sự ẩn component sau khi backdrop mờ đi
       // (Không cần onHide() ở đây vì nó sẽ được gọi từ ExamPage)
     }
   };
@@ -84,6 +86,18 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
 
   const sectionScores = resultData?.section_scores || [];
 
+  // === 3. TẠO HÀM XỬ LÝ NÚT MỚI ===
+  const handleViewDetails = () => {
+    const resultId = resultData?.id;
+    if (resultId) {
+      if (onHide) onHide(); // Đóng modal
+      navigate(`/results/${resultId}`); // Điều hướng đến trang review
+    } else {
+      console.error("Certificate Overlay: Không tìm thấy resultData.id");
+      alert("Không thể tải chi tiết bài làm, vui lòng thử lại.");
+    }
+  };
+
   if (!show && !isVisible) {
     return null; // Không render gì cả khi ẩn
   }
@@ -106,7 +120,7 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
           <p className="text-sm text-gray-500 mb-6" style={{fontFamily: 'Nunito'}}>Đây là kết quả cho lần làm bài thi này của bạn.</p>
 
           <div className="border border-gray-300 rounded-lg p-4 sm:p-6 text-left space-y-3 mb-6 bg-gray-50" style={{fontFamily: 'Nunito'}}>
-            {/* Hàng 1: Ngày thi, Mã HV */}
+            {/* ... (Code hiển thị thông tin học viên giữ nguyên) ... */}
             <div className="flex flex-col sm:flex-row justify-between text-sm">
               <div className="mb-2 sm:mb-0">
                 <span className="font-semibold text-gray-600">Ngày thi:</span>
@@ -117,12 +131,10 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
                 <span className="font-semibold text-gray-600">Mã học viên:</span>
                 <span className="ml-2 text-gray-800">{studentId}</span>
             </div>
-            {/* Hàng 2: Tên HV */}
             <div className="text-sm">
               <span className="font-semibold text-gray-600">Họ và tên:</span>
               <span className="ml-2 text-gray-800">{studentName}</span>
             </div>
-             {/* Hàng 3: Level */}
              <div className="text-sm">
               <span className="font-semibold text-gray-600">Cấp độ:</span>
               <span className="ml-2 text-gray-800 font-normal">{level}</span>
@@ -131,7 +143,7 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
 
           {/* Phần điểm */}
           <div className="mb-6">
-            {/* === LƯỚI ĐIỂM TỪNG PHẦN (MỚI) === */}
+            {/* ... (Code hiển thị điểm từng phần giữ nguyên) ... */}
             {sectionScores.length > 0 && (
               <div className="mb-6 border-b pb-6">
                 <p className="text-sm text-gray-600 mb-3 text-center font-bold" style={{fontFamily: 'Nunito'}}>Điểm theo từng phần</p>
@@ -148,7 +160,7 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
               </div>
             )}
 
-            {/* Điểm tổng và Kết quả (giữ nguyên) */}
+            {/* ... (Code hiển thị điểm tổng và kết quả giữ nguyên) ... */}
             <div className="text-center">
               <div className="mb-4">
                 <p className="text-sm text-gray-600 mb-1 font-bold" style={{fontFamily: 'Nunito'}}>Điểm tổng</p>
@@ -164,14 +176,26 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
             </div>
           </div>
 
-          {/* Nút đóng */}
-          <button
-            onClick={onHide}
-            className="px-8 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors w-full sm:w-auto"
-            style={{fontFamily: 'Nunito'}}
-          >
-            OK
-          </button>
+          {/* === 3. SỬA KHU VỰC NÚT BẤM === */}
+          <div className="flex flex-col-reverse sm:flex-row justify-center gap-3" style={{fontFamily: 'Nunito'}}>
+            {/* Nút OK (Đóng và về Dashboard) */}
+            <button
+              onClick={onHide}
+              className="px-8 py-2.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold transition-colors w-full sm:w-auto"
+            >
+              OK (Về Dashboard)
+            </button>
+            
+            {/* Nút XEM CHI TIẾT (Mới) */}
+            <button
+              onClick={handleViewDetails}
+              className="px-8 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors w-full sm:w-auto"
+            >
+              Xem chi tiết bài làm
+            </button>
+          </div>
+          {/* =============================== */}
+
         </ModalCard>
       </div>
     </div>
