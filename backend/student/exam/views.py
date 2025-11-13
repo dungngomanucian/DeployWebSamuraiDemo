@@ -16,8 +16,8 @@ from .serializers import (
     FullExamDataSerializer,
     ExamResultSerializer,
     StudentAnswerSerializer,
-    ExamSubmissionSerializer
-
+    ExamSubmissionSerializer,
+    ListeningExamSubmissionSerializer
 )
 
 
@@ -58,12 +58,33 @@ def get_exams_by_level(request, level_id):
 @api_view(['GET'])
 def get_full_exam_data(request, exam_id):
     """Get complete exam data including all questions and answers"""
-    result = ExamService.get_full_exam_data(exam_id)
-    
-    if result['success']:
-        # Return raw data without serialization to preserve nested structure
-        return Response(result['data'], status=status.HTTP_200_OK)
-    return Response({'error': result['error']}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    try:
+        # Check if client is still connected
+        if hasattr(request, '_closed') and request._closed:
+            return Response({'error': 'Client disconnected'}, status=499)
+        
+        result = ExamService.get_full_exam_data(exam_id)
+        
+        # Check again before sending response
+        if hasattr(request, '_closed') and request._closed:
+            return Response({'error': 'Client disconnected'}, status=499)
+        
+        if result['success']:
+            # Return raw data without serialization to preserve nested structure
+            return Response(result['data'], status=status.HTTP_200_OK)
+        return Response({'error': result['error']}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except BrokenPipeError:
+        # Client closed connection - suppress error
+        return Response({'error': 'Connection closed'}, status=499)
+    except (ConnectionResetError, ConnectionAbortedError) as e:
+        # Connection errors - suppress
+        return Response({'error': 'Connection error'}, status=499)
+    except Exception as e:
+        # Log other errors
+        import traceback
+        print(f"Error in get_full_exam_data: {e}")
+        print(traceback.format_exc())
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # Xu ly luu bai thi
@@ -198,8 +219,8 @@ def submit_listening_exam(request, exam_id):
     except Exception as e:
         return Response({"error": f"Lỗi không xác định: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    # Validate data
-    serializer = ExamSubmissionSerializer(data=request.data)
+    # Validate data - sử dụng ListeningExamSubmissionSerializer cho phép answers rỗng
+    serializer = ListeningExamSubmissionSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         

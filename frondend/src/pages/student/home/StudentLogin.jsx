@@ -185,6 +185,7 @@ const StudentLogin = () => {
     const navigate = useNavigate(); 
     
     const [formData, setFormData] = useState({
+        studentId: '',
         email: '',
         password: '',
         rememberMe: false, 
@@ -233,18 +234,23 @@ const StudentLogin = () => {
         const newErrors = {};
         let isValid = true;
 
-        // 2. KIỂM TRA ĐỊNH DẠNG EMAIL
-        if (!formData.email.trim()) {
-            // Lỗi rỗng
-            newErrors.email = 'Email không được để trống.';
+        // 1. KIỂM TRA: Phải có ít nhất một trong hai (mã học viên hoặc email)
+        const hasStudentId = formData.studentId.trim() !== '';
+        const hasEmail = formData.email.trim() !== '';
+        
+        if (!hasStudentId && !hasEmail) {
+            newErrors.studentId = 'Vui lòng nhập Mã học viên hoặc Email.';
+            newErrors.email = 'Vui lòng nhập Mã học viên hoặc Email.';
             isValid = false;
-        } else if (!EMAIL_REGEX.test(formData.email.trim())) { 
-            // Lỗi định dạng Email
-            newErrors.email = 'Định dạng Email không hợp lệ. Vui lòng kiểm tra lại.'; 
-            isValid = false;
+        } else {
+            // 2. Nếu có email, kiểm tra định dạng
+            if (hasEmail && !EMAIL_REGEX.test(formData.email.trim())) { 
+                newErrors.email = 'Định dạng Email không hợp lệ. Vui lòng kiểm tra lại.'; 
+                isValid = false;
+            }
         }
         
-        // Kiểm tra mật khẩu rỗng (sử dụng boolean true)
+        // 3. Kiểm tra mật khẩu rỗng (sử dụng boolean true)
         if (!formData.password.trim()) {
             newErrors.password = true;
             isValid = false;
@@ -260,7 +266,7 @@ const StudentLogin = () => {
 
         // 1. Kiểm tra validation
         if (!validateForm()) {
-            addToast("Vui lòng kiểm tra lại Email và Mật khẩu.", "warning");
+            addToast("Vui lòng kiểm tra lại thông tin đăng nhập.", "warning");
             return;
         }
 
@@ -269,6 +275,7 @@ const StudentLogin = () => {
         try {
             // 2. GỌI HÀM SERVICE API THẬT
             const { data, error } = await loginService(
+                formData.studentId,
                 formData.email, 
                 formData.password, 
                 formData.rememberMe
@@ -353,20 +360,35 @@ const StudentLogin = () => {
 
                     {/* Form nhập liệu */}
                     <form onSubmit={handleLogin} className="space-y-4" noValidate> 
-                        {/* Input 1: Email */}
+                        {/* Input 1: Mã học viên */}
                         <InputField
-                            label="Nhập Email của bạn" 
+                            label="Mã học viên" 
+                            placeholder="VD: 2025N11201-05"
+                            icon={Mail} 
+                            type="text"
+                            name="studentId"
+                            value={formData.studentId}
+                            onChange={handleChange}
+                            isRequired={false}
+                            isInvalid={errors.studentId}
+                        />
+                        
+                        <div className="text-center text-gray-500 font-medium">HOẶC</div>
+                        
+                        {/* Input 2: Email */}
+                        <InputField
+                            label="Email" 
                             placeholder="samurai@gmail.com"
                             icon={Mail} 
                             type="email"
                             name="email"
                             value={formData.email}
                             onChange={handleChange}
-                            isRequired={true}
+                            isRequired={false}
                             // errors.email là string (lỗi định dạng/rỗng) hoặc undefined
                             isInvalid={errors.email}
                         />
-                        {/* Input 2: Mật khẩu */}
+                        {/* Input 3: Mật khẩu */}
                         <InputField
                             label="Mật khẩu"
                             placeholder="***********" 

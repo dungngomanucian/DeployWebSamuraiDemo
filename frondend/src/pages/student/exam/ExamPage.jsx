@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense, lazy } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import Navbar from "../../../components/Navbar";
-import Footer from "../../../components/Footer";
 import { getFullExamData, submitExam } from "../../../api/examService";
-// import ExamCertificateOverlay from "../../../components/JLPTCertificateOverlay"; // <-- ĐÃ XÓA
 import toast, { Toaster } from "react-hot-toast";
-import TimeUpModal from "../../../components/Exam/TimeUpModal";
+
+// Lazy load các component nặng để cải thiện tốc độ tải ban đầu
+const Navbar = lazy(() => import("../../../components/Navbar"));
+const Footer = lazy(() => import("../../../components/Footer"));
+const ExamCertificateOverlay = lazy(() => import("../../../components/JLPTCertificateOverlay"));
+const TimeUpModal = lazy(() => import("../../../components/Exam/TimeUpModal"));
 
 // 1. IMPORT CÁC HÀM RENDER (Giữ nguyên)
 import {
@@ -42,8 +44,7 @@ export default function ExamPage() {
   const [currentQuestionPage, setCurrentQuestionPage] = useState(0);
   const [openPassageQuestions, setOpenPassageQuestions] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // const [showCertificate, setShowCertificate] = useState(false); // <-- ĐÃ XÓA
-  // const [finalResultData, setFinalResultData] = useState(null); // <-- ĐÃ XÓA
+  const [finalResultData, setFinalResultData] = useState(null);
   
   // (Refs)
   const userSelectedSectionRef = useRef(false);
@@ -58,21 +59,29 @@ export default function ExamPage() {
 
   
   // === 5. GỌI CÁC HOOK MỚI ===
-  const getFilteredQuestions = () => {
+  // Memoize filteredQuestions để tránh tính toán lại không cần thiết
+  const filteredQuestions = useMemo(() => {
     if (!activeQuestionType || !groupedQuestions[activeQuestionType]) return [];
     const questions = groupedQuestions[activeQuestionType].questions;
     const uniqueQuestions = questions.filter((question, index, self) => 
       index === self.findIndex(q => q.id === question.id)
     );
     return uniqueQuestions;
-  };
-  const filteredQuestions = getFilteredQuestions();
-  const shouldUsePagination = filteredQuestions.length > 0 && 
-    groupedQuestions[activeQuestionType]?.type?.duration &&
-    (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
-  const currentQuestion = shouldUsePagination ? 
-    filteredQuestions[currentQuestionPage] : 
-    (filteredQuestions[currentQuestionIndex] || null);
+  }, [activeQuestionType, groupedQuestions]);
+
+  // Memoize shouldUsePagination
+  const shouldUsePagination = useMemo(() => {
+    return filteredQuestions.length > 0 && 
+      groupedQuestions[activeQuestionType]?.type?.duration &&
+      (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
+  }, [filteredQuestions, activeQuestionType, groupedQuestions]);
+
+  // Memoize currentQuestion
+  const currentQuestion = useMemo(() => {
+    return shouldUsePagination ? 
+      filteredQuestions[currentQuestionPage] : 
+      (filteredQuestions[currentQuestionIndex] || null);
+  }, [shouldUsePagination, filteredQuestions, currentQuestionPage, currentQuestionIndex]);
   
   const {
     timeRemaining,
@@ -87,7 +96,8 @@ export default function ExamPage() {
     !loading && !!examData,
     currentQuestion,
     groupedQuestions,
-    activeQuestionType
+    activeQuestionType,
+    examId // Truyền examId để lưu/khôi phục timer
   );
 
   const {
@@ -95,71 +105,129 @@ export default function ExamPage() {
     answerOrder,
     handleAnswerSelect,
     getAnswerOrder,
-    isAnswerSelected
-  } = useExamState();
+    isAnswerSelected,
+    clearSavedAnswers
+  } = useExamState(examId); // Truyền examId để lưu/khôi phục đáp án
 
   
   // === 6. CÁC HÀM VÀ useEffect GỐC CÒN GIỮ LẠI ===
 
-  // useEffect: Tải dữ liệu thi
+  // useEffect: Tải dữ liệu thi - Tối ưu với xử lý dữ liệu song song
   useEffect(() => {
+    const abortController = new AbortController();
+    
     const loadExamData = async () => {
       if (!examId) {
         navigate("/mock-exam-jlpt");
         return;
       }
-      setLoading(true);
-      const { data, error } = await getFullExamData(examId);
-      if (error) {
-        console.error("Error loading exam:", error);
-        alert("Không thể tải dữ liệu đề thi. Vui lòng thử lại!");
-        navigate(-1);
-        return;
-      }
-      setExamData(data);
-      const totalMinutesFromSections = Array.isArray(data?.sections)
-        ? data.sections.slice(0, 2).reduce((sum, section) => sum + (Number(section?.duration) || 0), 0)
-        : 0;
-      const totalSeconds = totalMinutesFromSections * 60;
-      setTotalTime(totalSeconds); 
-      const grouped = {};
-      data.sections.forEach((section) => {
-        section.question_types.forEach((qt) => {
-          if (!grouped[qt.id]) {
-            grouped[qt.id] = {
-              type: qt,
-              questions: [],
-              sectionType: section.type,
-              sectionId: section.id
-            };
-          }
-          qt.questions.forEach((q) => {
-            const existingQuestion = grouped[qt.id].questions.find(existing => existing.id === q.id);
-            if (!existingQuestion) {
-              grouped[qt.id].questions.push({
-                ...q,
-                sectionType: section.type,
-                sectionId: section.id,
-                questionTypeId: qt.id,
-                taskInstructions: qt.task_instructions,
-              });
-            }
-          });
-        });
-      });
-      setGroupedQuestions(grouped);
-      if (data.sections && data.sections.length > 0 && !userSelectedSectionRef.current) {
-        const firstSectionType = data.sections[0].type;
-        setActiveSection(firstSectionType);
-        activeSectionRef.current = firstSectionType;
-        const firstQuestionType = data.sections[0].question_types?.[0];
-        if (firstQuestionType) {
-          setActiveQuestionType(firstQuestionType.id);
+      
+      // Xóa đáp án của exam cũ nếu có (khi chuyển sang exam khác)
+      const previousExamId = localStorage.getItem('current_exam_id');
+      if (previousExamId && previousExamId !== examId) {
+        try {
+          localStorage.removeItem(`exam_answers_${previousExamId}`);
+          localStorage.removeItem(`exam_timer_${previousExamId}`);
+        } catch (error) {
+          console.error('Error clearing previous exam data:', error);
         }
       }
-      setLoading(false);
+      // Lưu examId hiện tại
+      localStorage.setItem('current_exam_id', examId);
+      
+      setLoading(true);
+      
+      try {
+        const { data, error } = await getFullExamData(examId);
+        
+        // Kiểm tra nếu request đã bị hủy
+        if (abortController.signal.aborted) {
+          return;
+        }
+        
+        if (error) {
+          // Không hiển thị lỗi nếu request bị hủy hoặc connection closed
+          if (error.includes('Connection closed') || error.includes('Client disconnected')) {
+            return;
+          }
+          console.error("Error loading exam:", error);
+          alert("Không thể tải dữ liệu đề thi. Vui lòng thử lại!");
+          navigate(-1);
+          return;
+        }
+        
+        // Set examData ngay để UI có thể render sớm hơn
+        setExamData(data);
+        
+        // Xử lý dữ liệu - tối ưu với Set để tránh duplicate
+        const nonListeningSections = data?.sections?.filter(section => section.is_listening === false) || [];
+        const totalMinutesFromSections = nonListeningSections.length > 0
+          ? nonListeningSections.reduce((sum, section) => sum + (Number(section?.duration) || 0), 0)
+          : 0;
+        const totalSeconds = totalMinutesFromSections * 60;
+        setTotalTime(totalSeconds); 
+        
+        // Tối ưu: Sử dụng Set để tránh duplicate questions nhanh hơn
+        const grouped = {};
+        const questionIdSet = new Set(); // Để tránh duplicate questions
+        
+        data.sections.forEach((section) => {
+          section.question_types.forEach((qt) => {
+            if (!grouped[qt.id]) {
+              grouped[qt.id] = {
+                type: qt,
+                questions: [],
+                sectionType: section.type,
+                sectionId: section.id
+              };
+            }
+            qt.questions.forEach((q) => {
+              const questionKey = `${qt.id}-${q.id}`;
+              if (!questionIdSet.has(questionKey)) {
+                questionIdSet.add(questionKey);
+                grouped[qt.id].questions.push({
+                  ...q,
+                  sectionType: section.type,
+                  sectionId: section.id,
+                  questionTypeId: qt.id,
+                  taskInstructions: qt.task_instructions,
+                });
+              }
+            });
+          });
+        });
+        
+        setGroupedQuestions(grouped);
+        
+        if (data.sections && data.sections.length > 0 && !userSelectedSectionRef.current) {
+          const firstSectionType = data.sections[0].type;
+          setActiveSection(firstSectionType);
+          activeSectionRef.current = firstSectionType;
+          const firstQuestionType = data.sections[0].question_types?.[0];
+          if (firstQuestionType) {
+            setActiveQuestionType(firstQuestionType.id);
+          }
+        }
+        
+        setLoading(false);
+      } catch (err) {
+        // Bỏ qua lỗi nếu request đã bị hủy
+        if (abortController.signal.aborted || err.name === 'AbortError') {
+          return;
+        }
+        console.error("Error loading exam:", err);
+        alert("Không thể tải dữ liệu đề thi. Vui lòng thử lại!");
+        navigate(-1);
+        setLoading(false);
+      }
     };
+    
     loadExamData();
+    
+    // Cleanup: Hủy request khi component unmount hoặc examId thay đổi
+    return () => {
+      abortController.abort();
+    };
   }, [examId, navigate]);
 
   // useEffect: Xử lý cuộn trang
@@ -219,16 +287,16 @@ export default function ExamPage() {
     return groupedQuestions[questionTypeId]?.type?.is_perforated_question === true;
   };
 
-  // Helper: Bật/tắt Popover câu hỏi perforated question
-  const togglePassageQuestion = (questionId) => {
+  // Helper: Bật/tắt Popover câu hỏi perforated question - useCallback để tránh re-render
+  const togglePassageQuestion = useCallback((questionId) => {
     setOpenPassageQuestions((prev) => ({
       ...prev,
       [questionId]: !prev[questionId]
     }));
-  };
+  }, []);
 
-  // Helper: Lấy các tab loại câu hỏi
-  const getQuestionTypeTabs = () => {
+  // Helper: Lấy các tab loại câu hỏi - Memoize để tránh tính toán lại
+  const questionTypeTabs = useMemo(() => {
     if (!activeSection || !examData) return [];
     const tabs = [];
     examData.sections.forEach((section) => {
@@ -245,8 +313,7 @@ export default function ExamPage() {
       }
     });
     return tabs;
-  };
-  const questionTypeTabs = getQuestionTypeTabs();
+  }, [activeSection, examData]);
   
   // Hàm render Popover câu hỏi
   const renderPassageQuestionPopover = (q) => {
@@ -264,17 +331,23 @@ export default function ExamPage() {
                 (a, b) => Number(a.show_order) - Number(b.show_order)
               );
               return normalizedAnswers.map((ans) => {
-                const selected = isAnswerSelected(q.id, ans.id, q.question_type_id);
+                const sortQuestion = isSortQuestion(q.question_type_id);
+                const selected = isAnswerSelected(q.id, ans.id, q.question_type_id, sortQuestion);
                 return (
                   <button
                     key={ans.id}
                     type="button"
-                    onClick={() => handleAnswerSelect(q.id, ans.id, q.question_type_id)}
+                    onClick={() => handleAnswerSelect(q.id, ans.id, q.question_type_id, sortQuestion)}
                     className={`text-left w-full px-3 py-2.5 transition-colors ${selected ? 'bg-[#DDE5FF]' : 'bg-white hover:bg-gray-50'}`}
                   >
                     <div className="flex items-start text-gray-900 leading-6">
                       <span className="whitespace-pre-wrap break-words">
-                        {formatAnswerText(ans?.answer_text || ans?.content || '', q?.question_text || '', q?.questionTypeId || q?.question_type_id)}
+                        {formatAnswerText(
+                          ans?.answer_text || ans?.content || '', 
+                          q?.question_text || '', 
+                          q?.questionTypeId || q?.question_type_id,
+                          groupedQuestions[q?.questionTypeId || q?.question_type_id]?.type?.is_correct_usage === true
+                        )}
                       </span>
                     </div>
                   </button>
@@ -289,8 +362,9 @@ export default function ExamPage() {
   
   // === 8. CẬP NHẬT CÁC HÀM HANDLER ===
 
-  // Hàm: Đổi Section
-  const handleSectionChange = (sectionType, questionTypeId = null) => {
+  // Hàm: Đổi Section - useCallback để tránh re-render
+  // Định nghĩa trước handleQuestionTypeChange vì handleQuestionTypeChange cần sử dụng nó
+  const handleSectionChange = useCallback((sectionType, questionTypeId = null) => {
     if (!examData) return;
     
     const newSection = examData.sections.find(s => s.type === sectionType);
@@ -344,10 +418,10 @@ export default function ExamPage() {
       setCurrentQuestionPage(0);
       resetQuestionToast(); 
     }
-  };
+  }, [examData, activeQuestionType, resetQuestionToast]);
 
-  // Hàm: Đổi Loại câu hỏi
-  const handleQuestionTypeChange = (questionTypeId) => {
+  // Hàm: Đổi Loại câu hỏi - useCallback để tránh re-render
+  const handleQuestionTypeChange = useCallback((questionTypeId) => {
     if (!examData) return;
     
     const targetSection = examData.sections.find(section => 
@@ -370,11 +444,37 @@ export default function ExamPage() {
         [activeSection]: prev[activeSection] === questionTypeId ? null : questionTypeId
       }));
       
-      setCurrentQuestionPage(0);
-      setCurrentQuestionIndex(0);
+      // Kiểm tra và reset index nếu vượt quá số lượng câu hỏi của question type mới
+      const newQuestions = groupedQuestions[questionTypeId]?.questions || [];
+      const uniqueNewQuestions = newQuestions.filter((question, index, self) => 
+        index === self.findIndex(q => q.id === question.id)
+      );
+      
+      if (uniqueNewQuestions.length > 0) {
+        const shouldUsePaginationNew = 
+          groupedQuestions[questionTypeId]?.type?.duration &&
+          (uniqueNewQuestions[0].passage || uniqueNewQuestions[0].jlpt_question_passages);
+        
+        if (shouldUsePaginationNew) {
+          // Nếu dùng pagination, reset về page 0 nếu page hiện tại vượt quá
+          if (currentQuestionPage >= uniqueNewQuestions.length) {
+            setCurrentQuestionPage(0);
+          }
+        } else {
+          // Nếu không dùng pagination, reset về index 0 nếu index hiện tại vượt quá
+          if (currentQuestionIndex >= uniqueNewQuestions.length) {
+            setCurrentQuestionIndex(0);
+          }
+        }
+      } else {
+        // Nếu không có câu hỏi, reset về 0
+        setCurrentQuestionPage(0);
+        setCurrentQuestionIndex(0);
+      }
+      
       resetQuestionToast(); 
     }
-  };
+  }, [examData, activeSection, groupedQuestions, currentQuestionPage, currentQuestionIndex, resetQuestionToast, handleSectionChange]);
 
   // Component: Thanh thời gian
   const TimerProgressBar = () => { 
@@ -411,8 +511,8 @@ export default function ExamPage() {
     return { backgroundColor: '#66D575', textColor: '#00620D', iconColor: '#006C0F' };
   };
 
-  // Hàm: Nộp bài
-  const handleSubmitExam = async () => {
+  // Hàm: Nộp bài - useCallback để tránh re-render
+  const handleSubmitExam = useCallback(async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     stopGlobalTimer(); 
@@ -431,29 +531,63 @@ export default function ExamPage() {
     });
     const submissionData = { duration: duration_taken, answers: answersList };
     console.log("Đang nộp bài...", submissionData);
-    const { data: resultData, error } = await submitExam(examId, submissionData);
-    setIsSubmitting(false);
-    if (error) {
-      console.error("Lỗi khi nộp bài:", error);
-      alert(`Nộp bài thất bại: ${error}`);
-    } else {
+    
+    try {
+      const { data: resultData, error } = await submitExam(examId, submissionData);
+      
+      if (error) {
+        console.error("Lỗi khi nộp bài:", error);
+        alert(`Nộp bài thất bại: ${error}`);
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (!resultData) {
+        console.error("Không nhận được dữ liệu từ server");
+        alert("Nộp bài thất bại: Không nhận được phản hồi từ server");
+        setIsSubmitting(false);
+        return;
+      }
+      
       console.log("Nộp bài thành công, kết quả:", resultData);
-      // setFinalResultData(resultData); // <-- ĐÃ XÓA
-      // Lưu exam_result_id vào localStorage để listening page sử dụng
-      localStorage.setItem('exam_result_id', resultData.id);
-      // Chuyển sang trang ListeningIntro thay vì hiển thị overlay
-      navigate(`/listening-intro?examId=${examId}`);
+      
+      // Kiểm tra exam_result_id (có thể là id hoặc exam_result_id)
+      const examResultId = resultData.id || resultData.exam_result_id;
+      if (!examResultId) {
+        console.error("Không tìm thấy exam_result_id trong response:", resultData);
+        alert("Nộp bài thất bại: Không tìm thấy ID kết quả");
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Lưu kết quả và exam_result_id
+      setFinalResultData(resultData);
+      clearSavedAnswers();
+      localStorage.setItem('exam_result_id', String(examResultId));
+      
+      // Chuyển sang trang ListeningIntro
+      setIsSubmitting(false);
+      navigate(`/listening-intro?examId=${examId}`, { replace: true });
+    } catch (err) {
+      console.error("Lỗi không mong đợi khi nộp bài:", err);
+      alert(`Nộp bài thất bại: ${err.message || 'Lỗi không xác định'}`);
+      setIsSubmitting(false);
     }
-  };
+  }, [isSubmitting, totalTime, timeRemaining, studentAnswers, examId, stopGlobalTimer, stopQuestionTimer, navigate, clearSavedAnswers]);
 
   // === PHẦN JSX (RETURN) ===
 
+  // Loading skeleton component để cải thiện UX
+  const LoadingSkeleton = () => (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#E9EFFC]">
+      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#4169E1] mb-4"></div>
+      <div className="text-2xl font-bold text-[#0B1320]">Đang tải đề thi...</div>
+      <div className="text-sm text-gray-600 mt-2">Vui lòng đợi trong giây lát</div>
+    </div>
+  );
+
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#E9EFFC]">
-        <div className="text-2xl font-bold text-[#0B1320]">Đang tải đề thi...</div>
-      </div>
-    );
+    return <LoadingSkeleton />;
   }
 
   if (isSubmitting) { 
@@ -477,7 +611,9 @@ export default function ExamPage() {
       <div 
         className={`transition-transform duration-300 ${hideHeader ? '-translate-y-full' : 'translate-y-0'}`}
       >
-      <Navbar />
+      <Suspense fallback={<div className="h-16 bg-white"></div>}>
+        <Navbar />
+      </Suspense>
       </div>
 
       {/* Sticky Header (Đã tách component) */}
@@ -597,7 +733,7 @@ export default function ExamPage() {
                   {groupedQuestions[activeQuestionType].type.passages.map((passage, passageIndex) => (
                     <div key={passageIndex}>
                       {passage.content && (
-                        <div className="whitespace-pre-line text-lg md:text-xl">
+                        <div className="whitespace-pre-line text-lg md:text-xl font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                           {renderPassageContent(passage.content, { 
                             questions: groupedQuestions[activeQuestionType]?.questions || [], 
                             questionTypeId: activeQuestionType,
@@ -635,7 +771,7 @@ export default function ExamPage() {
                     {/* ... (Code render câu hỏi phân trang giữ nguyên) ... */}
                     {currentQuestion.passage && (
                       <div className="mb-6 p-6 bg-gray-50 rounded-lg">
-                        <div className="text-lg md:text-xl leading-relaxed text-gray-800">
+                        <div className="text-lg md:text-xl leading-relaxed text-gray-800 font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                           {renderFramedPassageBlocks(
                             currentQuestion.passage,
                             (questionTimeRemaining[currentQuestion?.id] !== undefined && questionTimeRemaining[currentQuestion?.id] <= 0)
@@ -649,7 +785,7 @@ export default function ExamPage() {
                           {currentQuestion.jlpt_question_passages.map((passage, passageIndex) => (
                             <div key={passageIndex}>
                               {passage.content && (
-                                <div className="whitespace-pre-line text-lg md:text-xl">
+                                <div className="whitespace-pre-line text-lg md:text-xl font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                                   {renderPassageContent(passage.content, { questions: filteredQuestions, questionTypeId: activeQuestionType })}
                                 </div>
                               )}
@@ -718,7 +854,8 @@ export default function ExamPage() {
                               }
                               return true;
                             }).map((answer) => {
-                              const isSelected = isAnswerSelected(currentQuestion.id, answer.id, currentQuestion.questionTypeId);
+                              const sortQuestion = isSortQuestion(currentQuestion.questionTypeId);
+                              const isSelected = isAnswerSelected(currentQuestion.id, answer.id, currentQuestion.questionTypeId, sortQuestion);
                               const orderNumber = getAnswerOrder(currentQuestion.id, answer.id);
                               
                               return (
@@ -735,7 +872,7 @@ export default function ExamPage() {
                                     name={`question-${currentQuestion.id}`}
                                     value={answer.id}
                                     checked={isSelected}
-                                    onChange={() => handleAnswerSelect(currentQuestion.id, answer.id, currentQuestion.questionTypeId)}
+                                    onChange={() => handleAnswerSelect(currentQuestion.id, answer.id, currentQuestion.questionTypeId, sortQuestion)}
                                     className="hidden"
                                   />
                                   <span
@@ -750,7 +887,12 @@ export default function ExamPage() {
                                     />
                                   </span>
                                   <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
-                                    {formatAnswerText(answer.answer_text, currentQuestion.question_text, currentQuestion.questionTypeId)}
+                                    {formatAnswerText(
+                                      answer.answer_text, 
+                                      currentQuestion.question_text, 
+                                      currentQuestion.questionTypeId,
+                                      groupedQuestions[currentQuestion.questionTypeId]?.type?.is_correct_usage === true
+                                    )}
                                   </span>
                                 </label>
                               );
@@ -773,7 +915,7 @@ export default function ExamPage() {
                     {/* ... (Code render toàn bộ câu hỏi giữ nguyên) ... */}
                     {question.passage && (
                       <div className="mb-6 p-6 bg-gray-50 rounded-lg">
-                        <div className="text-lg md:text-xl leading-relaxed text-gray-800">
+                        <div className="text-lg md:text-xl leading-relaxed text-gray-800 font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                           {renderFramedPassageBlocks(
                             question.passage,
                             (questionTimeRemaining[question?.id] !== undefined && questionTimeRemaining[question?.id] <= 0)
@@ -787,7 +929,7 @@ export default function ExamPage() {
                           {question.jlpt_question_passages.map((passage, passageIndex) => (
                             <div key={passageIndex}>
                               {passage.content && (
-                                <div className="whitespace-pre-line text-lg md:text-xl">
+                                <div className="whitespace-pre-line text-lg md:text-xl font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                                   {renderPassageContent(passage.content, { questions: groupedQuestions[activeQuestionType]?.questions || [], questionTypeId: activeQuestionType })}
                                 </div>
                               )}
@@ -855,7 +997,7 @@ export default function ExamPage() {
                                   <div
                                     key={answerId}
                                     className="flex items-center gap-2 bg-white px-4 py-3 rounded-lg border-2 border-[#874FFF] cursor-pointer hover:bg-purple-50 transition-all"
-                                    onClick={() => handleAnswerSelect(question.id, answerId, question.questionTypeId)}
+                                    onClick={() => handleAnswerSelect(question.id, answerId, question.questionTypeId, true)}
                                   >
                                     <span className="w-8 h-8 bg-[#874FFF] text-white rounded-full flex items-center justify-center font-bold text-sm">
                                       {index + 1}
@@ -895,7 +1037,8 @@ export default function ExamPage() {
                               }
                               return true;
                             }).map((answer) => {
-                              const isSelected = isAnswerSelected(question.id, answer.id, question.questionTypeId);
+                              const sortQuestion = isSortQuestion(question.questionTypeId);
+                              const isSelected = isAnswerSelected(question.id, answer.id, question.questionTypeId, sortQuestion);
                               const orderNumber = getAnswerOrder(question.id, answer.id);
                               
                               return (
@@ -904,23 +1047,23 @@ export default function ExamPage() {
                                   className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all ${
                                     activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4
                                       ? "flex-row"
-                                      : isSortQuestion(question.questionTypeId)
+                                      : sortQuestion
                                       ? "flex-row"
                                       : "flex-row"
                                   } ${
                                     isSelected
-                                      ? isSortQuestion(question.questionTypeId)
+                                      ? sortQuestion
                                         ? "border-[#874FFF] bg-purple-50 opacity-60"
                                         : "border-[#874FFF] bg-purple-50"
                                       : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50"
                                   }`}
                                 >
                                   <input
-                                    type={isSortQuestion(question.questionTypeId) ? "checkbox" : "radio"}
+                                    type={sortQuestion ? "checkbox" : "radio"}
                                     name={`question-${question.id}`}
                                     value={answer.id}
                                     checked={isSelected}
-                                    onChange={() => handleAnswerSelect(question.id, answer.id, question.questionTypeId)}
+                                    onChange={() => handleAnswerSelect(question.id, answer.id, question.questionTypeId, sortQuestion)}
                                     className="hidden"
                                   />
                                   {isSortQuestion(question.questionTypeId) ? (
@@ -941,7 +1084,12 @@ export default function ExamPage() {
                                     </span>
                                   )}
                                   <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
-                                    {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
+                                    {formatAnswerText(
+                                      answer.answer_text, 
+                                      question.question_text, 
+                                      question.questionTypeId,
+                                      groupedQuestions[question.questionTypeId]?.type?.is_correct_usage === true
+                                    )}
                                   </span>
                                   {isSortQuestion(question.questionTypeId) && (
                                     <span className="ml-auto text-xs text-gray-500" style={{fontFamily: "Nunito"}}>(Click để chọn)</span>
@@ -961,18 +1109,24 @@ export default function ExamPage() {
         </div>
       </main>
 
-      <Footer />
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
 
       {/* === COMPONENT OVERLAY === */}
-      <TimeUpModal
-        show={showReadingTimeUpModal} 
-        onClose={() => setShowReadingTimeUpModal(false)} 
-        onAction={() => {
-          setShowReadingTimeUpModal(false);
-          // (Logic nộp bài đã xử lý, chỉ cần chuyển trang)
-          navigate(`/listening-intro?examId=${examId}`); 
-        }}
-      />
+      {showReadingTimeUpModal && (
+        <Suspense fallback={null}>
+          <TimeUpModal
+            show={showReadingTimeUpModal} 
+            onClose={() => setShowReadingTimeUpModal(false)} 
+            onAction={() => {
+              setShowReadingTimeUpModal(false);
+              handleSubmitExam();
+            }}
+            bothButtonsSubmit={true}
+          />
+        </Suspense>
+      )}
       
       {/* Toast notifications */}
       <Toaster 

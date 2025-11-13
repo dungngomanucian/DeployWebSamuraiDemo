@@ -42,12 +42,11 @@ class ExamService:
             
             exam_data = response.data
             
-            # Get first 3 sections to calculate durations for intro pages
+            # Get sections to calculate durations for intro pages (include is_listening for filtering)
             sections_response = supabase.table('jlpt_exam_sections')\
-                .select('id, duration, position')\
+                .select('id, duration, position, is_listening, type')\
                 .eq('exam_id', exam_id)\
                 .order('position')\
-                .limit(3)\
                 .execute()
             
             # Add sections to exam data
@@ -197,55 +196,161 @@ class ExamService:
     
     @staticmethod
     def get_full_exam_data(exam_id: str) -> Dict:
-        """Get complete exam data including sections, questions, and answers"""
+        """
+        Get complete exam data including sections, questions, and answers
+        OPTIMIZED: Uses batch queries instead of N+1 queries for better performance
+        """
         try:
             # 1. Get exam info
             exam_result = ExamService.get_exam_by_id(exam_id)
             if not exam_result['success']:
                 return exam_result
             
-            # 2. Get sections
+            # 2. Get all sections for this exam
             sections_result = ExamService.get_exam_sections(exam_id)
             if not sections_result['success']:
                 return sections_result
             
-            sections_with_data = []
+            sections_data = sections_result['data']
+            if not sections_data:
+                return {
+                    'success': True,
+                    'data': {
+                        'exam': exam_result['data'],
+                        'sections': []
+                    }
+                }
             
-            # 3. Get question types for each section
-            for section in sections_result['data']:
-                qt_result = ExamService.get_question_types(section['id'])
-                if not qt_result['success']:
-                    continue
-                
-                question_types_with_data = []
-                
-                # 4. Get questions for each question type
-                for qt in qt_result['data']:
-                    # Attach passages only for specific question type QT008
-                    try:
-                        if qt.get('id') == 'QT008':
+            # 3. Get ALL question types for ALL sections in ONE query (batch)
+            section_ids = [s['id'] for s in sections_data]
+            try:
+                all_question_types_response = supabase.table('jlpt_question_types')\
+                    .select('*, question_guides:jlpt_question_guides(id, name)')\
+                    .in_('exam_section_id', section_ids)\
+                    .order('id')\
+                    .execute()
+                all_question_types = all_question_types_response.data if all_question_types_response.data else []
+            except Exception as e:
+                print(f"Error fetching question types: {str(e)}")
+                all_question_types = []
+            
+            # Group question types by section_id
+            question_types_by_section = {}
+            for qt in all_question_types:
+                section_id = qt.get('exam_section_id')
+                if section_id not in question_types_by_section:
+                    question_types_by_section[section_id] = []
+                question_types_by_section[section_id].append(qt)
+            
+            # 4. Get ALL questions for ALL question types in ONE query (batch)
+            question_type_ids = [qt['id'] for qt in all_question_types]
+            all_questions = []
+            all_passages_map = {}
+            
+            if question_type_ids:
+                try:
+                    # Get all questions
+                    all_questions_response = supabase.table('jlpt_questions')\
+                        .select('*')\
+                        .in_('question_type_id', question_type_ids)\
+                        .is_('deleted_at', 'null')\
+                        .order('position')\
+                        .execute()
+                    all_questions = all_questions_response.data if all_questions_response.data else []
+                    
+                    # Get ALL passages for ALL question types (không chỉ perforated)
+                    # Vì có thể có passages cho các question types khác
+                    if question_type_ids:
+                        try:
                             passages_response = supabase.table('jlpt_question_passages')\
                                 .select('id, question_type_id, content, underline_text')\
-                                .eq('question_type_id', qt['id'])\
+                                .in_('question_type_id', question_type_ids)\
                                 .execute()
-                            qt['passages'] = passages_response.data
-                    except Exception:
-                        # If passages query fails, keep proceeding without blocking
-                        qt['passages'] = []
-
-                    q_result = ExamService.get_questions(qt['id'])
-                    if not q_result['success']:
-                        continue
+                            if passages_response.data:
+                                # Group passages by question_type_id
+                                for passage in passages_response.data:
+                                    qt_id = passage.get('question_type_id')
+                                    if qt_id not in all_passages_map:
+                                        all_passages_map[qt_id] = []
+                                    all_passages_map[qt_id].append(passage)
+                        except Exception as e:
+                            print(f"Error fetching passages: {str(e)}")
+                except Exception as e:
+                    print(f"Error fetching questions: {str(e)}")
+            
+            # Tạo map passages theo ID để tra cứu nhanh
+            passages_by_id = {}
+            for qt_id, passages in all_passages_map.items():
+                for passage in passages:
+                    passages_by_id[passage['id']] = passage
+            
+            # Group questions by question_type_id
+            questions_by_question_type = {}
+            for question in all_questions:
+                qt_id = question.get('question_type_id')
+                if qt_id not in questions_by_question_type:
+                    questions_by_question_type[qt_id] = []
+                
+                # Attach passage to question if exists
+                passage_id = question.get('question_passages_id')
+                if passage_id and passage_id in passages_by_id:
+                    question['jlpt_question_passages'] = [passages_by_id[passage_id]]
+                else:
+                    question['jlpt_question_passages'] = None
+                
+                questions_by_question_type[qt_id].append(question)
+            
+            # 5. Get ALL answers for ALL questions in ONE query (batch)
+            question_ids = [q['id'] for q in all_questions]
+            all_answers = []
+            
+            if question_ids:
+                try:
+                    all_answers_response = supabase.table('jlpt_answers')\
+                        .select('*')\
+                        .in_('question_id', question_ids)\
+                        .is_('deleted_at', 'null')\
+                        .order('show_order')\
+                        .execute()
+                    all_answers = all_answers_response.data if all_answers_response.data else []
+                except Exception as e:
+                    print(f"Error fetching answers: {str(e)}")
+            
+            # Group answers by question_id and remove duplicates
+            answers_by_question = {}
+            seen_answer_ids = set()
+            for answer in all_answers:
+                answer_id = answer['id']
+                if answer_id in seen_answer_ids:
+                    continue
+                seen_answer_ids.add(answer_id)
+                
+                question_id = answer.get('question_id')
+                if question_id not in answers_by_question:
+                    answers_by_question[question_id] = []
+                answers_by_question[question_id].append(answer)
+            
+            # 6. Build the nested structure
+            sections_with_data = []
+            for section in sections_data:
+                section_id = section['id']
+                question_types_for_section = question_types_by_section.get(section_id, [])
+                
+                question_types_with_data = []
+                for qt in question_types_for_section:
+                    qt_id = qt['id']
                     
+                    # Attach passages for question type (có thể có passages cho cả non-perforated)
+                    qt['passages'] = all_passages_map.get(qt_id, [])
+                    
+                    # Attach questions
+                    questions_for_qt = questions_by_question_type.get(qt_id, [])
                     questions_with_answers = []
                     
-                    # 5. Get answers for each question
-                    for question in q_result['data']:
-                        a_result = ExamService.get_answers(question['id'])
-                        if a_result['success']:
-                            question['answers'] = a_result['data']
-                        else:
-                            question['answers'] = []
+                    for question in questions_for_qt:
+                        question_id = question['id']
+                        # Attach answers
+                        question['answers'] = answers_by_question.get(question_id, [])
                         questions_with_answers.append(question)
                     
                     qt['questions'] = questions_with_answers
@@ -262,6 +367,7 @@ class ExamService:
                 }
             }
         except Exception as e:
+            print(f"Error in get_full_exam_data: {str(e)}")
             return {
                 'success': False,
                 'error': str(e)

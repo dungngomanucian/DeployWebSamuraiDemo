@@ -28,7 +28,13 @@ export default function ExamHeader({
   setCurrentQuestionPage,
 
   // === Component Props ===
-  TimerProgressBarComponent, 
+  TimerProgressBarComponent, // Nhận component TimerProgressBar từ cha
+  
+  // === Props tùy chỉnh cho ListeningPage ===
+  showSectionTabs = true, // Ẩn/hiện section tabs
+  titleInFirstRow = false, // Hiển thị title ở hàng đầu
+  stickyBackButton = false, // Hiển thị nút Quay lại trong sticky header
+  autoSubmitCountdownDisplay = null,
 }) {
   const navigate = useNavigate();
 
@@ -42,101 +48,149 @@ export default function ExamHeader({
       <div className={`flex items-center justify-between gap-4 ${isSticky ? 'mb-4' : ''}`}>
         {isSticky ? (
           <>
-            {/* 1. HIỂN THỊ CÓ ĐIỀU KIỆN */}
-            {!isReviewMode && TimerProgressBarComponent && <TimerProgressBarComponent />}
-            
-            {/* Nút quay lại (chỉ cho Review mode bản sticky) */}
-            {isReviewMode && (
+            {/* 1. Nút Quay lại hoặc Progress Bar (Bản Sticky) */}
+            {stickyBackButton ? (
               <button
+                type="button"
                 style={{ fontFamily: "Nunito" }}
-                onClick={() => navigate(-1)}
-                className="px-4 h-8 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-semibold hover:bg-[#5427B4] hover:text-white transition-all text-sm w-24 justify-center flex items-center"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(-1);
+                }}
+                className="px-4 h-8 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-semibold hover:bg-[#5427B4] hover:text-white transition-all text-sm flex items-center"
               >
                 Quay lại
               </button>
+            ) : (
+              TimerProgressBarComponent && <TimerProgressBarComponent />
             )}
-
-            {/* 2. Section Tabs (Bản Sticky) */}
-            <div className="flex items-center justify-center gap-2 flex-1">
-              {examData?.sections?.map((section) => (
-                <button
-                  style={{ fontFamily: "UD Digi Kyokasho N-R" }}
-                  key={section.type}
-                  onClick={() => onSectionChange(section.type)}
-                  className={`h-8 px-3 rounded-lg text-sm font-medium border transition-all cursor-pointer flex items-center ${
-                    section.type === activeSection
-                      ? "bg-[#4169E1] text-white border-[#4169E1]"
-                      : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
-                  }`}
-                >
-                  {section.type}
-                </button>
-              ))}
-            </div>
             
-            {/* 3. HIỂN THỊ CÓ ĐIỀU KIỆN */}
-            {!isReviewMode ? (
+            {/* 2. Timer ở giữa (nếu có stickyBackButton) hoặc Section Tabs */}
+            {stickyBackButton ? (
+              <div className="flex-1 flex justify-center">
+                {TimerProgressBarComponent && <TimerProgressBarComponent />}
+              </div>
+            ) : showSectionTabs ? (
+              <div className="flex items-center justify-center gap-2 flex-1">
+                {examData?.sections?.map((section) => (
+                  <button
+                    type="button"
+                    style={{ fontFamily: "UD Digi Kyokasho N-R" }}
+                    key={section.type}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onSectionChange(section.type);
+                    }}
+                    className={`h-8 px-3 rounded-lg text-sm font-medium border transition-all cursor-pointer flex items-center ${
+                      section.type === activeSection
+                        ? "bg-[#4169E1] text-white border-[#4169E1]"
+                        : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
+                    }`}
+                  >
+                    {section.type}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            
+            {/* 3. Submit Button (Bản Sticky) */}
+            <div className="flex items-center gap-3">
+              {autoSubmitCountdownDisplay && (
+                <span
+                  className="text-sm font-semibold text-red-500 whitespace-nowrap"
+                  style={{ fontFamily: 'Nunito' }}
+                >
+                  Tự động nộp sau {autoSubmitCountdownDisplay}
+                </span>
+              )}
               <button
-                onClick={onSubmitExam}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onSubmitExam();
+                }}
                 disabled={isSubmitting}
-                className="w-24 px-4 h-8 rounded-lg border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all text-sm flex items-center justify-center"
+                className="px-4 h-8 rounded-lg border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all text-sm flex items-center"
               >
                 {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
               </button>
-            ) : (
-              <div className="w-24"></div> // Giữ layout cho cân bằng
-            )}
+            </div>
           </>
         ) : (
           <>
             {/* 1. Nút Quay lại (Bản Thường) */}
             <button
+              type="button"
               style={{ fontFamily: "Nunito" }}
-              onClick={() => navigate(-1)}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate(-1);
+              }}
               className="px-4 py-2 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-extrabold hover:bg-[#5427B4] hover:text-white transition-all"
             >
               Quay lại
             </button>
 
-            {/* 2. Section Tabs (Bản Thường) */}
-            <div className="hidden md:flex items-center gap-2">
-              {examData?.sections?.map((section) => (
-                <button
-                  style={{ fontFamily: "UD Digi Kyokasho N-R" }}
-                  key={section.type}
-                  onClick={() => onSectionChange(section.type)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all cursor-pointer ${
-                    section.type === activeSection
-                      ? "bg-[#4169E1] text-white border-[#4169E1]"
-                      : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
-                  }`}
-                >
-                  {section.type}
-                </button>
-              ))}
-            </div>
-
-            {/* 3. HIỂN THỊ CÓ ĐIỀU KIỆN */}
-            {!isReviewMode ? (
-              <div className="flex items-center gap-3">
-                <button
-                  style={{ fontFamily: "Nunito", font: Bold }}
-                  onClick={onSubmitExam}
-                  disabled={isSubmitting}
-                  className="px-5 py-2.5 rounded-lg border-2 border-red-500 text-red-500 font-extrabold hover:bg-red-500 hover:text-white transition-all"
-                >
-                  {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-                </button>
+            {/* 2. Section Tabs hoặc Title (Bản Thường) */}
+            {titleInFirstRow ? (
+              <div className="flex-1 flex items-center justify-center">
+                <h1 className="text-3xl md:text-4xl font-extrabold text-[#3563E9] leading-tight">
+                  言語知識 {activeSection}
+                </h1>
               </div>
-            ) : (
-              <div className="w-32"></div> // Giữ layout
-            )}
+            ) : showSectionTabs ? (
+              <div className="hidden md:flex items-center gap-2">
+                {examData?.sections?.map((section) => (
+                  <button
+                    type="button"
+                    style={{ fontFamily: "UD Digi Kyokasho N-R" }}
+                    key={section.type}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onSectionChange(section.type);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all cursor-pointer ${
+                      section.type === activeSection
+                        ? "bg-[#4169E1] text-white border-[#4169E1]"
+                        : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
+                    }`}
+                  >
+                    {section.type}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {/* 3. Submit Button (Bản Thường) */}
+            <div className="flex items-center gap-3">
+              {autoSubmitCountdownDisplay && (
+                <span
+                  className="text-sm font-semibold text-red-500 whitespace-nowrap"
+                  style={{ fontFamily: 'Nunito' }}
+                >
+                  Tự động nộp sau {autoSubmitCountdownDisplay}
+                </span>
+              )}
+              <button
+                type="button"
+                style={{ fontFamily: "Nunito", font: Bold }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onSubmitExam();
+                }}
+                disabled={isSubmitting}
+                className="px-5 py-2.5 rounded-lg border-2 border-red-500 text-red-500 font-extrabold hover:bg-red-500 hover:text-white transition-all"
+              >
+                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
+              </button>
+            </div>
           </>
         )}
       </div>
 
-      {/* HÀNG 2: Tiêu đề (Chỉ cho bản Thường) */}
-      {!isSticky && (
+      {/* HÀNG 2: Tiêu đề (Chỉ cho bản Thường và khi không ở hàng đầu)
+      */}
+      {!isSticky && !titleInFirstRow && (
         <div className="mt-4 flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-3xl md:text-4xl font-extrabold text-[#3563E9] leading-tight">

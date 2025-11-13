@@ -56,9 +56,10 @@ export default function ExamIntro() {
     );
   }
 
-  // Tính tổng thời gian từ 2 sections đầu tiên (KHÔNG dùng total_duration từ jlpt_exams)
-  const totalDurationFromSections = examData.sections && examData.sections.length > 0
-    ? examData.sections.slice(0, 2).reduce((sum, section) => sum + (section.duration || 0), 0)
+  // Tính tổng thời gian từ các sections KHÔNG phải Listening (is_listening = false)
+  const nonListeningSections = examData.sections?.filter(section => section.is_listening === false) || [];
+  const totalDurationFromSections = nonListeningSections.length > 0
+    ? nonListeningSections.reduce((sum, section) => sum + (section.duration || 0), 0)
     : 0;
 
   return (

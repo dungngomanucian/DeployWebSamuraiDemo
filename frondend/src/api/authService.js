@@ -8,19 +8,21 @@ const AUTH_BASE_ENDPOINT = '/student/login';
 
 /**
  * Đăng nhập học sinh/sinh viên
- * @param {string} email - Email của người dùng
+ * @param {string} studentId - Mã học viên (optional)
+ * @param {string} email - Email của người dùng (optional)
  * @param {string} password - Mật khẩu
  * @param {boolean} rememberMe - Trạng thái 'ghi nhớ đăng nhập'
  * @returns {Promise<{data: any, error: string | null}>} - Đối tượng kết quả
  */
-export const userlogin = async (email, password, rememberMe = false) => {
+export const userlogin = async (studentId, email, password, rememberMe = false) => {
     // Tên endpoint đăng nhập cụ thể (ví dụ: /auth/login/). 
     // Chúng ta dùng /login/ để gọi tới 'http://.../api/v1/auth/login/'
     const endpoint = `${AUTH_BASE_ENDPOINT}/userlogin/`; 
 
     // Chuẩn bị dữ liệu gửi lên
     const resultData = {
-        email: email,
+        student_id: studentId || null,
+        email: email || null,
         password: password,
         remember_me: rememberMe // Tên trường thường dùng trong backend (snake_case)
     };

@@ -15,45 +15,124 @@ export const useExamTimers = (
   isExamDataLoaded,
   currentQuestion,
   groupedQuestions,
-  activeQuestionType
+  activeQuestionType,
+  examId = null // Thêm examId để lưu/khôi phục timer
 ) => {
   // === 1. Timer Tổng (Global Timer) ===
   const [timeRemaining, setTimeRemaining] = useState(totalExamSeconds);
   const [showReadingTimeUpModal, setShowReadingTimeUpModal] = useState(false);
   const timerRef = useRef(null);
+  const startTimeRef = useRef(null);
+  const hasInitializedRef = useRef(false);
 
-  // Khởi tạo timer tổng khi dữ liệu sẵn sàng
+  // Khởi tạo timer tổng khi dữ liệu sẵn sàng - với khôi phục từ localStorage
   useEffect(() => {
-    // Chỉ set khi totalExamSeconds > 0 và timeRemaining chưa được set
-    if (isExamDataLoaded && totalExamSeconds > 0 && timeRemaining === 0) {
-      setTimeRemaining(totalExamSeconds);
+    if (!isExamDataLoaded || totalExamSeconds <= 0 || hasInitializedRef.current) {
+      return;
     }
-  }, [isExamDataLoaded, totalExamSeconds]); // Tách riêng logic set time
+
+    hasInitializedRef.current = true;
+
+    // Thử khôi phục timer từ localStorage
+    if (examId) {
+      const storageKey = `exam_timer_${examId}`;
+      const savedData = localStorage.getItem(storageKey);
+      
+      if (savedData) {
+        try {
+          const { startTime, totalTime } = JSON.parse(savedData);
+          const now = Date.now();
+          const elapsedSeconds = Math.floor((now - startTime) / 1000);
+          const remaining = Math.max(0, totalTime - elapsedSeconds);
+          
+          // Chỉ khôi phục nếu timer chưa hết (còn ít nhất 1 giây)
+          if (remaining > 0 && elapsedSeconds < totalTime) {
+            setTimeRemaining(remaining);
+            startTimeRef.current = startTime;
+            return;
+          } else {
+            // Timer đã hết, xóa dữ liệu đã lưu
+            localStorage.removeItem(storageKey);
+          }
+        } catch (error) {
+          console.error('Error parsing saved timer:', error);
+          localStorage.removeItem(storageKey);
+        }
+      }
+    }
+
+    // Nếu không có dữ liệu đã lưu, khởi tạo timer mới
+    setTimeRemaining(totalExamSeconds);
+    const now = Date.now();
+    startTimeRef.current = now;
+    
+    // Lưu startTime vào localStorage
+    if (examId) {
+      const storageKey = `exam_timer_${examId}`;
+      localStorage.setItem(storageKey, JSON.stringify({
+        startTime: now,
+        totalTime: totalExamSeconds
+      }));
+    }
+  }, [isExamDataLoaded, totalExamSeconds, examId]);
 
   // Chạy đồng hồ đếm ngược tổng
   useEffect(() => {
     // Chỉ chạy khi đã load xong và có thời gian
-    if (!isExamDataLoaded || timeRemaining <= 0) {
-      // Đảm bảo dừng timer nếu timeRemaining bị set về 0 từ bên ngoài
+    if (!isExamDataLoaded || !startTimeRef.current) {
+      // Đảm bảo dừng timer nếu không có startTime
       if (timerRef.current) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
       return;
     }
 
-    timerRef.current = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          setShowReadingTimeUpModal(true); // Hiển thị modal hết giờ
-          return 0;
+    // Cập nhật timer dựa trên thời gian thực tế đã trôi qua
+    const updateTimer = () => {
+      if (!startTimeRef.current) return;
+      
+      const now = Date.now();
+      const elapsedSeconds = Math.floor((now - startTimeRef.current) / 1000);
+      const remaining = Math.max(0, totalExamSeconds - elapsedSeconds);
+      
+      if (remaining <= 0) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+        setTimeRemaining(0);
+        setShowReadingTimeUpModal(true);
+        
+        // Xóa dữ liệu đã lưu khi timer hết
+        if (examId) {
+          localStorage.removeItem(`exam_timer_${examId}`);
         }
-        return prev - 1;
-      });
-    }, 1000);
+      } else {
+        setTimeRemaining(remaining);
+        
+        // Cập nhật localStorage mỗi giây (chỉ khi còn thời gian)
+        if (examId && remaining > 0) {
+          const storageKey = `exam_timer_${examId}`;
+          localStorage.setItem(storageKey, JSON.stringify({
+            startTime: startTimeRef.current,
+            totalTime: totalExamSeconds
+          }));
+        }
+      }
+    };
 
-    return () => clearInterval(timerRef.current);
-  }, [isExamDataLoaded, timeRemaining]); // Phụ thuộc vào timeRemaining
+    // Chạy ngay lập tức để sync với thời gian thực
+    updateTimer();
+    
+    // Sau đó chạy mỗi giây
+    timerRef.current = setInterval(updateTimer, 1000);
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [isExamDataLoaded, totalExamSeconds, examId]); // Bỏ timeRemaining khỏi dependencies để tránh re-render
 
 
   // === 2. Timer Câu hỏi (Question Timer) ===
@@ -131,13 +210,25 @@ export const useExamTimers = (
     toastShownRef.current = {};
   };
 
-  // === 4. Trả về State và Hàm ===
+  // === 4. Hàm dừng timer và xóa dữ liệu đã lưu ===
+  const stopGlobalTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    // Xóa dữ liệu timer đã lưu khi nộp bài
+    if (examId) {
+      localStorage.removeItem(`exam_timer_${examId}`);
+    }
+  };
+
+  // === 5. Trả về State và Hàm ===
   return {
     // Timer tổng
     timeRemaining,
     showReadingTimeUpModal,
     setShowReadingTimeUpModal,
-    stopGlobalTimer: () => clearInterval(timerRef.current), // Hàm để dừng timer khi nộp bài
+    stopGlobalTimer, // Hàm để dừng timer khi nộp bài
 
     // Timer câu hỏi
     questionTimeRemaining,
