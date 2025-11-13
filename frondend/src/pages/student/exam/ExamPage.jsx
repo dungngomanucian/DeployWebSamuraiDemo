@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense, lazy } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import Navbar from "../../../components/Navbar";
-import Footer from "../../../components/Footer";
 import { getFullExamData, submitExam } from "../../../api/examService";
-import ExamCertificateOverlay from "../../../components/JLPTCertificateOverlay";
 import toast, { Toaster } from "react-hot-toast";
-import TimeUpModal from "../../../components/Exam/TimeUpModal";
+
+// Lazy load các component nặng để cải thiện tốc độ tải ban đầu
+const Navbar = lazy(() => import("../../../components/Navbar"));
+const Footer = lazy(() => import("../../../components/Footer"));
+const ExamCertificateOverlay = lazy(() => import("../../../components/JLPTCertificateOverlay"));
+const TimeUpModal = lazy(() => import("../../../components/Exam/TimeUpModal"));
 
 // 1. IMPORT CÁC HÀM RENDER (Giữ nguyên)
 import {
@@ -59,21 +61,29 @@ export default function ExamPage() {
 
   
   // === 5. GỌI CÁC HOOK MỚI ===
-  const getFilteredQuestions = () => {
+  // Memoize filteredQuestions để tránh tính toán lại không cần thiết
+  const filteredQuestions = useMemo(() => {
     if (!activeQuestionType || !groupedQuestions[activeQuestionType]) return [];
     const questions = groupedQuestions[activeQuestionType].questions;
     const uniqueQuestions = questions.filter((question, index, self) => 
       index === self.findIndex(q => q.id === question.id)
     );
     return uniqueQuestions;
-  };
-  const filteredQuestions = getFilteredQuestions();
-  const shouldUsePagination = filteredQuestions.length > 0 && 
-    groupedQuestions[activeQuestionType]?.type?.duration &&
-    (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
-  const currentQuestion = shouldUsePagination ? 
-    filteredQuestions[currentQuestionPage] : 
-    (filteredQuestions[currentQuestionIndex] || null);
+  }, [activeQuestionType, groupedQuestions]);
+
+  // Memoize shouldUsePagination
+  const shouldUsePagination = useMemo(() => {
+    return filteredQuestions.length > 0 && 
+      groupedQuestions[activeQuestionType]?.type?.duration &&
+      (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
+  }, [filteredQuestions, activeQuestionType, groupedQuestions]);
+
+  // Memoize currentQuestion
+  const currentQuestion = useMemo(() => {
+    return shouldUsePagination ? 
+      filteredQuestions[currentQuestionPage] : 
+      (filteredQuestions[currentQuestionIndex] || null);
+  }, [shouldUsePagination, filteredQuestions, currentQuestionPage, currentQuestionIndex]);
   
   const {
     timeRemaining,
@@ -88,7 +98,8 @@ export default function ExamPage() {
     !loading && !!examData,
     currentQuestion,
     groupedQuestions,
-    activeQuestionType
+    activeQuestionType,
+    examId // Truyền examId để lưu/khôi phục timer
   );
 
   const {
@@ -96,74 +107,129 @@ export default function ExamPage() {
     answerOrder,
     handleAnswerSelect,
     getAnswerOrder,
-    isAnswerSelected
-  } = useExamState();
+    isAnswerSelected,
+    clearSavedAnswers
+  } = useExamState(examId); // Truyền examId để lưu/khôi phục đáp án
 
   
   // === 6. CÁC HÀM VÀ useEffect GỐC CÒN GIỮ LẠI ===
 
-  // useEffect: Tải dữ liệu thi
+  // useEffect: Tải dữ liệu thi - Tối ưu với xử lý dữ liệu song song
   useEffect(() => {
+    const abortController = new AbortController();
+    
     const loadExamData = async () => {
       if (!examId) {
         navigate("/mock-exam-jlpt");
         return;
       }
-      setLoading(true);
-      const { data, error } = await getFullExamData(examId);
-      if (error) {
-        console.error("Error loading exam:", error);
-        alert("Không thể tải dữ liệu đề thi. Vui lòng thử lại!");
-        navigate(-1);
-        return;
-      }
-      setExamData(data);
       
-      // Lọc các sections không phải listening (is_listening = false)
-      const nonListeningSections = data?.sections?.filter(section => section.is_listening === false) || [];
-      const totalMinutesFromSections = nonListeningSections.length > 0
-        ? nonListeningSections.reduce((sum, section) => sum + (Number(section?.duration) || 0), 0)
-        : 0;
-      const totalSeconds = totalMinutesFromSections * 60;
-      setTotalTime(totalSeconds); 
-      const grouped = {};
-      data.sections.forEach((section) => {
-        section.question_types.forEach((qt) => {
-          if (!grouped[qt.id]) {
-            grouped[qt.id] = {
-              type: qt,
-              questions: [],
-              sectionType: section.type,
-              sectionId: section.id
-            };
-          }
-          qt.questions.forEach((q) => {
-            const existingQuestion = grouped[qt.id].questions.find(existing => existing.id === q.id);
-            if (!existingQuestion) {
-              grouped[qt.id].questions.push({
-                ...q,
-                sectionType: section.type,
-                sectionId: section.id,
-                questionTypeId: qt.id,
-                taskInstructions: qt.task_instructions,
-              });
-            }
-          });
-        });
-      });
-      setGroupedQuestions(grouped);
-      if (data.sections && data.sections.length > 0 && !userSelectedSectionRef.current) {
-        const firstSectionType = data.sections[0].type;
-        setActiveSection(firstSectionType);
-        activeSectionRef.current = firstSectionType;
-        const firstQuestionType = data.sections[0].question_types?.[0];
-        if (firstQuestionType) {
-          setActiveQuestionType(firstQuestionType.id);
+      // Xóa đáp án của exam cũ nếu có (khi chuyển sang exam khác)
+      const previousExamId = localStorage.getItem('current_exam_id');
+      if (previousExamId && previousExamId !== examId) {
+        try {
+          localStorage.removeItem(`exam_answers_${previousExamId}`);
+          localStorage.removeItem(`exam_timer_${previousExamId}`);
+        } catch (error) {
+          console.error('Error clearing previous exam data:', error);
         }
       }
-      setLoading(false);
+      // Lưu examId hiện tại
+      localStorage.setItem('current_exam_id', examId);
+      
+      setLoading(true);
+      
+      try {
+        const { data, error } = await getFullExamData(examId);
+        
+        // Kiểm tra nếu request đã bị hủy
+        if (abortController.signal.aborted) {
+          return;
+        }
+        
+        if (error) {
+          // Không hiển thị lỗi nếu request bị hủy hoặc connection closed
+          if (error.includes('Connection closed') || error.includes('Client disconnected')) {
+            return;
+          }
+          console.error("Error loading exam:", error);
+          alert("Không thể tải dữ liệu đề thi. Vui lòng thử lại!");
+          navigate(-1);
+          return;
+        }
+        
+        // Set examData ngay để UI có thể render sớm hơn
+        setExamData(data);
+        
+        // Xử lý dữ liệu - tối ưu với Set để tránh duplicate
+        const nonListeningSections = data?.sections?.filter(section => section.is_listening === false) || [];
+        const totalMinutesFromSections = nonListeningSections.length > 0
+          ? nonListeningSections.reduce((sum, section) => sum + (Number(section?.duration) || 0), 0)
+          : 0;
+        const totalSeconds = totalMinutesFromSections * 60;
+        setTotalTime(totalSeconds); 
+        
+        // Tối ưu: Sử dụng Set để tránh duplicate questions nhanh hơn
+        const grouped = {};
+        const questionIdSet = new Set(); // Để tránh duplicate questions
+        
+        data.sections.forEach((section) => {
+          section.question_types.forEach((qt) => {
+            if (!grouped[qt.id]) {
+              grouped[qt.id] = {
+                type: qt,
+                questions: [],
+                sectionType: section.type,
+                sectionId: section.id
+              };
+            }
+            qt.questions.forEach((q) => {
+              const questionKey = `${qt.id}-${q.id}`;
+              if (!questionIdSet.has(questionKey)) {
+                questionIdSet.add(questionKey);
+                grouped[qt.id].questions.push({
+                  ...q,
+                  sectionType: section.type,
+                  sectionId: section.id,
+                  questionTypeId: qt.id,
+                  taskInstructions: qt.task_instructions,
+                });
+              }
+            });
+          });
+        });
+        
+        setGroupedQuestions(grouped);
+        
+        if (data.sections && data.sections.length > 0 && !userSelectedSectionRef.current) {
+          const firstSectionType = data.sections[0].type;
+          setActiveSection(firstSectionType);
+          activeSectionRef.current = firstSectionType;
+          const firstQuestionType = data.sections[0].question_types?.[0];
+          if (firstQuestionType) {
+            setActiveQuestionType(firstQuestionType.id);
+          }
+        }
+        
+        setLoading(false);
+      } catch (err) {
+        // Bỏ qua lỗi nếu request đã bị hủy
+        if (abortController.signal.aborted || err.name === 'AbortError') {
+          return;
+        }
+        console.error("Error loading exam:", err);
+        alert("Không thể tải dữ liệu đề thi. Vui lòng thử lại!");
+        navigate(-1);
+        setLoading(false);
+      }
     };
+    
     loadExamData();
+    
+    // Cleanup: Hủy request khi component unmount hoặc examId thay đổi
+    return () => {
+      abortController.abort();
+    };
   }, [examId, navigate]);
 
   // useEffect: Xử lý cuộn trang
@@ -223,16 +289,16 @@ export default function ExamPage() {
     return groupedQuestions[questionTypeId]?.type?.is_perforated_question === true;
   };
 
-  // Helper: Bật/tắt Popover câu hỏi perforated question
-  const togglePassageQuestion = (questionId) => {
+  // Helper: Bật/tắt Popover câu hỏi perforated question - useCallback để tránh re-render
+  const togglePassageQuestion = useCallback((questionId) => {
     setOpenPassageQuestions((prev) => ({
       ...prev,
       [questionId]: !prev[questionId]
     }));
-  };
+  }, []);
 
-  // Helper: Lấy các tab loại câu hỏi
-  const getQuestionTypeTabs = () => {
+  // Helper: Lấy các tab loại câu hỏi - Memoize để tránh tính toán lại
+  const questionTypeTabs = useMemo(() => {
     if (!activeSection || !examData) return [];
     const tabs = [];
     examData.sections.forEach((section) => {
@@ -249,8 +315,7 @@ export default function ExamPage() {
       }
     });
     return tabs;
-  };
-  const questionTypeTabs = getQuestionTypeTabs();
+  }, [activeSection, examData]);
   
   // Hàm render Popover câu hỏi
   const renderPassageQuestionPopover = (q) => {
@@ -299,8 +364,9 @@ export default function ExamPage() {
   
   // === 8. CẬP NHẬT CÁC HÀM HANDLER ===
 
-  // Hàm: Đổi Section
-  const handleSectionChange = (sectionType, questionTypeId = null) => {
+  // Hàm: Đổi Section - useCallback để tránh re-render
+  // Định nghĩa trước handleQuestionTypeChange vì handleQuestionTypeChange cần sử dụng nó
+  const handleSectionChange = useCallback((sectionType, questionTypeId = null) => {
     if (!examData) return;
     
     const newSection = examData.sections.find(s => s.type === sectionType);
@@ -354,10 +420,10 @@ export default function ExamPage() {
       setCurrentQuestionPage(0);
       resetQuestionToast(); 
     }
-  };
+  }, [examData, activeQuestionType, resetQuestionToast]);
 
-  // Hàm: Đổi Loại câu hỏi
-  const handleQuestionTypeChange = (questionTypeId) => {
+  // Hàm: Đổi Loại câu hỏi - useCallback để tránh re-render
+  const handleQuestionTypeChange = useCallback((questionTypeId) => {
     if (!examData) return;
     
     const targetSection = examData.sections.find(section => 
@@ -410,7 +476,7 @@ export default function ExamPage() {
       
       resetQuestionToast(); 
     }
-  };
+  }, [examData, activeSection, groupedQuestions, currentQuestionPage, currentQuestionIndex, resetQuestionToast, handleSectionChange]);
 
   // Component: Thanh thời gian
   const TimerProgressBar = () => { 
@@ -447,8 +513,8 @@ export default function ExamPage() {
     return { backgroundColor: '#66D575', textColor: '#00620D', iconColor: '#006C0F' };
   };
 
-  // Hàm: Nộp bài
-  const handleSubmitExam = async () => {
+  // Hàm: Nộp bài - useCallback để tránh re-render
+  const handleSubmitExam = useCallback(async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     stopGlobalTimer(); 
@@ -467,29 +533,63 @@ export default function ExamPage() {
     });
     const submissionData = { duration: duration_taken, answers: answersList };
     console.log("Đang nộp bài...", submissionData);
-    const { data: resultData, error } = await submitExam(examId, submissionData);
-    setIsSubmitting(false);
-    if (error) {
-      console.error("Lỗi khi nộp bài:", error);
-      alert(`Nộp bài thất bại: ${error}`);
-    } else {
+    
+    try {
+      const { data: resultData, error } = await submitExam(examId, submissionData);
+      
+      if (error) {
+        console.error("Lỗi khi nộp bài:", error);
+        alert(`Nộp bài thất bại: ${error}`);
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (!resultData) {
+        console.error("Không nhận được dữ liệu từ server");
+        alert("Nộp bài thất bại: Không nhận được phản hồi từ server");
+        setIsSubmitting(false);
+        return;
+      }
+      
       console.log("Nộp bài thành công, kết quả:", resultData);
-      setFinalResultData(resultData); // Lưu kết quả (chứa submission_id)
-      // Lưu exam_result_id vào localStorage để listening page sử dụng
-      localStorage.setItem('exam_result_id', resultData.id);
-      // Chuyển sang trang ListeningIntro thay vì hiển thị overlay
-      navigate(`/listening-intro?examId=${examId}`);
+      
+      // Kiểm tra exam_result_id (có thể là id hoặc exam_result_id)
+      const examResultId = resultData.id || resultData.exam_result_id;
+      if (!examResultId) {
+        console.error("Không tìm thấy exam_result_id trong response:", resultData);
+        alert("Nộp bài thất bại: Không tìm thấy ID kết quả");
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Lưu kết quả và exam_result_id
+      setFinalResultData(resultData);
+      clearSavedAnswers();
+      localStorage.setItem('exam_result_id', String(examResultId));
+      
+      // Chuyển sang trang ListeningIntro
+      setIsSubmitting(false);
+      navigate(`/listening-intro?examId=${examId}`, { replace: true });
+    } catch (err) {
+      console.error("Lỗi không mong đợi khi nộp bài:", err);
+      alert(`Nộp bài thất bại: ${err.message || 'Lỗi không xác định'}`);
+      setIsSubmitting(false);
     }
-  };
+  }, [isSubmitting, totalTime, timeRemaining, studentAnswers, examId, stopGlobalTimer, stopQuestionTimer, navigate, clearSavedAnswers]);
 
   // === PHẦN JSX (RETURN) ===
 
+  // Loading skeleton component để cải thiện UX
+  const LoadingSkeleton = () => (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#E9EFFC]">
+      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#4169E1] mb-4"></div>
+      <div className="text-2xl font-bold text-[#0B1320]">Đang tải đề thi...</div>
+      <div className="text-sm text-gray-600 mt-2">Vui lòng đợi trong giây lát</div>
+    </div>
+  );
+
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#E9EFFC]">
-        <div className="text-2xl font-bold text-[#0B1320]">Đang tải đề thi...</div>
-      </div>
-    );
+    return <LoadingSkeleton />;
   }
 
   if (isSubmitting) { 
@@ -513,7 +613,9 @@ export default function ExamPage() {
       <div 
         className={`transition-transform duration-300 ${hideHeader ? '-translate-y-full' : 'translate-y-0'}`}
       >
-      <Navbar />
+      <Suspense fallback={<div className="h-16 bg-white"></div>}>
+        <Navbar />
+      </Suspense>
       </div>
 
       {/* Sticky Header (Đã tách component) */}
@@ -1007,31 +1109,41 @@ export default function ExamPage() {
         </div>
       </main>
 
-      <Footer />
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
 
       {/* === COMPONENT OVERLAY === */}
-      <TimeUpModal
-        show={showReadingTimeUpModal} 
-        onClose={() => setShowReadingTimeUpModal(false)} 
-        onAction={() => {
-          setShowReadingTimeUpModal(false);
-          handleSubmitExam();
-        }}
-        bothButtonsSubmit={true}
-      />
-      <ExamCertificateOverlay
-        show={showCertificate}
-        onHide={() => {
-          setShowCertificate(false);
-          navigate(`/student-dashboard`, {
-            state: { 
-              resultData: finalResultData 
-            } 
-          });
-        }}
-        resultData={finalResultData}
-        examData={examData} 
-      />
+      {showReadingTimeUpModal && (
+        <Suspense fallback={null}>
+          <TimeUpModal
+            show={showReadingTimeUpModal} 
+            onClose={() => setShowReadingTimeUpModal(false)} 
+            onAction={() => {
+              setShowReadingTimeUpModal(false);
+              handleSubmitExam();
+            }}
+            bothButtonsSubmit={true}
+          />
+        </Suspense>
+      )}
+      {showCertificate && (
+        <Suspense fallback={null}>
+          <ExamCertificateOverlay
+            show={showCertificate}
+            onHide={() => {
+              setShowCertificate(false);
+              navigate(`/student-dashboard`, {
+                state: { 
+                  resultData: finalResultData 
+                } 
+              });
+            }}
+            resultData={finalResultData}
+            examData={examData} 
+          />
+        </Suspense>
+      )}
       
       {/* Toast notifications */}
       <Toaster 

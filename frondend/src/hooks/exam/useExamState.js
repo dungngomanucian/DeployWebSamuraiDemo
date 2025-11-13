@@ -1,16 +1,72 @@
 // src/hooks/exam/useExamState.js
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 /**
  * Hook tùy chỉnh để quản lý state của các câu trả lời (trắc nghiệm và sắp xếp).
+ * @param {string} examId - ID của bài thi để lưu/khôi phục đáp án từ localStorage
  */
-export const useExamState = () => {
+export const useExamState = (examId = null) => {
+  // Khôi phục đáp án từ localStorage khi khởi tạo
+  const getInitialAnswers = () => {
+    if (!examId) return {};
+    try {
+      const storageKey = `exam_answers_${examId}`;
+      const savedData = localStorage.getItem(storageKey);
+      if (savedData) {
+        const parsed = JSON.parse(savedData);
+        return parsed.studentAnswers || {};
+      }
+    } catch (error) {
+      console.error('Error loading saved answers:', error);
+    }
+    return {};
+  };
+
+  const getInitialAnswerOrder = () => {
+    if (!examId) return {};
+    try {
+      const storageKey = `exam_answers_${examId}`;
+      const savedData = localStorage.getItem(storageKey);
+      if (savedData) {
+        const parsed = JSON.parse(savedData);
+        return parsed.answerOrder || {};
+      }
+    } catch (error) {
+      console.error('Error loading saved answer order:', error);
+    }
+    return {};
+  };
+
   // State chính lưu trữ đáp án (dạng { q1: "a1", q2: "a3" })
-  const [studentAnswers, setStudentAnswers] = useState({});
+  const [studentAnswers, setStudentAnswers] = useState(getInitialAnswers);
   
   // State RÊNG BIỆT cho câu hỏi sắp xếp (is_Sort_Question = true)
   // Dạng { q_sort_1: ["a2", "a1", "a4"] }
-  const [answerOrder, setAnswerOrder] = useState({});
+  const [answerOrder, setAnswerOrder] = useState(getInitialAnswerOrder);
+  
+  const isInitialMountRef = useRef(true);
+
+  // Lưu đáp án vào localStorage mỗi khi có thay đổi
+  useEffect(() => {
+    // Bỏ qua lần render đầu tiên (khi đang khôi phục từ localStorage)
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
+
+    if (examId) {
+      try {
+        const storageKey = `exam_answers_${examId}`;
+        localStorage.setItem(storageKey, JSON.stringify({
+          studentAnswers,
+          answerOrder,
+          timestamp: Date.now()
+        }));
+      } catch (error) {
+        console.error('Error saving answers to localStorage:', error);
+      }
+    }
+  }, [studentAnswers, answerOrder, examId]);
 
   /**
    * Hàm xử lý chính khi chọn một đáp án.
@@ -93,6 +149,23 @@ export const useExamState = () => {
   };
 
   /**
+   * Hàm xóa đáp án đã lưu trong localStorage khi nộp bài thành công
+   */
+  const clearSavedAnswers = () => {
+    if (examId) {
+      try {
+        const storageKey = `exam_answers_${examId}`;
+        localStorage.removeItem(storageKey);
+        // Reset state về rỗng
+        setStudentAnswers({});
+        setAnswerOrder({});
+      } catch (error) {
+        console.error('Error clearing saved answers:', error);
+      }
+    }
+  };
+
+  /**
    * Trả về state và các hàm điều khiển.
    */
   return {
@@ -100,6 +173,7 @@ export const useExamState = () => {
     answerOrder,
     handleAnswerSelect,
     getAnswerOrder,
-    isAnswerSelected
+    isAnswerSelected,
+    clearSavedAnswers
   };
 };

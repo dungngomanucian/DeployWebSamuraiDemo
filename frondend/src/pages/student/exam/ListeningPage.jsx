@@ -1,12 +1,14 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense, lazy } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import Navbar from "../../../components/Navbar";
-import Footer from "../../../components/Footer";
 import { submitListeningExam } from "../../../api/examService";
-import ExamCertificateOverlay from "../../../components/JLPTCertificateOverlay";
 import { Toaster } from "react-hot-toast";
-import TimeUpModal from "../../../components/Exam/TimeUpModal";
 import { API_BASE_URL } from "../../../config/apiConfig";
+
+// Lazy load các component nặng để cải thiện tốc độ tải ban đầu
+const Navbar = lazy(() => import("../../../components/Navbar"));
+const Footer = lazy(() => import("../../../components/Footer"));
+const ExamCertificateOverlay = lazy(() => import("../../../components/JLPTCertificateOverlay"));
+const TimeUpModal = lazy(() => import("../../../components/Exam/TimeUpModal"));
 
 import {
   Underline,
@@ -167,21 +169,29 @@ export default function ListeningPage() {
     }
   }, [examId, hasStartedListening, loading, isAudioLoading, audioDuration]);
 
-  const getFilteredQuestions = () => {
+  // Memoize filteredQuestions để tránh tính toán lại không cần thiết
+  const filteredQuestions = useMemo(() => {
     if (!activeQuestionType || !groupedQuestions[activeQuestionType]) return [];
     const questions = groupedQuestions[activeQuestionType].questions;
     const uniqueQuestions = questions.filter((question, index, self) => 
       index === self.findIndex(q => q.id === question.id)
     );
     return uniqueQuestions;
-  };
-  const filteredQuestions = getFilteredQuestions();
-  const shouldUsePagination = filteredQuestions.length > 0 && 
-    groupedQuestions[activeQuestionType]?.type?.duration &&
-    (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
-  const currentQuestion = shouldUsePagination ? 
-    filteredQuestions[currentQuestionPage] : 
-    (filteredQuestions[currentQuestionIndex] || null);
+  }, [activeQuestionType, groupedQuestions]);
+
+  // Memoize shouldUsePagination
+  const shouldUsePagination = useMemo(() => {
+    return filteredQuestions.length > 0 && 
+      groupedQuestions[activeQuestionType]?.type?.duration &&
+      (filteredQuestions[0].passage || filteredQuestions[0].jlpt_question_passages);
+  }, [filteredQuestions, activeQuestionType, groupedQuestions]);
+
+  // Memoize currentQuestion
+  const currentQuestion = useMemo(() => {
+    return shouldUsePagination ? 
+      filteredQuestions[currentQuestionPage] : 
+      (filteredQuestions[currentQuestionIndex] || null);
+  }, [shouldUsePagination, filteredQuestions, currentQuestionPage, currentQuestionIndex]);
   
   const {
     timeRemaining,
@@ -201,8 +211,9 @@ export default function ListeningPage() {
   const {
     studentAnswers,
     handleAnswerSelect,
-    isAnswerSelected
-  } = useExamState();
+    isAnswerSelected,
+    clearSavedAnswers
+  } = useExamState(examId); // Truyền examId để lưu/khôi phục đáp án
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -214,6 +225,18 @@ export default function ListeningPage() {
         }
         return;
       }
+
+      // Xóa đáp án của exam cũ nếu có (khi chuyển sang exam khác)
+      const previousExamId = localStorage.getItem('current_listening_exam_id');
+      if (previousExamId && previousExamId !== examId) {
+        try {
+          localStorage.removeItem(`exam_answers_${previousExamId}`);
+        } catch (error) {
+          console.error('Error clearing previous exam data:', error);
+        }
+      }
+      // Lưu examId hiện tại cho listening
+      localStorage.setItem('current_listening_exam_id', examId);
 
       // Hủy request trước đó nếu có
       if (examDataAbortControllerRef.current) {
@@ -317,7 +340,10 @@ export default function ListeningPage() {
           const totalSeconds = totalMinutesFromSections * 60;
           setTotalTime(totalSeconds);
           
+          // Tối ưu: Sử dụng Set để tránh duplicate questions nhanh hơn
           const grouped = {};
+          const questionIdSet = new Set(); // Để tránh duplicate questions
+          
           listeningSections.forEach((section) => {
             section.question_types?.forEach((qt) => {
               if (!grouped[qt.id]) {
@@ -329,8 +355,9 @@ export default function ListeningPage() {
                 };
               }
               qt.questions?.forEach((q) => {
-                const existingQuestion = grouped[qt.id].questions.find(existing => existing.id === q.id);
-                if (!existingQuestion) {
+                const questionKey = `${qt.id}-${q.id}`;
+                if (!questionIdSet.has(questionKey)) {
+                  questionIdSet.add(questionKey);
                   grouped[qt.id].questions.push({
                     ...q,
                     sectionType: section.type,
@@ -395,7 +422,8 @@ export default function ListeningPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const getQuestionTypeTabs = () => {
+  // Memoize questionTypeTabs để tránh tính toán lại
+  const questionTypeTabs = useMemo(() => {
     if (!activeSection || !examData) return [];
     const tabs = [];
     examData.sections.forEach((section) => {
@@ -412,8 +440,7 @@ export default function ListeningPage() {
       }
     });
     return tabs;
-  };
-  const questionTypeTabs = getQuestionTypeTabs();
+  }, [activeSection, examData]);
   const autoSubmitCountdownDisplay = postAudioCountdown !== null ? formatTime(postAudioCountdown, true) : null;
 
   const getQuestionImageUrl = (questionImagePath) => {
@@ -459,7 +486,7 @@ export default function ListeningPage() {
         className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all ${
           isSelected
             ? "border-[#874FFF] bg-purple-50"
-            : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50"
+            : "border-gray-300"
         }`}
       >
         <input
@@ -885,6 +912,8 @@ export default function ListeningPage() {
       alert(`Nộp bài listening thất bại: ${error}`);
     } else {
       setFinalResultData(resultData);
+      // Xóa đáp án đã lưu khi nộp bài thành công
+      clearSavedAnswers();
       localStorage.removeItem('exam_result_id');
       setShowCertificate(true);
     }
@@ -896,7 +925,8 @@ export default function ListeningPage() {
     totalTime,
     timeRemaining,
     studentAnswers,
-    examId
+    examId,
+    clearSavedAnswers
   ]);
 
   useEffect(() => {
@@ -906,12 +936,17 @@ export default function ListeningPage() {
     }
   }, [postAudioCountdown, isSubmitting, handleSubmitExam]);
 
+  // Loading skeleton component để cải thiện UX
+  const LoadingSkeleton = () => (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#E9EFFC]">
+      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#4169E1] mb-4"></div>
+      <div className="text-2xl font-bold text-[#0B1320]">Đang tải đề thi...</div>
+      <div className="text-sm text-gray-600 mt-2">Vui lòng đợi trong giây lát</div>
+    </div>
+  );
+
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#E9EFFC]">
-        <div className="text-2xl font-bold text-[#0B1320]">Đang tải đề thi...</div>
-      </div>
-    );
+    return <LoadingSkeleton />;
   }
 
   if (isSubmitting) { 
@@ -935,7 +970,9 @@ export default function ListeningPage() {
       <div 
         className={`transition-transform duration-300 ${hideHeader ? '-translate-y-full' : 'translate-y-0'}`}
       >
-      <Navbar />
+      <Suspense fallback={<div className="h-16 bg-white"></div>}>
+        <Navbar />
+      </Suspense>
       </div>
 
       {showStickyProgress && (
@@ -1140,29 +1177,39 @@ export default function ListeningPage() {
         </div>
       </main>
 
-      <Footer />
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
 
-      <TimeUpModal
-        show={showReadingTimeUpModal}
-        onClose={() => setShowReadingTimeUpModal(false)}
-        onAction={() => {
-          setShowReadingTimeUpModal(false);
-          navigate('/listening-intro');
-        }}
-      />
-      <ExamCertificateOverlay
-        show={showCertificate}
-        onHide={() => {
-          setShowCertificate(false);
-          navigate(`/student-dashboard`, {
-            state: { 
-              resultData: finalResultData
-            } 
-          });
-        }}
-        resultData={finalResultData}
-        examData={examData}
-      />
+      {showReadingTimeUpModal && (
+        <Suspense fallback={null}>
+          <TimeUpModal
+            show={showReadingTimeUpModal}
+            onClose={() => setShowReadingTimeUpModal(false)}
+            onAction={() => {
+              setShowReadingTimeUpModal(false);
+              navigate('/listening-intro');
+            }}
+          />
+        </Suspense>
+      )}
+      {showCertificate && (
+        <Suspense fallback={null}>
+          <ExamCertificateOverlay
+            show={showCertificate}
+            onHide={() => {
+              setShowCertificate(false);
+              navigate(`/student-dashboard`, {
+                state: { 
+                  resultData: finalResultData
+                } 
+              });
+            }}
+            resultData={finalResultData}
+            examData={examData}
+          />
+        </Suspense>
+      )}
       
       <Toaster 
         position="top-right"
