@@ -114,7 +114,7 @@ export default function ExamReviewPage() {
             }
 
             if (q.student_chosen_answer_id) {
-              const qType = qt; // Sử dụng qt trực tiếp
+              const qType = qt; 
               if (qType?.is_Sort_Question === true && Array.isArray(q.student_chosen_answer_id)) {
                  sAnswers[q.id] = q.student_chosen_answer_id;
                  aOrder[q.id] = q.student_chosen_answer_id;
@@ -208,8 +208,6 @@ export default function ExamReviewPage() {
   const questionTypeTabs = getQuestionTypeTabs();
 
   const renderPassageQuestionPopover = (q) => {
-    
-    // BƯỚC 1: Lấy ID đáp án mà học sinh đã chọn (từ backend)
     const studentChoiceId = q.student_chosen_answer_id;
 
     return (
@@ -227,37 +225,30 @@ export default function ExamReviewPage() {
               );
               return normalizedAnswers.map((ans) => {
                 
-                // === BƯỚC 2: LOGIC TÔ MÀU ĐÃ SỬA ===
-                
-                // 1. Đáp án này có đúng không? (Từ backend)
                 const isCorrect = ans.is_correct === true;
-                
-                // 2. Học sinh có chọn đáp án này không?
                 const isStudentChoice = (ans.id === studentChoiceId);
                 
-                // 3. Quyết định màu sắc
                 let answerStyle = 'bg-white hover:bg-gray-50';
                 if (isStudentChoice && isCorrect) {
-                    answerStyle = "bg-green-100"; // Chọn đúng
+                    answerStyle = "bg-green-100";
                 } else if (isStudentChoice && !isCorrect) {
-                    answerStyle = "bg-red-100"; // Chọn sai
-                } else if (isCorrect) {
-                    answerStyle = "bg-green-100"; // Đáp án đúng (nhưng không chọn)
+                    answerStyle = "bg-red-100";
+                } else if (!isStudentChoice && isCorrect) {
+                    answerStyle = "bg-green-100";
                 }
-                // === KẾT THÚC SỬA LOGIC ===
 
                 return (
                   <button
                     key={ans.id}
                     type="button"
-                    disabled 
+                    disabled
                     className={`text-left w-full px-3 py-2.5 transition-colors cursor-not-allowed ${answerStyle}`}
                   >
                     <div className="flex items-start text-gray-900 leading-6">
                       <span className="whitespace-pre-wrap break-words">
                         {formatAnswerText(ans?.answer_text || ans?.content || '', q?.question_text || '', q?.questionTypeId || q?.question_type_id)}
                       </span>
-                      {isCorrect && (
+                      {isStudentChoice && isCorrect && (
                         <span className="ml-auto text-green-600 font-bold">✓</span>
                       )}
                       {isStudentChoice && !isCorrect && (
@@ -335,9 +326,6 @@ export default function ExamReviewPage() {
       setCurrentQuestionIndex(0);
     }
   };
-  
-  
-  
   
   if (loading) {
     return (
@@ -444,7 +432,6 @@ export default function ExamReviewPage() {
             
             {isListeningSection ? (
               <>
-                
                 {filteredQuestions.map((question, questionIndex) => (
                   <div 
                     key={question.id} 
@@ -490,7 +477,7 @@ export default function ExamReviewPage() {
                               } else if (isStudentChoice && !isCorrect) {
                                   answerStyle = "border-red-500 bg-red-50"; 
                                   textStyle = "text-red-800 font-semibold";
-                              } else if (isCorrect) {
+                              } else if (!isStudentChoice && isCorrect) {
                                   answerStyle = "border-green-400 border-dashed bg-green-50";
                                   textStyle = "text-green-800";
                               }
@@ -523,11 +510,11 @@ export default function ExamReviewPage() {
                                     {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
                                   </span>
                                   
-                                  {isCorrect && (
+                                  {isStudentChoice && isCorrect && (
                                     <span className="ml-auto text-green-600 font-bold px-2">✓ Đúng</span>
                                   )}
                                   {isStudentChoice && !isCorrect && (
-                                    <span className="ml-auto text-red-600 font-bold px-2">✗</span>
+                                    <span className="ml-auto text-red-600 font-bold px-2">✗ Sai</span>
                                   )}
                                 </label>
                               );
@@ -684,12 +671,17 @@ export default function ExamReviewPage() {
                                   const isCorrect = answer.is_correct === true;
                                   
                                   let answerStyle = "border-gray-300";
+                                  let textStyle = "text-gray-800";
+
                                   if (isStudentChoice && isCorrect) {
-                                      answerStyle = "border-green-500 bg-green-50";
+                                      answerStyle = "border-green-500 bg-green-50"; 
+                                      textStyle = "text-green-800 font-semibold";
                                   } else if (isStudentChoice && !isCorrect) {
-                                      answerStyle = "border-red-500 bg-red-50";
-                                  } else if (isCorrect) {
+                                      answerStyle = "border-red-500 bg-red-50"; 
+                                      textStyle = "text-red-800 font-semibold";
+                                  } else if (!isStudentChoice && isCorrect) {
                                       answerStyle = "border-green-400 border-dashed bg-green-50";
+                                      textStyle = "text-green-800";
                                   }
                                   
                                   return (
@@ -716,15 +708,15 @@ export default function ExamReviewPage() {
                                           }`}
                                         />
                                       </span>
-                                      <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
+                                      <span className={`ml-3 text-base font-normal ${textStyle}`} style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                                         {formatAnswerText(answer.answer_text, currentPaginationQuestion.question_text, currentPaginationQuestion.questionTypeId)}
                                       </span>
                                       
-                                      {isCorrect && (
+                                      {isStudentChoice && isCorrect && (
                                         <span className="ml-auto text-green-600 font-bold px-2">✓ Đúng</span>
                                       )}
                                       {isStudentChoice && !isCorrect && (
-                                        <span className="ml-auto text-red-600 font-bold px-2">✗ Lựa chọn của bạn</span>
+                                        <span className="ml-auto text-red-600 font-bold px-2">✗ Sai</span>
                                       )}
     
                                     </label>
@@ -815,7 +807,6 @@ export default function ExamReviewPage() {
                                         key={answerId}
                                         className="flex items-center gap-2 bg-white px-4 py-3 rounded-lg border-2 border-[#874FFF] cursor-default"
                                       >
-                                        
                                         <span className="text-gray-800 font-normal">
                                           {answer.show_order}. {answer.answer_text}
                                         </span>
@@ -850,7 +841,6 @@ export default function ExamReviewPage() {
                                           key={answer.id}
                                           className="flex items-center gap-2 bg-white px-4 py-3 rounded-lg border-2 border-green-500 cursor-default"
                                         >
-                                          
                                           <span className="text-gray-800 font-normal">
                                             {answer.show_order}. {answer.answer_text}
                                           </span>
@@ -885,15 +875,14 @@ export default function ExamReviewPage() {
                                     
                                     let answerStyle = "border-gray-300";
                                     let textStyle = "text-gray-800";
-                                    
-                                    // (Logic này là của câu trắc nghiệm, không phải câu sắp xếp)
+
                                     if (isStudentChoice && isCorrect) {
                                         answerStyle = "border-green-500 bg-green-50"; 
                                         textStyle = "text-green-800 font-semibold";
                                     } else if (isStudentChoice && !isCorrect) {
                                         answerStyle = "border-red-500 bg-red-50"; 
                                         textStyle = "text-red-800 font-semibold";
-                                    } else if (isCorrect) {
+                                    } else if (!isStudentChoice && isCorrect) {
                                         answerStyle = "border-green-400 border-dashed bg-green-50";
                                         textStyle = "text-green-800";
                                     }
@@ -908,31 +897,31 @@ export default function ExamReviewPage() {
                                         } ${answerStyle} cursor-not-allowed`}
                                       >
                                         <input
-                                          type="radio"
+                                          type={"radio"}
                                           checked={isStudentChoice}
                                           readOnly disabled
                                           className="hidden"
                                         />
                                         <span
-                                          className={`flex items-center justify-center w-5 h-5 rounded-full border-2 flex-shrink-0 ${
-                                            isStudentChoice ? "border-[#874FFF]" : "border-gray-400"
-                                          }`}
-                                        >
-                                          <span
-                                            className={`w-3 h-3 rounded-full ${
-                                              isStudentChoice ? "bg-[#874FFF]" : "bg-transparent"
+                                            className={`flex items-center justify-center w-5 h-5 rounded-full border-2 flex-shrink-0 ${
+                                              isStudentChoice ? "border-[#874FFF]" : "border-gray-400"
                                             }`}
-                                          />
+                                          >
+                                            <span
+                                              className={`w-3 h-3 rounded-full ${
+                                                isStudentChoice ? "bg-[#874FFF]" : "bg-transparent"
+                                              }`}
+                                            />
                                         </span>
                                         <span className={`ml-3 text-base font-normal ${textStyle}`} style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                                           {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
                                         </span>
                                         
-                                        {isCorrect && (
+                                        {isStudentChoice && isCorrect && (
                                           <span className="ml-auto text-green-600 font-bold px-2">✓ Đúng</span>
                                         )}
-                                        {!isCorrect && (
-                                          <span className="ml-auto text-red-600 font-bold px-2">✗</span>
+                                        {isStudentChoice && !isCorrect && (
+                                          <span className="ml-auto text-red-600 font-bold px-2">✗ Sai</span>
                                         )}
       
                                       </label>
