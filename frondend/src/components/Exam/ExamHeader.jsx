@@ -1,19 +1,13 @@
-// src/components/Exam/ExamHeader.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bold } from 'lucide-react';
-import ExamQuestionTypeTabs from './ExamQuestionTypeTabs'; // Import component tab
+import ExamQuestionTypeTabs from './ExamQuestionTypeTabs'; 
 
-/**
- * Component Header (cho cả bản dính và bản thường)
- * - isSticky (boolean): Quyết định style render
- * - TimerProgressBarComponent (React.Component): Nhận component TimerProgressBar từ cha
- * - ...props: Nhận tất cả các state và hàm xử lý từ ExamPage
- */
 export default function ExamHeader({
-  // === Props trạng thái ===
   isSticky = false,
+  isReviewMode = false,
   examData,
+  reviewSections, // <-- SỬA 1: NHẬN PROP MỚI
   activeSection,
   activeQuestionType,
   questionTypeTabs,
@@ -23,11 +17,8 @@ export default function ExamHeader({
   currentQuestionIndex,
   currentQuestionPage,
   isSubmitting,
-  
-  // === 1. NHẬN STATE MỚI TỪ EXAMPAGE ===
   expandedQuestionType,
   
-  // === Props sự kiện ===
   onSectionChange,
   onQuestionTypeChange,
   onSubmitExam,
@@ -36,12 +27,16 @@ export default function ExamHeader({
 
   // === Component Props ===
   TimerProgressBarComponent, // Nhận component TimerProgressBar từ cha
+  showSectionTabs = true, 
+  titleInFirstRow = false, 
+  stickyBackButton = false, 
+  autoSubmitCountdownDisplay = null,
   // === Props mới cho Notepad ===
   annotations,
   onNotepadOpen,
 }) {
   const navigate = useNavigate();
-
+  const sectionsToRender = isReviewMode ? reviewSections : examData?.sections;
   // TẠO COMPONENT CON CHO NÚT NOTEPAD ĐỂ TÁI SỬ DỤNG
   const NotepadButton = ({ className = '' }) => {
     const noteCount = annotations?.filter(a => a.type === 'note').length || 0;
@@ -67,33 +62,32 @@ export default function ExamHeader({
   // JSX cho phần nội dung (sẽ được bọc bởi 1 trong 2 div dưới)
   const headerContent = (
     <>
-      {/* HÀNG 1:
-        - Bản thường: [Quay lại] [Tab Section] [Nộp bài]
-        - Bản dính: [Timer] [Tab Section] [Nộp bài]
-      */}
       <div className={`flex items-center justify-between gap-4 ${isSticky ? 'mb-4' : ''}`}>
         {isSticky ? (
           <>
-            {/* 1. Progress Bar (Bản Sticky) */}
-            {TimerProgressBarComponent && <TimerProgressBarComponent />}
-            
-            {/* 2. Section Tabs (Bản Sticky) */}
-            <div className="flex items-center justify-center gap-2 flex-1">
-              {examData?.sections?.map((section) => (
+            {isReviewMode ? (
+              <button
+                type="button"
+                style={{ fontFamily: "Nunito" }}
+                onClick={(e) => { e.preventDefault(); navigate(-1); }}
+                className="px-4 h-8 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-semibold hover:bg-[#5427B4] hover:text-white transition-all text-sm flex items-center w-24 justify-center"
+              >
+                Quay lại
+              </button>
+            ) : (
+              stickyBackButton ? (
                 <button
-                  style={{ fontFamily: "UD Digi Kyokasho N-R" }}
-                  key={section.type}
-                  onClick={() => onSectionChange(section.type)}
-                  className={`h-8 px-3 rounded-lg text-sm font-medium border transition-all cursor-pointer flex items-center ${
-                    section.type === activeSection
-                      ? "bg-[#4169E1] text-white border-[#4169E1]"
-                      : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
-                  }`}
+                  type="button"
+                  style={{ fontFamily: "Nunito" }}
+                  onClick={(e) => { e.preventDefault(); navigate(-1); }}
+                  className="px-4 h-8 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-semibold hover:bg-[#5427B4] hover:text-white transition-all text-sm flex items-center"
                 >
-                  {section.type}
+                  Quay lại
                 </button>
-              ))}
-            </div>
+              ) : (
+                TimerProgressBarComponent && <TimerProgressBarComponent />
+              )
+            )}
             
             {/* 3. Notepad & Submit Button (Bản Sticky) */}
             <div className="flex items-center gap-3">
@@ -106,32 +100,112 @@ export default function ExamHeader({
                 {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
               </button>
             </div>
+            {stickyBackButton ? (
+              <div className="flex-1 flex justify-center">
+                {!isReviewMode && TimerProgressBarComponent && <TimerProgressBarComponent />}
+              </div>
+            ) : showSectionTabs ? (
+              <div className="flex items-center justify-center gap-2 flex-1">
+                {/* SỬA 3: Dùng sectionsToRender */}
+                {sectionsToRender?.map((section) => (
+                  <button
+                    type="button"
+                    style={{ fontFamily: "UD Digi Kyokasho N-R" }}
+                    key={section.type}
+                    onClick={(e) => { e.preventDefault(); onSectionChange(section.type); }}
+                    className={`h-8 px-3 rounded-lg text-sm font-medium border transition-all cursor-pointer flex items-center ${
+                      section.type === activeSection
+                        ? "bg-[#4169E1] text-white border-[#4169E1]"
+                        : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
+                    }`}
+                  >
+                    {section.type}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            
+            {isReviewMode ? (
+              <div className="w-24"></div> 
+            ) : (
+              <div className="flex items-center gap-3">
+                {autoSubmitCountdownDisplay && (
+                  <span
+                    className="text-sm font-semibold text-red-500 whitespace-nowrap"
+                    style={{ fontFamily: 'Nunito' }}
+                  >
+                    Tự động nộp sau {autoSubmitCountdownDisplay}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); onSubmitExam(); }}
+                  disabled={isSubmitting}
+                  className="px-4 h-8 rounded-lg border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all text-sm flex items-center"
+                >
+                  {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <>
-            {/* 1. Nút Quay lại (Bản Thường) */}
             <button
+              type="button"
               style={{ fontFamily: "Nunito" }}
-              onClick={() => navigate(-1)}
+              onClick={(e) => { e.preventDefault(); navigate(-1); }}
               className="px-4 py-2 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-extrabold hover:bg-[#5427B4] hover:text-white transition-all"
             >
               Quay lại
             </button>
 
-            {/* 2. Section Tabs (Bản Thường) */}
-            <div className="hidden md:flex items-center gap-2">
-              {examData?.sections?.map((section) => (
+            {titleInFirstRow ? (
+              <div className="flex-1 flex items-center justify-center">
+                <h1 className="text-3xl md:text-4xl font-extrabold text-[#3563E9] leading-tight">
+                  言語知識 {activeSection}
+                </h1>
+              </div>
+            ) : showSectionTabs ? (
+              <div className="hidden md:flex items-center gap-2">
+                {/* SỬA 4: Dùng sectionsToRender */}
+                {sectionsToRender?.map((section) => (
+                  <button
+                    type="button"
+                    style={{ fontFamily: "UD Digi Kyokasho N-R" }}
+                    key={section.type}
+                    onClick={(e) => { e.preventDefault(); onSectionChange(section.type); }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all cursor-pointer ${
+                      section.type === activeSection
+                        ? "bg-[#4169E1] text-white border-[#4169E1]"
+                        : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
+                    }`}
+                  >
+                    {section.type}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {isReviewMode ? (
+              <div className="w-32"></div>
+            ) : (
+              <div className="flex items-center gap-3">
+                {autoSubmitCountdownDisplay && (
+                  <span
+                    className="text-sm font-semibold text-red-500 whitespace-nowrap"
+                    style={{ fontFamily: 'Nunito' }}
+                  >
+                    Tự động nộp sau {autoSubmitCountdownDisplay}
+                  </span>
+                )}
                 <button
-                  style={{ fontFamily: "UD Digi Kyokasho N-R" }}
-                  key={section.type}
-                  onClick={() => onSectionChange(section.type)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all cursor-pointer ${
-                    section.type === activeSection
-                      ? "bg-[#4169E1] text-white border-[#4169E1]"
-                      : "bg-gray-100 text-gray-700 border-gray-300 hover:border-[#4169E1]"
-                  }`}
+                  type="button"
+                  style={{ fontFamily: "Nunito", font: Bold }}
+                  onClick={(e) => { e.preventDefault(); onSubmitExam(); }}
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 rounded-lg border-2 border-red-500 text-red-500 font-extrabold hover:bg-red-500 hover:text-white transition-all"
                 >
-                  {section.type}
+                  {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
                 </button>
               ))}
             </div>
@@ -152,9 +226,7 @@ export default function ExamHeader({
         )}
       </div>
 
-      {/* HÀNG 2: Tiêu đề (Chỉ cho bản Thường)
-      */}
-      {!isSticky && (
+      {!isSticky && !titleInFirstRow && (
         <div className="mt-4 flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-3xl md:text-4xl font-extrabold text-[#3563E9] leading-tight">
@@ -164,21 +236,18 @@ export default function ExamHeader({
         </div>
       )}
 
-      {/* HÀNG 3: Timer (Chỉ cho bản Thường)
-      */}
-      {!isSticky && (
+      {!isSticky && !isReviewMode && (
         <div className="mt-4 flex justify-center">
           {TimerProgressBarComponent && <TimerProgressBarComponent />}
         </div>
       )}
 
-      {/* HÀNG 4: Thanh Tabs câu hỏi (Chung cho cả hai)
-      */}
       {questionTypeTabs.length > 0 && (
         <div className={`${isSticky ? 'mt-4' : 'mt-6'} w-full`}>
           <ExamQuestionTypeTabs
-            // === 2. TRUYỀN TIẾP XUỐNG TABS ===
+            isReviewMode={isReviewMode}
             examData={examData}
+            reviewSections={reviewSections} // <-- SỬA 5: TRUYỀN XUỐNG
             questionTypeTabs={questionTypeTabs}
             activeSection={activeSection}
             activeQuestionType={activeQuestionType}
@@ -187,9 +256,7 @@ export default function ExamHeader({
             answerOrder={answerOrder}
             currentQuestionIndex={currentQuestionIndex}
             currentQuestionPage={currentQuestionPage}
-            
-            expandedQuestionType={expandedQuestionType} // <--- TRUYỀN XUỐNG
-            
+            expandedQuestionType={expandedQuestionType}
             handleQuestionTypeChange={onQuestionTypeChange}
             handleSectionChange={onSectionChange}
             setCurrentQuestionIndex={setCurrentQuestionIndex}
@@ -200,7 +267,6 @@ export default function ExamHeader({
     </>
   );
 
-  // Render dựa trên isSticky
   if (isSticky) {
     return (
       <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-lg border-b border-gray-200 px-6 py-3" style={{ fontFamily: "Nunito" }}>
@@ -216,4 +282,4 @@ export default function ExamHeader({
       {headerContent}
     </div>
   );
-} 
+}

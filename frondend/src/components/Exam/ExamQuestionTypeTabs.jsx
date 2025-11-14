@@ -1,14 +1,10 @@
-// src/components/Exam/ExamQuestionTypeTabs.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import QuestionButtons from './QuestionButtons'; // Import component con
+import QuestionButtons from './QuestionButtons';
 
-/**
- * Component chuyên render thanh tiến trình các loại câu hỏi (Mondai)
- * Tự quản lý state co dãn (expand/collapse)
- */
 export default function ExamQuestionTypeTabs({
-  // === Dữ liệu truyền vào ===
+  isReviewMode,
   examData,
+  reviewSections, // <-- SỬA 1: NHẬN PROP MỚI
   questionTypeTabs,
   activeSection,
   activeQuestionType,
@@ -18,32 +14,24 @@ export default function ExamQuestionTypeTabs({
   currentQuestionIndex,
   currentQuestionPage,
   
-  // === Hàm callback truyền vào ===
   handleQuestionTypeChange,
   handleSectionChange,
   setCurrentQuestionIndex,
   setCurrentQuestionPage,
 
-  // === 1. NHẬN STATE MỚI TỪ CHA ===
-  expandedQuestionType, // Nhận state 'expanded' từ cha
+  expandedQuestionType,
 }) {
 
-  // === 2. XÓA STATE NỘI BỘ ===
-  // const [expandedQuestionType, setExpandedQuestionType] = useState({}); // <--- ĐÃ XÓA
-
-  // === (Tất cả logic state/ref/useEffect tính toán độ rộng giữ nguyên) ===
   const [barWidths, setBarWidths] = useState({});
   const [collapsedTabWidths, setCollapsedTabWidths] = useState({});
   const [expandedTabWidths, setExpandedTabWidths] = useState({});
   const tabContainerRefs = useRef({});
 
-  // useEffect: Tính toán độ rộng của thanh bar
   useEffect(() => {
     const expandedTabs = Object.values(expandedQuestionType).filter(Boolean);
     if (expandedTabs.length > 0) {
       setTimeout(() => {
         expandedTabs.forEach(qtId => {
-          // Cần ID duy nhất cho container (ví dụ: dùng activeSection)
           const container = document.getElementById(`question-buttons-${activeSection}-${qtId}`);
           if (container) {
             const buttons = container.querySelectorAll('button');
@@ -59,9 +47,8 @@ export default function ExamQuestionTypeTabs({
         });
       }, 0);
     }
-  }, [expandedQuestionType, groupedQuestions, activeSection]); // Phụ thuộc vào prop 'expandedQuestionType'
+  }, [expandedQuestionType, groupedQuestions, activeSection]);
 
-  // useEffect: Tính toán độ rộng ban đầu
   useEffect(() => {
     if (examData && Object.keys(groupedQuestions).length > 0) {
       const newWidths = {};
@@ -74,28 +61,30 @@ export default function ExamQuestionTypeTabs({
     }
   }, [examData, groupedQuestions]);
 
-  // useEffect: Tính toán độ rộng tab co dãn
   useEffect(() => {
     if (examData && Object.keys(expandedQuestionType).length > 0) {
       setTimeout(() => {
         const newCollapsedWidths = {};
         const newExpandedWidths = {};
         
-        examData.sections.forEach(section => {
+        // Dùng mảng sections chính xác (giống như onClick)
+        const sectionsToSearch = isReviewMode ? reviewSections : examData?.sections;
+        if (!sectionsToSearch) return;
+
+        sectionsToSearch.forEach(section => {
           const sectionType = section.type;
-          // Chỉ tính toán cho section đang active
           if (sectionType !== activeSection) return;
 
-          const expandedQtId = expandedQuestionType[sectionType]; // Đọc từ prop
+          const expandedQtId = expandedQuestionType[sectionType];
           const containerRef = tabContainerRefs.current[sectionType];
           
-          if (expandedQtId && containerRef) {
+          if (expandedQtId && containerRef && section.question_types) { // Thêm check
             const containerWidth = containerRef.offsetWidth;
             const expandedTabBarWidth = barWidths[expandedQtId] || 0;
             const totalTabs = section.question_types.length;
             const collapsedTabCount = totalTabs - 1;
             
-            if (collapsedTabCount > 0) { // Tránh chia cho 0
+            if (collapsedTabCount > 0) {
               const gapWidth = 16;
               const totalGaps = (totalTabs - 1) * gapWidth;
               const minCollapsedWidth = 80;
@@ -107,7 +96,7 @@ export default function ExamQuestionTypeTabs({
               
               newExpandedWidths[sectionType] = expandedWidth;
               newCollapsedWidths[sectionType] = finalCollapsedWidth;
-            } else { // Chỉ có 1 tab, cho nó full width
+            } else {
               newExpandedWidths[sectionType] = containerWidth;
               newCollapsedWidths[sectionType] = 0;
             }
@@ -118,35 +107,31 @@ export default function ExamQuestionTypeTabs({
         setCollapsedTabWidths(newCollapsedWidths);
       }, 0);
     }
-  }, [expandedQuestionType, barWidths, examData, activeSection]); // Phụ thuộc vào prop 'expandedQuestionType'
-  // === KẾT THÚC TÁCH LOGIC ===
+  }, [expandedQuestionType, barWidths, examData, reviewSections, activeSection, isReviewMode]); // Thêm dependencies
 
 
-  // === (Phần JSX Render) ===
   if (!questionTypeTabs || questionTypeTabs.length === 0) {
-    return null; // Không render gì nếu không có tab
+    return null;
   }
   
-  // 3. 'isExpanded' bây giờ đọc từ PROPS
   const isExpanded = !!expandedQuestionType[activeSection]; 
   
   return (
     <div 
       ref={(el) => tabContainerRefs.current[activeSection] = el}
-      className={`${isExpanded ? 'flex' : 'grid'} gap-4 w-full`} // (Đã fix lỗi co cụm từ trước)
+      className={`${isExpanded ? 'flex' : 'grid'} gap-4 w-full`}
       style={!isExpanded ? { gridTemplateColumns: `repeat(${questionTypeTabs.length}, 1fr)` } : {}}
     >
       {questionTypeTabs.map((tab) => {
         const answeredCount = Array.from({ length: tab.questionCount }, (_, index) => {
           const question = groupedQuestions[tab.id]?.questions[index];
           return question ? (
-            question.questionTypeId === "QT007" 
+            groupedQuestions[question.questionTypeId]?.type?.is_Sort_Question === true
               ? (answerOrder[question.id] && answerOrder[question.id].length > 0)
               : studentAnswers[question.id]
           ) : false;
         }).filter(Boolean).length;
 
-        // 4. 'isActive' bây giờ đọc từ PROPS
         const isActive = expandedQuestionType[activeSection] === tab.id;
         const currentSectionExpanded = expandedQuestionType[activeSection];
 
@@ -167,9 +152,7 @@ export default function ExamQuestionTypeTabs({
                 : {}
             }
           >
-            {/* Tab button with top/bottom bar */}
             <div className="flex flex-col items-center">
-              {/* Top bar (gray) - shown when not active */}
               {!isActive && (
                 <div 
                   className="h-0.5 bg-gray-300 mb-2 transition-all" 
@@ -181,25 +164,27 @@ export default function ExamQuestionTypeTabs({
                 ></div>
               )}
               
-              {/* Tab text */}
                <button
-                 onClick={() => {
-                   const targetSection = examData.sections.find(section => 
+                 type="button"
+                 onClick={(e) => {
+                   e.preventDefault();
+                   
+                   // === SỬA 2: DÙNG MẢNG SECTIONS CHÍNH XÁC ===
+                   const sectionsToSearch = isReviewMode ? reviewSections : examData?.sections;
+                   if (!sectionsToSearch) return; // Thoát nếu data chưa sẵn sàng
+
+                   const targetSection = sectionsToSearch.find(section => 
+                     section.question_types && // Thêm check an toàn
                      section.question_types.some(qt => qt.id === tab.id)
                    );
+                   // === KẾT THÚC SỬA ===
                    
                    if (targetSection && targetSection.type !== activeSection) {
-                     // Gọi hàm prop từ cha
                      handleSectionChange(targetSection.type, tab.id);
                      return;
                    }
                    
-                   // === 5. BỎ LOGIC SET STATE NỘI BỘ ===
-                   // setExpandedQuestionType(prev => ({ ... })); // <--- ĐÃ XÓA
-                   
-                   // Chỉ cần gọi hàm của cha, cha sẽ tự set state
-                   handleQuestionTypeChange(tab.id); 
-                   setCurrentQuestionIndex(0);
+                   handleQuestionTypeChange(tab.id);
                  
                  }}
                 className={`text-sm font-medium whitespace-nowrap transition-all ${
@@ -229,7 +214,6 @@ export default function ExamQuestionTypeTabs({
                  </span> {answeredCount}/{tab.questionCount}
               </button>
               
-              {/* Bottom bar (blue) and question buttons - shown when active */}
               {isActive && (
                 <>
                   <div 
@@ -237,6 +221,7 @@ export default function ExamQuestionTypeTabs({
                     style={{ width: barWidths[tab.id] || '100%' }}
                   ></div>
                   <QuestionButtons
+                    isReviewMode={isReviewMode}
                     tab={tab}
                     groupedQuestions={groupedQuestions}
                     activeQuestionType={activeQuestionType}

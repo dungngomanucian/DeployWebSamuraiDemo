@@ -35,6 +35,11 @@ export async function apiRequest(endpoint, options = {}) {
 
         // 6. Xử lý lỗi HTTP (4xx hoặc 5xx)
         if (!response.ok) {
+            // Status 499 = Client Closed Request - không cần hiển thị lỗi
+            if (response.status === 499) {
+                return { data: null, error: null }; // Silently ignore
+            }
+            
             let errorDetails = 'API request failed';
             
             try {
@@ -67,6 +72,21 @@ export async function apiRequest(endpoint, options = {}) {
         
     } catch (error) {
         // Xử lý lỗi Mạng (Network error) hoặc lỗi throw từ bước 6
+        
+        // Ignore AbortError (request bị hủy) - không cần log hoặc hiển thị lỗi
+        if (error.name === 'AbortError') {
+            return { data: null, error: null };
+        }
+        
+        // Ignore các lỗi connection khi client đóng kết nối
+        if (error.message && (
+            error.message.includes('Connection closed') ||
+            error.message.includes('Client disconnected') ||
+            error.message.includes('Connection error')
+        )) {
+            return { data: null, error: null };
+        }
+        
         console.error(`API Error [${endpoint}]:`, error);
         
         // Trả về thông báo lỗi cho component hiển thị

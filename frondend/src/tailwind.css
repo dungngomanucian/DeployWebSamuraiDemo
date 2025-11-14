@@ -58,3 +58,22 @@
 body {
   font-family: 'UD Digi Kyokasho N-B', 'Inter', 'Noto Sans JP', sans-serif;
 }
+/* Volume Slider Styles - From AudioPlayer.jsx */
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #535353;
+  cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #535353;
+  cursor: pointer;
+  border: none;
+}

@@ -42,12 +42,11 @@ class ExamService:
             
             exam_data = response.data
             
-            # Get first 3 sections to calculate durations for intro pages
+            # Get sections to calculate durations for intro pages (include is_listening for filtering)
             sections_response = supabase.table('jlpt_exam_sections')\
-                .select('id, duration, position')\
+                .select('id, duration, position, is_listening, type')\
                 .eq('exam_id', exam_id)\
                 .order('position')\
-                .limit(3)\
                 .execute()
             
             # Add sections to exam data

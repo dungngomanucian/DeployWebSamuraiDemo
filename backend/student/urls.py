@@ -21,5 +21,6 @@ urlpatterns = [
     path('dashboard/', include('student.dashboard.urls'))
 
 
+    path('exam-results/', include('student.exam-results.urls')),
 ]
 
