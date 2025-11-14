@@ -91,7 +91,7 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
     const resultId = resultData?.id;
     if (resultId) {
       if (onHide) onHide(); // Đóng modal
-      navigate(`/results/${resultId}`); // Điều hướng đến trang review
+      navigate(`/exam-results/${resultId}`); // Điều hướng đến trang review
     } else {
       console.error("Certificate Overlay: Không tìm thấy resultData.id");
       alert("Không thể tải chi tiết bài làm, vui lòng thử lại.");
