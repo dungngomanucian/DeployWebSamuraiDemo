@@ -18,7 +18,7 @@ urlpatterns = [
 
     path('AISearch/', include('student.AISearch.urls')),
 
-    path('dashboard/', include('student.dashboard.urls'))
+    path('dashboard/', include('student.dashboard.urls')),
 
 
     path('exam-results/', include('student.exam-results.urls')),

@@ -7,7 +7,7 @@ export default function ExamHeader({
   isSticky = false,
   isReviewMode = false,
   examData,
-  reviewSections, // <-- SỬA 1: NHẬN PROP MỚI
+  reviewSections,
   activeSection,
   activeQuestionType,
   questionTypeTabs,
@@ -25,19 +25,18 @@ export default function ExamHeader({
   setCurrentQuestionIndex,
   setCurrentQuestionPage,
 
-  // === Component Props ===
-  TimerProgressBarComponent, // Nhận component TimerProgressBar từ cha
+  TimerProgressBarComponent, 
+  
   showSectionTabs = true, 
   titleInFirstRow = false, 
   stickyBackButton = false, 
   autoSubmitCountdownDisplay = null,
-  // === Props mới cho Notepad ===
   annotations,
   onNotepadOpen,
 }) {
   const navigate = useNavigate();
   const sectionsToRender = isReviewMode ? reviewSections : examData?.sections;
-  // TẠO COMPONENT CON CHO NÚT NOTEPAD ĐỂ TÁI SỬ DỤNG
+
   const NotepadButton = ({ className = '' }) => {
     const noteCount = annotations?.filter(a => a.type === 'note').length || 0;
 
@@ -59,12 +58,13 @@ export default function ExamHeader({
       </button>
     );
   };
-  // JSX cho phần nội dung (sẽ được bọc bởi 1 trong 2 div dưới)
+
   const headerContent = (
     <>
       <div className={`flex items-center justify-between gap-4 ${isSticky ? 'mb-4' : ''}`}>
         {isSticky ? (
           <>
+            {/* === BÊN TRÁI (STICKY) === */}
             {isReviewMode ? (
               <button
                 type="button"
@@ -89,24 +89,13 @@ export default function ExamHeader({
               )
             )}
             
-            {/* 3. Notepad & Submit Button (Bản Sticky) */}
-            <div className="flex items-center gap-3">
-              <NotepadButton className="h-8" />
-              <button
-                onClick={onSubmitExam}
-                disabled={isSubmitting}
-                className="px-4 h-8 rounded-lg border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all text-sm flex items-center"
-              >
-                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-              </button>
-            </div>
+            {/* === Ở GIỮA (STICKY) === */}
             {stickyBackButton ? (
               <div className="flex-1 flex justify-center">
                 {!isReviewMode && TimerProgressBarComponent && <TimerProgressBarComponent />}
               </div>
             ) : showSectionTabs ? (
               <div className="flex items-center justify-center gap-2 flex-1">
-                {/* SỬA 3: Dùng sectionsToRender */}
                 {sectionsToRender?.map((section) => (
                   <button
                     type="button"
@@ -125,6 +114,7 @@ export default function ExamHeader({
               </div>
             ) : null}
             
+            {/* === BÊN PHẢI (STICKY) === */}
             {isReviewMode ? (
               <div className="w-24"></div> 
             ) : (
@@ -137,6 +127,7 @@ export default function ExamHeader({
                     Tự động nộp sau {autoSubmitCountdownDisplay}
                   </span>
                 )}
+                <NotepadButton className="h-8" />
                 <button
                   type="button"
                   onClick={(e) => { e.preventDefault(); onSubmitExam(); }}
@@ -150,6 +141,7 @@ export default function ExamHeader({
           </>
         ) : (
           <>
+            {/* === BÊN TRÁI (NON-STICKY) === */}
             <button
               type="button"
               style={{ fontFamily: "Nunito" }}
@@ -159,6 +151,7 @@ export default function ExamHeader({
               Quay lại
             </button>
 
+            {/* === Ở GIỮA (NON-STICKY) === */}
             {titleInFirstRow ? (
               <div className="flex-1 flex items-center justify-center">
                 <h1 className="text-3xl md:text-4xl font-extrabold text-[#3563E9] leading-tight">
@@ -167,7 +160,6 @@ export default function ExamHeader({
               </div>
             ) : showSectionTabs ? (
               <div className="hidden md:flex items-center gap-2">
-                {/* SỬA 4: Dùng sectionsToRender */}
                 {sectionsToRender?.map((section) => (
                   <button
                     type="button"
@@ -186,6 +178,7 @@ export default function ExamHeader({
               </div>
             ) : null}
 
+            {/* === BÊN PHẢI (NON-STICKY) === */}
             {isReviewMode ? (
               <div className="w-32"></div>
             ) : (
@@ -198,6 +191,7 @@ export default function ExamHeader({
                     Tự động nộp sau {autoSubmitCountdownDisplay}
                   </span>
                 )}
+                <NotepadButton />
                 <button
                   type="button"
                   style={{ fontFamily: "Nunito", font: Bold }}
@@ -207,21 +201,8 @@ export default function ExamHeader({
                 >
                   {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
                 </button>
-              ))}
-            </div>
-
-            {/* 3. Notepad & Submit Button (Bản Thường) */}
-            <div className="flex items-center gap-3">
-              {/* Nút Nộp bài */}
-              <button
-                style={{ fontFamily: "Nunito", font: Bold }}
-                onClick={onSubmitExam}
-                disabled={isSubmitting}
-                className="px-5 py-2.5 rounded-lg border-2 border-red-500 text-red-500 font-extrabold hover:bg-red-500 hover:text-white transition-all"
-              >
-                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-              </button>
-            </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -247,7 +228,7 @@ export default function ExamHeader({
           <ExamQuestionTypeTabs
             isReviewMode={isReviewMode}
             examData={examData}
-            reviewSections={reviewSections} // <-- SỬA 5: TRUYỀN XUỐNG
+            reviewSections={reviewSections}
             questionTypeTabs={questionTypeTabs}
             activeSection={activeSection}
             activeQuestionType={activeQuestionType}
