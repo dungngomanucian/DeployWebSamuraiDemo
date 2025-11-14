@@ -357,7 +357,7 @@ export default function ExamReviewPage() {
     );
   }
 
-  if (!examData || !currentQuestion) {
+  if (!examData || (!currentQuestion && !isListeningSection) ) {
     if (!resultInfo) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-[#E9EFFC]">
@@ -380,7 +380,7 @@ export default function ExamReviewPage() {
           isSticky={true}
           isReviewMode={true}
           examData={examData}
-          reviewSections={reviewSections} // <-- SỬA 1: TRUYỀN XUỐNG
+          reviewSections={reviewSections}
           activeSection={activeSection}
           activeQuestionType={activeQuestionType}
           questionTypeTabs={questionTypeTabs}
@@ -406,7 +406,7 @@ export default function ExamReviewPage() {
                 isSticky={false}
                 isReviewMode={true}
                 examData={examData}
-                reviewSections={reviewSections} // <-- SỬA 2: TRUYỀN XUỐNG
+                reviewSections={reviewSections}
                 activeSection={activeSection}
                 activeQuestionType={activeQuestionType}
                 questionTypeTabs={questionTypeTabs}
@@ -471,6 +471,7 @@ export default function ExamReviewPage() {
                               {question.position}
                            </div>
                           <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
+                            {question.question_text}
                           </div>
                         </div>
                       </div>
@@ -554,131 +555,388 @@ export default function ExamReviewPage() {
             ) : (
               <>
                 <div className="flex items-start justify-between mb-4">
+                   <div className="flex items-center gap-4">
+                    <div className="px-4 py-2 rounded-xl bg-[#FFD24D] text-[#1E1E1E] font-bold text-lg whitespace-nowrap">
+                      {(() => {
+                        const currentTab = questionTypeTabs.find(tab => tab.id === activeQuestionType);
+                        return currentTab?.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || `問題 ${currentQuestionIndex + 1}`;
+                      })()} 
+                    </div>
+                    {currentQuestion?.taskInstructions && (
+                      <p 
+                        className="text-xl font-bold text-[#0B1320] leading-relaxed cursor-pointer hover:text-[#4169E1] transition-colors break-words hyphens-auto"
+                        onClick={() => {
+                          handleQuestionTypeChange(currentQuestion.questionTypeId);
+                        }}
+                      >
+                        {currentQuestion.taskInstructions.replace(/^問題\s*[０-９0-9]+\s*[：:]\s*/, '')}
+                      </p>
+                    )}
+                    </div>
                 </div>
 
-                {isPerforatedQuestion(activeQuestionType) && (
+                {isPerforatedQuestion(activeQuestionType) && groupedQuestions[activeQuestionType]?.type?.passages && groupedQuestions[activeQuestionType]?.type?.passages.length > 0 && (
                    <div className="mb-6">
                       <PassageBorderBox>
+                        {groupedQuestions[activeQuestionType].type.passages.map((passage, passageIndex) => (
+                          <div key={passageIndex}>
+                            {passage.content && (
+                              <div className="whitespace-pre-line text-lg md:text-xl">
+                                {renderPassageContent(passage.content, { 
+                                  questions: groupedQuestions[activeQuestionType]?.questions || [], 
+                                  questionTypeId: activeQuestionType,
+                                  onQuestionClick: togglePassageQuestion,
+                                  renderQuestionPopover: renderPassageQuestionPopover,
+                                  passageQuestionState: openPassageQuestions,
+                                  questionRefs: passageQuestionRefs
+                                })}                        
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </PassageBorderBox>
                    </div>
                 )}
                 
                 {isPerforatedQuestion(activeQuestionType) ? null : (() => {
                   if (shouldUsePagination) {
+                    const safePageIndex = Math.min(currentQuestionPage, filteredQuestions.length - 1);
+                    const currentPaginationQuestion = filteredQuestions[safePageIndex];
+                    
+                    if (!currentPaginationQuestion) {
+                      return <div className="text-center py-8 text-gray-500">Không tìm thấy câu hỏi</div>;
+                    }
+                    
                     return (
-                      <div className="space-y-2">
-                        {currentQuestion.answers.map((answer) => {
-                            const isStudentChoice = answer.is_student_choice === true;
-                            const isCorrect = answer.is_correct === true;
-                            
-                            let answerStyle = "border-gray-300";
-                            if (isStudentChoice && isCorrect) {
-                                answerStyle = "border-green-500 bg-green-50";
-                            } else if (isStudentChoice && !isCorrect) {
-                                answerStyle = "border-red-500 bg-red-50";
-                            } else if (isCorrect) {
-                                answerStyle = "border-green-400 border-dashed bg-green-50";
-                            }
-                            
-                            return (
-                              <label
-                                key={answer.id}
-                                className={`flex items-center p-2 border rounded-lg transition-all ${answerStyle} cursor-not-allowed`}
-                              >
-                                <input
-                                  type="radio"
-                                  name={`question-${currentQuestion.id}`}
-                                  value={answer.id}
-                                  checked={isStudentChoice}
-                                  readOnly disabled
-                                  className="hidden"
-                                />
-                                <span className="ml-3 ...">
-                                  {formatAnswerText(answer.answer_text, null, null)}
-                                </span>
-                              </label>
-                            );
-                        })}
+                      <div 
+                        key={currentPaginationQuestion.id} 
+                        id={`question-${currentPaginationQuestion.id}`} 
+                        className="scroll-mt-30" 
+                        style={{ scrollMarginTop: `${scrollOffset}px` }}
+                      >
+                        {currentPaginationQuestion.passage && (
+                          <div className="mb-6 p-6 bg-gray-50 rounded-lg">
+                            <div className="text-lg md:text-xl leading-relaxed text-gray-800">
+                              {renderFramedPassageBlocks(currentPaginationQuestion.passage, false)}
+                            </div>
+                          </div>
+                        )}
+                        {currentPaginationQuestion.jlpt_question_passages && currentPaginationQuestion.jlpt_question_passages.length > 0 && (
+                          <div className="mb-6">
+                            <PassageBorderBox>
+                              {currentPaginationQuestion.jlpt_question_passages.map((passage, passageIndex) => (
+                                <div key={passageIndex}>
+                                  {passage.content && (
+                                    <div className="whitespace-pre-line text-lg md:text-xl">
+                                      {renderPassageContent(passage.content, { questions: filteredQuestions, questionTypeId: activeQuestionType })}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </PassageBorderBox>
+                          </div>
+                        )}
+                        <div className="mb-8">
+                          <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 border-2 border-gray-300 rounded-md flex items-center justify-center text-base font-semibold text-gray-700 select-none">
+                              {currentPaginationQuestion.position}
+                            </div>
+                            <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
+                              {currentPaginationQuestion.underline_text ? (
+                                <>
+                                  {currentPaginationQuestion.question_text.split(currentPaginationQuestion.underline_text)[0].split('<enter>').map((part, index) => (
+                                    <span key={index}>
+                                      {part}
+                                      {index < currentPaginationQuestion.question_text.split(currentPaginationQuestion.underline_text)[0].split('<enter>').length - 1 && <br />}
+                                    </span>
+                                  ))}
+                              <Underline weight={1}>
+                                    {currentPaginationQuestion.underline_text.split('<enter>').map((part, index) => (
+                                      <span key={index}>
+                                        {part}
+                                        {index < currentPaginationQuestion.underline_text.split('<enter>').length - 1 && <br />}
+                                      </span>
+                                    ))}
+                              </Underline>
+                                  {currentPaginationQuestion.question_text.split(currentPaginationQuestion.underline_text)[1].split('<enter>').map((part, index) => (
+                                    <span key={index}>
+                                      {part}
+                                      {index < currentPaginationQuestion.question_text.split(currentPaginationQuestion.underline_text)[1].split('<enter>').length - 1 && <br />}
+                                    </span>
+                                  ))}
+                                </>
+                              ) : (
+                                (currentPaginationQuestion?.question_text ?? '')
+                                  .split('<enter>')
+                                  .map((part, index, arr) => (
+                                    <span key={index}>
+                                      {part}
+                                      {index < arr.length - 1 && <br />}
+                                    </span>
+                                  ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          {currentPaginationQuestion.answers && currentPaginationQuestion.answers.length > 0 ? (
+                            (() => {
+                                  const byOrder = new Map();
+                                  currentPaginationQuestion.answers.forEach((a) => {
+                                    const key = String(a.show_order);
+                                    if (!byOrder.has(key)) byOrder.set(key, a);
+                                  });
+                                  return Array.from(byOrder.values()).sort(
+                                    (a, b) => Number(a.show_order) - Number(b.show_order)
+                                  );
+                                })()
+                                .map((answer) => {
+                                  
+                                  const isStudentChoice = answer.is_student_choice === true;
+                                  const isCorrect = answer.is_correct === true;
+                                  
+                                  let answerStyle = "border-gray-300";
+                                  if (isStudentChoice && isCorrect) {
+                                      answerStyle = "border-green-500 bg-green-50";
+                                  } else if (isStudentChoice && !isCorrect) {
+                                      answerStyle = "border-red-500 bg-red-50";
+                                  } else if (isCorrect) {
+                                      answerStyle = "border-green-400 border-dashed bg-green-50";
+                                  }
+                                  
+                                  return (
+                                    <label
+                                      key={answer.id}
+                                      className={`flex items-center p-2 border rounded-lg transition-all ${answerStyle} cursor-not-allowed`}
+                                    >
+                                      <input
+                                        type="radio"
+                                        name={`question-${currentPaginationQuestion.id}`}
+                                        value={answer.id}
+                                        checked={isStudentChoice}
+                                        readOnly disabled
+                                        className="hidden"
+                                      />
+                                      <span
+                                        className={`flex items-center justify-center w-5 h-5 rounded-full border-2 flex-shrink-0 ${
+                                          isStudentChoice ? "border-[#874FFF]" : "border-gray-400"
+                                        }`}
+                                      >
+                                        <span
+                                          className={`w-3 h-3 rounded-full ${
+                                            isStudentChoice ? "bg-[#874FFF]" : "bg-transparent"
+                                          }`}
+                                        />
+                                      </span>
+                                      <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
+                                        {formatAnswerText(answer.answer_text, currentPaginationQuestion.question_text, currentPaginationQuestion.questionTypeId)}
+                                      </span>
+                                      
+                                      {isCorrect && (
+                                        <span className="ml-auto text-green-600 font-bold px-2">✓ Đúng</span>
+                                      )}
+                                      {isStudentChoice && !isCorrect && (
+                                        <span className="ml-auto text-red-600 font-bold px-2">✗ Lựa chọn của bạn</span>
+                                      )}
+    
+                                    </label>
+                                  );
+                            })
+                          ) : (
+                            <p className="text-gray-500">Không có đáp án</p>
+                          )}
+                        </div>
                       </div>
-                    )
+                    );
                   } else {
                     return filteredQuestions.map((question, questionIndex) => (
-                      <div key={question.id} >
+                      <div 
+                        key={question.id} 
+                        id={`question-${question.id}`}
+                        className={`${questionIndex > 0 ? 'mt-8' : ''} scroll-mt-30`}
+                        style={{ scrollMarginTop: `${scrollOffset}px` }}
+                      >
+                        
+                        {question.passage && (
+                          <div className="mb-6 p-6 bg-gray-50 rounded-lg">
+                            <div className="text-lg md:text-xl leading-relaxed text-gray-800">
+                              {renderFramedPassageBlocks(question.passage, false)}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="mb-8">
+                          <div className="flex items-start gap-3">
+                            <div className="w-9 h-9 border-2 border-gray-300 rounded-md flex items-center justify-center text-base font-semibold text-gray-700 select-none">
+                              {question.position}
+                            </div>
+                            <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
+                              {question.underline_text ? (
+                                <>
+                                  {question.question_text.split(question.underline_text)[0].split('<enter>').map((part, index) => (
+                                    <span key={index}>
+                                      {part}
+                                      {index < question.question_text.split(question.underline_text)[0].split('<enter>').length - 1 && <br />}
+                                    </span>
+                                  ))}
+                                  <Underline weight={1}>
+                                    {question.underline_text.split('<enter>').map((part, index) => (
+                                      <span key={index}>
+                                        {part}
+                                        {index < question.underline_text.split('<enter>').length - 1 && <br />}
+                                      </span>
+                                    ))}
+                                  </Underline>
+                                  {question.question_text.split(question.underline_text)[1].split('<enter>').map((part, index) => (
+                                    <span key={index}>
+                                      {part}
+                                      {index < question.question_text.split(question.underline_text)[1].split('<enter>').length - 1 && <br />}
+                                    </span>
+                                  ))}
+                                </>
+                              ) : (
+                                (question?.question_text ?? '')
+                                  .split('<enter>')
+                                  .map((part, index, arr) => (
+                                    <span key={index}>
+                                      {part}
+                                      {index < arr.length - 1 && <br />}
+                                    </span>
+                                  ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {isSortQuestion(question.questionTypeId) && (
+                          <div className="mb-8" style={{fontFamily: "Nunito"}}>
+                            <div className="bg-gray-100 rounded-xl p-6 border-2 border-dashed border-gray-300 min-h-[120px]">
+                              <h4 className="text-lg font-semibold text-gray-700 mb-4 text-center">
+                                Thứ tự đáp án của bạn:
+                              </h4>
+                              <div className="flex flex-wrap gap-3 justify-center">
+                                {(() => {
+                                  const selectedAnswers = answerOrder[question.id] || [];
+                                  
+                                  return selectedAnswers.map((answerId, index) => {
+                                    const answer = question.answers.find(a => a.id === answerId);
+                                    if (!answer) return null;
+                                    
+                                    return (
+                                      <div
+                                        key={answerId}
+                                        className="flex items-center gap-2 bg-white px-4 py-3 rounded-lg border-2 border-[#874FFF] cursor-default"
+                                      >
+                                        <span className="w-8 h-8 bg-[#874FFF] text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                          {index + 1}
+                                        </span>
+                                        <span className="text-gray-800 font-normal">
+                                          {answer.show_order}. {answer.answer_text}
+                                        </span>
+                                      </div>
+                                    );
+                                  });
+                                })()}
+                                {(!answerOrder[question.id] || answerOrder[question.id].length === 0) && (
+                                  <div className="text-gray-500 text-center w-full py-8">
+                                    Bạn đã không trả lời câu hỏi này.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         
                         <div className={activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4 ? "grid grid-cols-4 gap-3" : isSortQuestion(question.questionTypeId) ? "grid grid-cols-4 gap-3" : "space-y-2"}>
-                          {question.answers.map((answer) => {
-                              const isStudentChoice = answer.is_student_choice === true;
-                              const isCorrect = answer.is_correct === true;
-                              let answerStyle = "border-gray-300";
-                              let textStyle = "text-gray-800";
-                              
-                              if (isSortQuestion(question.questionTypeId)) {
-                                if (isStudentChoice) {
-                                  answerStyle = "border-gray-400 bg-gray-100 opacity-60 cursor-not-allowed";
-                                } else {
-                                  answerStyle = "border-gray-300";
-                                }
-                              } else {
-                                if (isStudentChoice && isCorrect) {
-                                    answerStyle = "border-green-500 bg-green-50"; 
-                                    textStyle = "text-green-800 font-semibold";
-                                } else if (isStudentChoice && !isCorrect) {
-                                    answerStyle = "border-red-500 bg-red-50"; 
-                                    textStyle = "text-red-800 font-semibold";
-                                } else if (isCorrect) {
-                                    answerStyle = "border-green-400 border-dashed bg-green-50";
-                                    textStyle = "text-green-800";
-                                }
-                              }
-                              
-                              return (
-                                <label
-                                  key={answer.id}
-                                  className={`flex items-center p-2 border rounded-lg transition-all ${
-                                    activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4
-                                      ? "flex-row"
-                                      : isSortQuestion(question.questionTypeId)
-                                      ? "flex-row"
-                                      : "flex-row"
-                                  } ${answerStyle} cursor-not-allowed`}
-                                >
-                                  <input
-                                    type={isSortQuestion(question.questionTypeId) ? "checkbox" : "radio"}
-                                    checked={isStudentChoice}
-                                    readOnly disabled
-                                    className="hidden"
-                                  />
-                                  {isSortQuestion(question.questionTypeId) ? (
-                                    <span className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-gray-400 flex-shrink-0 font-bold text-xs text-gray-600">
-                                      {answer.show_order}
-                                    </span>
-                                  ) : (
-                                    <span
-                                      className={`flex items-center justify-center w-5 h-5 rounded-full border-2 flex-shrink-0 ${
-                                        isStudentChoice ? "border-[#874FFF]" : "border-gray-400"
-                                      }`}
-                                    >
-                                      <span
-                                        className={`w-3 h-3 rounded-full ${
-                                          isStudentChoice ? "bg-[#874FFF]" : "bg-transparent"
-                                        }`}
-                                      />
-                                    </span>
-                                  )}
-                                  <span className={`ml-3 text-base font-normal ${textStyle}`} style={{fontFamily: "UD Digi Kyokasho N-R"}}>
-                                    {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
-                                  </span>
+                          {question.answers && question.answers.length > 0 ? (
+                            (() => {
+                                  const byOrder = new Map();
+                                  question.answers.forEach((a) => {
+                                    const key = String(a.show_order);
+                                    if (!byOrder.has(key)) byOrder.set(key, a);
+                                  });
+                                  return Array.from(byOrder.values()).sort(
+                                    (a, b) => Number(a.show_order) - Number(b.show_order)
+                                  );
+                                })()
+                                .map((answer) => {
                                   
-                                  {!isSortQuestion(question.questionTypeId) && isCorrect && (
-                                    <span className="ml-auto text-green-600 font-bold px-2">✓ Đúng</span>
-                                  )}
-                                  {!isSortQuestion(question.questionTypeId) && isStudentChoice && !isCorrect && (
-                                    <span className="ml-auto text-red-600 font-bold px-2">✗</span>
-                                  )}
-
-                                </label>
-                              );
-                          })}
+                                  const isStudentChoice = answer.is_student_choice === true;
+                                  const isCorrect = answer.is_correct === true;
+                                  
+                                  let answerStyle = "border-gray-300";
+                                  let textStyle = "text-gray-800";
+                                  
+                                  if (isSortQuestion(question.questionTypeId)) {
+                                    if (isStudentChoice) {
+                                      answerStyle = "border-gray-400 bg-gray-100 opacity-60 cursor-not-allowed";
+                                    } else {
+                                      answerStyle = "border-gray-300";
+                                    }
+                                  } else {
+                                    if (isStudentChoice && isCorrect) {
+                                        answerStyle = "border-green-500 bg-green-50"; 
+                                        textStyle = "text-green-800 font-semibold";
+                                    } else if (isStudentChoice && !isCorrect) {
+                                        answerStyle = "border-red-500 bg-red-50"; 
+                                        textStyle = "text-red-800 font-semibold";
+                                    } else if (isCorrect) {
+                                        answerStyle = "border-green-400 border-dashed bg-green-50";
+                                        textStyle = "text-green-800";
+                                    }
+                                  }
+                                  
+                                  return (
+                                    <label
+                                      key={answer.id}
+                                      className={`flex items-center p-2 border rounded-lg transition-all ${
+                                        activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4
+                                          ? "flex-row"
+                                          : isSortQuestion(question.questionTypeId)
+                                          ? "flex-row"
+                                          : "flex-row"
+                                      } ${answerStyle} cursor-not-allowed`}
+                                    >
+                                      <input
+                                        type={isSortQuestion(question.questionTypeId) ? "checkbox" : "radio"}
+                                        checked={isStudentChoice}
+                                        readOnly disabled
+                                        className="hidden"
+                                      />
+                                      {isSortQuestion(question.questionTypeId) ? (
+                                        <span className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-gray-400 flex-shrink-0 font-bold text-xs text-gray-600">
+                                          {answer.show_order}
+                                        </span>
+                                      ) : (
+                                        <span
+                                          className={`flex items-center justify-center w-5 h-5 rounded-full border-2 flex-shrink-0 ${
+                                            isStudentChoice ? "border-[#874FFF]" : "border-gray-400"
+                                          }`}
+                                        >
+                                          <span
+                                            className={`w-3 h-3 rounded-full ${
+                                              isStudentChoice ? "bg-[#874FFF]" : "bg-transparent"
+                                            }`}
+                                          />
+                                        </span>
+                                      )}
+                                      <span className={`ml-3 text-base font-normal ${textStyle}`} style={{fontFamily: "UD Digi Kyokasho N-R"}}>
+                                        {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
+                                      </span>
+                                      
+                                      {!isSortQuestion(question.questionTypeId) && isCorrect && (
+                                        <span className="ml-auto text-green-600 font-bold px-2">✓ Đúng</span>
+                                      )}
+                                      {!isSortQuestion(question.questionTypeId) && !isCorrect && (
+                                        <span className="ml-auto text-red-600 font-bold px-2">✗</span>
+                                      )}
+    
+                                    </label>
+                                  );
+                            })
+                          ) : (
+                            <p className="text-gray-500">Không có đáp án</p>
+                          )}
                         </div>
                       </div>
                     ));
