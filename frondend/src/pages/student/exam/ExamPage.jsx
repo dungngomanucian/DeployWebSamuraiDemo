@@ -24,7 +24,6 @@ import { useExamTimers } from "../../../hooks/exam/useExamTimers";
 import { useExamState } from "../../../hooks/exam/useExamState";
 
 // 3. IMPORT CÁC COMPONENT UI ĐÃ TÁCH
-// (Không cần import ExamQuestionTypeTabs nữa, vì ExamHeader đã gọi nó)
 import ExamHeader from "../../../components/Exam/ExamHeader";
 
 export default function ExamPage() {
@@ -45,7 +44,6 @@ export default function ExamPage() {
   const [currentQuestionPage, setCurrentQuestionPage] = useState(0);
   const [openPassageQuestions, setOpenPassageQuestions] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showCertificate, setShowCertificate] = useState(false);
   const [finalResultData, setFinalResultData] = useState(null);
   
   // (Refs)
@@ -622,6 +620,7 @@ export default function ExamPage() {
       {showStickyProgress && (
         <ExamHeader
           isSticky={true}
+          isReviewMode={false}
           examData={examData}
           activeSection={activeSection}
           activeQuestionType={activeQuestionType}
@@ -650,6 +649,7 @@ export default function ExamPage() {
             <div ref={nonStickyHeaderRef}> {/* (SỬA LỖI CUỘN) Gắn Ref vào đây */}
               <ExamHeader
                 isSticky={false}
+                isReviewMode={false}
                 examData={examData}
                 activeSection={activeSection}
                 activeQuestionType={activeQuestionType}
@@ -1124,23 +1124,6 @@ export default function ExamPage() {
               handleSubmitExam();
             }}
             bothButtonsSubmit={true}
-          />
-        </Suspense>
-      )}
-      {showCertificate && (
-        <Suspense fallback={null}>
-          <ExamCertificateOverlay
-            show={showCertificate}
-            onHide={() => {
-              setShowCertificate(false);
-              navigate(`/student-dashboard`, {
-                state: { 
-                  resultData: finalResultData 
-                } 
-              });
-            }}
-            resultData={finalResultData}
-            examData={examData} 
           />
         </Suspense>
       )}

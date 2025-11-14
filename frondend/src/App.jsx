@@ -28,6 +28,7 @@ import ManageCourses from './pages/admin/course/Index';
 import ManageClassrooms from './pages/admin/classroom/Index';
 import ManageLevels from './pages/admin/level/Index';
 import CreateStudentPage from "./pages/admin/student/Form";
+import ExamResultPage from "./pages/student/exam/ExamResultPage";
 
 export default function App() {
   return (
@@ -50,7 +51,7 @@ export default function App() {
           <Route path="/listening-intro" element={<ListeningIntro />} />
           <Route path="/exam-start" element={<ExamPage />} />
           <Route path="/listening-start" element={<ListeningPage />} />
-          
+          <Route path="/exam-results/:examResultId" element={<ExamResultPage />} />
           <Route path="/student-dashboard" element={<StudentDashboard />} />     
 
           <Route path="/admin/login" element={<AdminLoginPage />} /> {/* <-- 2. Thêm route login admin */}
