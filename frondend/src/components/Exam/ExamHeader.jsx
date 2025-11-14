@@ -1,13 +1,11 @@
-// src/components/Exam/ExamHeader.jsx (ĐÃ SỬA VỚI isReviewMode)
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bold } from 'lucide-react';
 import ExamQuestionTypeTabs from './ExamQuestionTypeTabs'; 
 
 export default function ExamHeader({
-  // === Props trạng thái ===
   isSticky = false,
-  isReviewMode = false, // <-- THÊM PROP MỚI VỚI GIÁ TRỊ MẶC ĐỊNH
+  isReviewMode = false,
   examData,
   activeSection,
   activeQuestionType,
@@ -20,55 +18,53 @@ export default function ExamHeader({
   isSubmitting,
   expandedQuestionType,
   
-  // === Props sự kiện ===
   onSectionChange,
   onQuestionTypeChange,
   onSubmitExam,
   setCurrentQuestionIndex,
   setCurrentQuestionPage,
 
-  // === Component Props ===
-  TimerProgressBarComponent, // Nhận component TimerProgressBar từ cha
+  TimerProgressBarComponent, 
   
-  // === Props tùy chỉnh cho ListeningPage ===
-  showSectionTabs = true, // Ẩn/hiện section tabs
-  titleInFirstRow = false, // Hiển thị title ở hàng đầu
-  stickyBackButton = false, // Hiển thị nút Quay lại trong sticky header
+  showSectionTabs = true, 
+  titleInFirstRow = false, 
+  stickyBackButton = false, 
   autoSubmitCountdownDisplay = null,
 }) {
   const navigate = useNavigate();
 
-  // JSX cho phần nội dung (sẽ được bọc bởi 1 trong 2 div dưới)
   const headerContent = (
     <>
-      {/* HÀNG 1:
-        - Bản thường: [Quay lại] [Tab Section] [Nộp bài]
-        - Bản dính: [Timer/Quay lại] [Tab Section] [Nộp bài]
-      */}
       <div className={`flex items-center justify-between gap-4 ${isSticky ? 'mb-4' : ''}`}>
         {isSticky ? (
           <>
-            {/* 1. Nút Quay lại hoặc Progress Bar (Bản Sticky) */}
-            {stickyBackButton ? (
+            {isReviewMode ? (
               <button
                 type="button"
                 style={{ fontFamily: "Nunito" }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate(-1);
-                }}
-                className="px-4 h-8 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-semibold hover:bg-[#5427B4] hover:text-white transition-all text-sm flex items-center"
+                onClick={(e) => { e.preventDefault(); navigate(-1); }}
+                className="px-4 h-8 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-semibold hover:bg-[#5427B4] hover:text-white transition-all text-sm flex items-center w-24 justify-center"
               >
                 Quay lại
               </button>
             ) : (
-              TimerProgressBarComponent && <TimerProgressBarComponent />
+              stickyBackButton ? (
+                <button
+                  type="button"
+                  style={{ fontFamily: "Nunito" }}
+                  onClick={(e) => { e.preventDefault(); navigate(-1); }}
+                  className="px-4 h-8 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-semibold hover:bg-[#5427B4] hover:text-white transition-all text-sm flex items-center"
+                >
+                  Quay lại
+                </button>
+              ) : (
+                TimerProgressBarComponent && <TimerProgressBarComponent />
+              )
             )}
             
-            {/* 2. Timer ở giữa (nếu có stickyBackButton) hoặc Section Tabs */}
             {stickyBackButton ? (
               <div className="flex-1 flex justify-center">
-                {TimerProgressBarComponent && <TimerProgressBarComponent />}
+                {!isReviewMode && TimerProgressBarComponent && <TimerProgressBarComponent />}
               </div>
             ) : showSectionTabs ? (
               <div className="flex items-center justify-center gap-2 flex-1">
@@ -77,10 +73,7 @@ export default function ExamHeader({
                     type="button"
                     style={{ fontFamily: "UD Digi Kyokasho N-R" }}
                     key={section.type}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onSectionChange(section.type);
-                    }}
+                    onClick={(e) => { e.preventDefault(); onSectionChange(section.type); }}
                     className={`h-8 px-3 rounded-lg text-sm font-medium border transition-all cursor-pointer flex items-center ${
                       section.type === activeSection
                         ? "bg-[#4169E1] text-white border-[#4169E1]"
@@ -93,45 +86,40 @@ export default function ExamHeader({
               </div>
             ) : null}
             
-            {/* 3. Submit Button (Bản Sticky) */}
-            <div className="flex items-center gap-3">
-              {autoSubmitCountdownDisplay && (
-                <span
-                  className="text-sm font-semibold text-red-500 whitespace-nowrap"
-                  style={{ fontFamily: 'Nunito' }}
+            {isReviewMode ? (
+              <div className="w-24"></div> 
+            ) : (
+              <div className="flex items-center gap-3">
+                {autoSubmitCountdownDisplay && (
+                  <span
+                    className="text-sm font-semibold text-red-500 whitespace-nowrap"
+                    style={{ fontFamily: 'Nunito' }}
+                  >
+                    Tự động nộp sau {autoSubmitCountdownDisplay}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); onSubmitExam(); }}
+                  disabled={isSubmitting}
+                  className="px-4 h-8 rounded-lg border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all text-sm flex items-center"
                 >
-                  Tự động nộp sau {autoSubmitCountdownDisplay}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  onSubmitExam();
-                }}
-                disabled={isSubmitting}
-                className="px-4 h-8 rounded-lg border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all text-sm flex items-center"
-              >
-                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-              </button>
-            </div>
+                  {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <>
-            {/* 1. Nút Quay lại (Bản Thường) */}
             <button
               type="button"
               style={{ fontFamily: "Nunito" }}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate(-1);
-              }}
+              onClick={(e) => { e.preventDefault(); navigate(-1); }}
               className="px-4 py-2 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-extrabold hover:bg-[#5427B4] hover:text-white transition-all"
             >
               Quay lại
             </button>
 
-            {/* 2. Section Tabs hoặc Title (Bản Thường) */}
             {titleInFirstRow ? (
               <div className="flex-1 flex items-center justify-center">
                 <h1 className="text-3xl md:text-4xl font-extrabold text-[#3563E9] leading-tight">
@@ -145,10 +133,7 @@ export default function ExamHeader({
                     type="button"
                     style={{ fontFamily: "UD Digi Kyokasho N-R" }}
                     key={section.type}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onSectionChange(section.type);
-                    }}
+                    onClick={(e) => { e.preventDefault(); onSectionChange(section.type); }}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all cursor-pointer ${
                       section.type === activeSection
                         ? "bg-[#4169E1] text-white border-[#4169E1]"
@@ -161,35 +146,33 @@ export default function ExamHeader({
               </div>
             ) : null}
 
-            {/* 3. Submit Button (Bản Thường) */}
-            <div className="flex items-center gap-3">
-              {autoSubmitCountdownDisplay && (
-                <span
-                  className="text-sm font-semibold text-red-500 whitespace-nowrap"
-                  style={{ fontFamily: 'Nunito' }}
+            {isReviewMode ? (
+              <div className="w-32"></div>
+            ) : (
+              <div className="flex items-center gap-3">
+                {autoSubmitCountdownDisplay && (
+                  <span
+                    className="text-sm font-semibold text-red-500 whitespace-nowrap"
+                    style={{ fontFamily: 'Nunito' }}
+                  >
+                    Tự động nộp sau {autoSubmitCountdownDisplay}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  style={{ fontFamily: "Nunito", font: Bold }}
+                  onClick={(e) => { e.preventDefault(); onSubmitExam(); }}
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 rounded-lg border-2 border-red-500 text-red-500 font-extrabold hover:bg-red-500 hover:text-white transition-all"
                 >
-                  Tự động nộp sau {autoSubmitCountdownDisplay}
-                </span>
-              )}
-              <button
-                type="button"
-                style={{ fontFamily: "Nunito", font: Bold }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onSubmitExam();
-                }}
-                disabled={isSubmitting}
-                className="px-5 py-2.5 rounded-lg border-2 border-red-500 text-red-500 font-extrabold hover:bg-red-500 hover:text-white transition-all"
-              >
-                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
-              </button>
-            </div>
+                  {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
 
-      {/* HÀNG 2: Tiêu đề (Chỉ cho bản Thường và khi không ở hàng đầu)
-      */}
       {!isSticky && !titleInFirstRow && (
         <div className="mt-4 flex items-center justify-center">
           <div className="text-center">
@@ -200,19 +183,16 @@ export default function ExamHeader({
         </div>
       )}
 
-      {/* HÀNG 3: Timer (Chỉ cho bản Thường & KHÔNG phải review) */}
       {!isSticky && !isReviewMode && (
         <div className="mt-4 flex justify-center">
           {TimerProgressBarComponent && <TimerProgressBarComponent />}
         </div>
       )}
 
-      {/* HÀNG 4: Thanh Tabs câu hỏi (Chung cho cả hai) */}
       {questionTypeTabs.length > 0 && (
         <div className={`${isSticky ? 'mt-4' : 'mt-6'} w-full`}>
           <ExamQuestionTypeTabs
-            isReviewMode={isReviewMode} // <-- TRUYỀN XUỐNG
-            // ... (tất cả các props khác)
+            isReviewMode={isReviewMode}
             examData={examData}
             questionTypeTabs={questionTypeTabs}
             activeSection={activeSection}
@@ -233,7 +213,6 @@ export default function ExamHeader({
     </>
   );
 
-  // Render dựa trên isSticky
   if (isSticky) {
     return (
       <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-lg border-b border-gray-200 px-6 py-3" style={{ fontFamily: "Nunito" }}>
