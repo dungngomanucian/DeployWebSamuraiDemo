@@ -16,7 +16,6 @@ import {
 } from "../../../components/Exam/ExamRenderUtils";
 
 import ExamHeader from "../../../components/Exam/ExamHeader";
-import AudioPlayer from "../../../components/Exam/AudioPlayer";
 
 export default function ExamReviewPage() {
   const navigate = useNavigate();
@@ -209,6 +208,10 @@ export default function ExamReviewPage() {
   const questionTypeTabs = getQuestionTypeTabs();
 
   const renderPassageQuestionPopover = (q) => {
+    
+    // BƯỚC 1: Lấy ID đáp án mà học sinh đã chọn (từ backend)
+    const studentChoiceId = q.student_chosen_answer_id;
+
     return (
       <div className="absolute z-50 left-0 top-0 translate-y-9">
         <div className="shadow-lg rounded bg-white max-w-[85vw] w-[240px]">
@@ -224,23 +227,30 @@ export default function ExamReviewPage() {
               );
               return normalizedAnswers.map((ans) => {
                 
-                const isStudentChoice = ans.is_student_choice === true;
+                // === BƯỚC 2: LOGIC TÔ MÀU ĐÃ SỬA ===
+                
+                // 1. Đáp án này có đúng không? (Từ backend)
                 const isCorrect = ans.is_correct === true;
                 
+                // 2. Học sinh có chọn đáp án này không?
+                const isStudentChoice = (ans.id === studentChoiceId);
+                
+                // 3. Quyết định màu sắc
                 let answerStyle = 'bg-white hover:bg-gray-50';
                 if (isStudentChoice && isCorrect) {
-                    answerStyle = "bg-green-100";
+                    answerStyle = "bg-green-100"; // Chọn đúng
                 } else if (isStudentChoice && !isCorrect) {
-                    answerStyle = "bg-red-100";
+                    answerStyle = "bg-red-100"; // Chọn sai
                 } else if (isCorrect) {
-                    answerStyle = "bg-green-100";
+                    answerStyle = "bg-green-100"; // Đáp án đúng (nhưng không chọn)
                 }
+                // === KẾT THÚC SỬA LOGIC ===
 
                 return (
                   <button
                     key={ans.id}
                     type="button"
-                    disabled
+                    disabled 
                     className={`text-left w-full px-3 py-2.5 transition-colors cursor-not-allowed ${answerStyle}`}
                   >
                     <div className="flex items-start text-gray-900 leading-6">
@@ -326,27 +336,7 @@ export default function ExamReviewPage() {
     }
   };
   
-  const renderAudioPlayer = () => {
-    const audioPath = currentSectionData?.audio_path;
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://oreasnlyzhaeteipyylw.supabase.co';
-    
-    const levelId = examData?.level_id || '';
-    const match = /^level0([1-5])$/.exec(levelId);
-    const bucket = match ? `N${match[1]}` : null;
-    
-    const audioUrl = audioPath && bucket
-      ? `${supabaseUrl}/storage/v1/object/public/${bucket}/${audioPath}`
-      : null;
-
-    if (!audioUrl) {
-      return (
-        <div className="py-8 text-center">
-          <p className="text-gray-500">Không tìm thấy file audio cho phần thi này.</p>
-        </div>
-      );
-    }
-    return <AudioPlayer audioUrl={audioUrl} sharedKey={`review-listening-${examId}`} />;
-  };
+  
   
   
   if (loading) {
@@ -454,9 +444,7 @@ export default function ExamReviewPage() {
             
             {isListeningSection ? (
               <>
-                <div className="mb-6">
-                  {renderAudioPlayer()}
-                </div>
+                
                 {filteredQuestions.map((question, questionIndex) => (
                   <div 
                     key={question.id} 
@@ -827,9 +815,7 @@ export default function ExamReviewPage() {
                                         key={answerId}
                                         className="flex items-center gap-2 bg-white px-4 py-3 rounded-lg border-2 border-[#874FFF] cursor-default"
                                       >
-                                        <span className="w-8 h-8 bg-[#874FFF] text-white rounded-full flex items-center justify-center font-bold text-sm">
-                                          {index + 1}
-                                        </span>
+                                        
                                         <span className="text-gray-800 font-normal">
                                           {answer.show_order}. {answer.answer_text}
                                         </span>
@@ -864,9 +850,7 @@ export default function ExamReviewPage() {
                                           key={answer.id}
                                           className="flex items-center gap-2 bg-white px-4 py-3 rounded-lg border-2 border-green-500 cursor-default"
                                         >
-                                          <span className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                                            {index + 1}
-                                          </span>
+                                          
                                           <span className="text-gray-800 font-normal">
                                             {answer.show_order}. {answer.answer_text}
                                           </span>
@@ -881,33 +865,28 @@ export default function ExamReviewPage() {
                           </div>
                         )}
                         
-                        <div className={activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4 ? "grid grid-cols-4 gap-3" : isSortQuestion(question.questionTypeId) ? "grid grid-cols-4 gap-3" : "space-y-2"}>
-                          {question.answers && question.answers.length > 0 ? (
-                            (() => {
-                                  const byOrder = new Map();
-                                  question.answers.forEach((a) => {
-                                    const key = String(a.show_order);
-                                    if (!byOrder.has(key)) byOrder.set(key, a);
-                                  });
-                                  return Array.from(byOrder.values()).sort(
-                                    (a, b) => Number(a.show_order) - Number(b.show_order)
-                                  );
-                                })()
-                                .map((answer) => {
-                                  
-                                  const isStudentChoice = answer.is_student_choice === true;
-                                  const isCorrect = answer.is_correct === true;
-                                  
-                                  let answerStyle = "border-gray-300";
-                                  let textStyle = "text-gray-800";
-                                  
-                                  if (isSortQuestion(question.questionTypeId)) {
-                                    if (isStudentChoice) {
-                                      answerStyle = "border-gray-400 bg-gray-100 opacity-60 cursor-not-allowed";
-                                    } else {
-                                      answerStyle = "border-gray-300";
-                                    }
-                                  } else {
+                        {!isSortQuestion(question.questionTypeId) && (
+                          <div className={activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4 ? "grid grid-cols-4 gap-3" : "space-y-2"}>
+                            {question.answers && question.answers.length > 0 ? (
+                              (() => {
+                                    const byOrder = new Map();
+                                    question.answers.forEach((a) => {
+                                      const key = String(a.show_order);
+                                      if (!byOrder.has(key)) byOrder.set(key, a);
+                                    });
+                                    return Array.from(byOrder.values()).sort(
+                                      (a, b) => Number(a.show_order) - Number(b.show_order)
+                                    );
+                                  })()
+                                  .map((answer) => {
+                                    
+                                    const isStudentChoice = answer.is_student_choice === true;
+                                    const isCorrect = answer.is_correct === true;
+                                    
+                                    let answerStyle = "border-gray-300";
+                                    let textStyle = "text-gray-800";
+                                    
+                                    // (Logic này là của câu trắc nghiệm, không phải câu sắp xếp)
                                     if (isStudentChoice && isCorrect) {
                                         answerStyle = "border-green-500 bg-green-50"; 
                                         textStyle = "text-green-800 font-semibold";
@@ -918,30 +897,22 @@ export default function ExamReviewPage() {
                                         answerStyle = "border-green-400 border-dashed bg-green-50";
                                         textStyle = "text-green-800";
                                     }
-                                  }
-                                  
-                                  return (
-                                    <label
-                                      key={answer.id}
-                                      className={`flex items-center p-2 border rounded-lg transition-all ${
-                                        activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4
-                                          ? "flex-row"
-                                          : isSortQuestion(question.questionTypeId)
-                                          ? "flex-row"
-                                          : "flex-row"
-                                      } ${answerStyle} cursor-not-allowed`}
-                                    >
-                                      <input
-                                        type={isSortQuestion(question.questionTypeId) ? "checkbox" : "radio"}
-                                        checked={isStudentChoice}
-                                        readOnly disabled
-                                        className="hidden"
-                                      />
-                                      {isSortQuestion(question.questionTypeId) ? (
-                                        <span className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-gray-400 flex-shrink-0 font-bold text-xs text-gray-600">
-                                          {answer.show_order}
-                                        </span>
-                                      ) : (
+                                    
+                                    return (
+                                      <label
+                                        key={answer.id}
+                                        className={`flex items-center p-2 border rounded-lg transition-all ${
+                                          activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4
+                                            ? "flex-row"
+                                            : "flex-row"
+                                        } ${answerStyle} cursor-not-allowed`}
+                                      >
+                                        <input
+                                          type="radio"
+                                          checked={isStudentChoice}
+                                          readOnly disabled
+                                          className="hidden"
+                                        />
                                         <span
                                           className={`flex items-center justify-center w-5 h-5 rounded-full border-2 flex-shrink-0 ${
                                             isStudentChoice ? "border-[#874FFF]" : "border-gray-400"
@@ -953,25 +924,25 @@ export default function ExamReviewPage() {
                                             }`}
                                           />
                                         </span>
-                                      )}
-                                      <span className={`ml-3 text-base font-normal ${textStyle}`} style={{fontFamily: "UD Digi Kyokasho N-R"}}>
-                                        {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
-                                      </span>
-                                      
-                                      {!isSortQuestion(question.questionTypeId) && isCorrect && (
-                                        <span className="ml-auto text-green-600 font-bold px-2">✓ Đúng</span>
-                                      )}
-                                      {!isSortQuestion(question.questionTypeId) && !isCorrect && (
-                                        <span className="ml-auto text-red-600 font-bold px-2">✗</span>
-                                      )}
-    
-                                    </label>
-                                  );
-                            })
-                          ) : (
-                            <p className="text-gray-500">Không có đáp án</p>
-                          )}
-                        </div>
+                                        <span className={`ml-3 text-base font-normal ${textStyle}`} style={{fontFamily: "UD Digi Kyokasho N-R"}}>
+                                          {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
+                                        </span>
+                                        
+                                        {isCorrect && (
+                                          <span className="ml-auto text-green-600 font-bold px-2">✓ Đúng</span>
+                                        )}
+                                        {!isCorrect && (
+                                          <span className="ml-auto text-red-600 font-bold px-2">✗</span>
+                                        )}
+      
+                                      </label>
+                                    );
+                              })
+                            ) : (
+                              <p className="text-gray-500">Không có đáp án</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ));
                   }
