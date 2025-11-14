@@ -7,6 +7,7 @@ export default function ExamHeader({
   isSticky = false,
   isReviewMode = false,
   examData,
+  reviewSections, // <-- SỬA 1: NHẬN PROP MỚI
   activeSection,
   activeQuestionType,
   questionTypeTabs,
@@ -32,6 +33,9 @@ export default function ExamHeader({
   autoSubmitCountdownDisplay = null,
 }) {
   const navigate = useNavigate();
+
+  // SỬA 2: Dùng mảng sections đúng cho chế độ review
+  const sectionsToRender = isReviewMode ? reviewSections : examData?.sections;
 
   const headerContent = (
     <>
@@ -68,7 +72,8 @@ export default function ExamHeader({
               </div>
             ) : showSectionTabs ? (
               <div className="flex items-center justify-center gap-2 flex-1">
-                {examData?.sections?.map((section) => (
+                {/* SỬA 3: Dùng sectionsToRender */}
+                {sectionsToRender?.map((section) => (
                   <button
                     type="button"
                     style={{ fontFamily: "UD Digi Kyokasho N-R" }}
@@ -128,7 +133,8 @@ export default function ExamHeader({
               </div>
             ) : showSectionTabs ? (
               <div className="hidden md:flex items-center gap-2">
-                {examData?.sections?.map((section) => (
+                {/* SỬA 4: Dùng sectionsToRender */}
+                {sectionsToRender?.map((section) => (
                   <button
                     type="button"
                     style={{ fontFamily: "UD Digi Kyokasho N-R" }}
@@ -194,6 +200,7 @@ export default function ExamHeader({
           <ExamQuestionTypeTabs
             isReviewMode={isReviewMode}
             examData={examData}
+            reviewSections={reviewSections} // <-- SỬA 5: TRUYỀN XUỐNG
             questionTypeTabs={questionTypeTabs}
             activeSection={activeSection}
             activeQuestionType={activeQuestionType}

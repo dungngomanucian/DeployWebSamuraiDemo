@@ -266,24 +266,64 @@ export default function ExamReviewPage() {
   
   const handleSectionChange = (sectionType, questionTypeId = null) => {
     if (!examData) return;
-    
+
     userSelectedSectionRef.current = true;
     activeSectionRef.current = sectionType;
     
     setActiveSection(sectionType);
     setCurrentQuestionIndex(0); 
+    setCurrentQuestionPage(0);
+
+    const newSection = reviewSections.find(s => s.type === sectionType); 
     
-    const newSection = examData.sections.find(s => s.type === sectionType);
     if (newSection && newSection.question_types.length > 0) {
+      let targetQuestionTypeId = null;
+      
       if (questionTypeId) {
-      } else {
-        const firstQuestionTypeId = newSection.question_types[0].id;
-        setActiveQuestionType(firstQuestionTypeId);
+        const targetQuestionType = newSection.question_types.find(qt => qt.id === questionTypeId);
+        if (targetQuestionType) {
+          targetQuestionTypeId = questionTypeId;
+        }
       }
+      
+      if (!targetQuestionTypeId) {
+        targetQuestionTypeId = newSection.question_types[0].id;
+      }
+
+      setActiveQuestionType(targetQuestionTypeId);
+      
+      setExpandedQuestionType(prev => ({
+          ...prev,
+          [sectionType]: targetQuestionTypeId
+      }));
     }
   };
 
   const handleQuestionTypeChange = (questionTypeId) => {
+    if (!examData) return;
+    
+    const targetSection = reviewSections.find(section => 
+      section.question_types.some(qt => qt.id === questionTypeId)
+    );
+    
+    if (targetSection && targetSection.type !== activeSection) {
+      userSelectedSectionRef.current = true;
+      activeSectionRef.current = targetSection.type;
+      handleSectionChange(targetSection.type, questionTypeId); 
+      return;
+    }
+    
+    if (targetSection && targetSection.type === activeSection) {
+      setActiveQuestionType(questionTypeId);
+      
+      setExpandedQuestionType(prev => ({
+        ...prev,
+        [activeSection]: prev[activeSection] === questionTypeId ? null : questionTypeId
+      }));
+      
+      setCurrentQuestionPage(0);
+      setCurrentQuestionIndex(0);
+    }
   };
   
   const renderAudioPlayer = () => {
@@ -307,6 +347,7 @@ export default function ExamReviewPage() {
     }
     return <AudioPlayer audioUrl={audioUrl} sharedKey={`review-listening-${examId}`} />;
   };
+  
   
   if (loading) {
     return (
@@ -339,6 +380,7 @@ export default function ExamReviewPage() {
           isSticky={true}
           isReviewMode={true}
           examData={examData}
+          reviewSections={reviewSections} // <-- SỬA 1: TRUYỀN XUỐNG
           activeSection={activeSection}
           activeQuestionType={activeQuestionType}
           questionTypeTabs={questionTypeTabs}
@@ -364,6 +406,7 @@ export default function ExamReviewPage() {
                 isSticky={false}
                 isReviewMode={true}
                 examData={examData}
+                reviewSections={reviewSections} // <-- SỬA 2: TRUYỀN XUỐNG
                 activeSection={activeSection}
                 activeQuestionType={activeQuestionType}
                 questionTypeTabs={questionTypeTabs}
