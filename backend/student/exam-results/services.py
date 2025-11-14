@@ -60,10 +60,10 @@ class ResultService:
     def get_result_detail(student_id: str, exam_result_id: int) -> Dict:
         """
         Lấy chi tiết bài làm (review) và gộp với đề thi gốc.
+        (ĐÃ CẬP NHẬT để xử lý câu hỏi sắp xếp)
         """
         try:
-            # 1. XÁC MINH QUYỀN SỞ HỮU (Verify Ownership)
-            # Kiểm tra xem exam_result_id có tồn tại VÀ thuộc student_id này không
+            # 1. XÁC MINH QUYỀN SỞ HỮU (Giữ nguyên)
             result_meta_res = supabase.table('exam_results')\
                 .select('id, exam_id, sum_score, duration, datetime')\
                 .eq('id', exam_result_id)\
@@ -72,63 +72,84 @@ class ResultService:
                 .execute()
 
             if not result_meta_res.data:
-                # Không tìm thấy hoặc không có quyền
                 return {'success': False, 'error': 'Không tìm thấy kết quả bài làm'}
             
             result_metadata = result_meta_res.data
-            exam_id = result_metadata['exam_id'] # Lấy ID của đề thi gốc
+            exam_id = result_metadata['exam_id']
 
-            # 2. LẤY BÀI LÀM CỦA HỌC SINH (Student's Submission)
-            # Lấy tất cả câu trả lời đã lưu của bài làm này
-            student_answers_res = supabase.table('save_answers')\
-                .select('exam_question_id, chosen_answer_id')\
-                .eq('exam_result_id', exam_result_id)\
-                .execute()
-            
-            # Chuyển từ List sang Map (Dictionary) để tra cứu nhanh (O(1))
-            # student_answers_map = {"Q1_ID": "Ans_B", "Q2_ID": "Ans_C", ...}
-            student_answers_map = {
-                ans['exam_question_id']: ans['chosen_answer_id'] 
-                for ans in student_answers_res.data
-            }
-            
-            # 3. LẤY ĐỀ THI GỐC (Exam Template)
-            # Tái sử dụng hàm get_full_exam_data từ ExamService
+            # 2. LẤY ĐỀ THI GỐC (Lấy trước)
             exam_data_result = ExamService.get_full_exam_data(exam_id)
             
             if not exam_data_result['success']:
-                # Nếu đề thi gốc bị lỗi (ví dụ: đã bị xóa), báo lỗi
                 return {'success': False, 'error': 'Không thể tải được đề thi gốc'}
             
-            exam_content = exam_data_result['data'] # Đây là dictionary lồng nhau khổng lồ
+            exam_content = exam_data_result['data']
 
-            # 4. KẾT HỢP (Merge) DỮ LIỆU
-            # Lặp qua đề thi gốc và "đánh dấu" các câu trả lời của học sinh
+            # 3. TẠO MAP CÂU HỎI SẮP XẾP
+            question_type_map = {}
+            for section in exam_content.get('sections', []):
+                for qt in section.get('question_types', []):
+                    
+                    # === ĐÂY LÀ DÒNG ĐÃ SỬA ===
+                    is_sort = qt.get('is_Sort_Question', False) 
+                    # ==========================
+                    
+                    for question in qt.get('questions', []):
+                        if question: 
+                           question_type_map[question.get('id')] = is_sort
+
+            # 4. LẤY BÀI LÀM (Sắp xếp theo 'position')
+            student_answers_res = supabase.table('save_answers')\
+                .select('exam_question_id, chosen_answer_id, position')\
+                .eq('exam_result_id', exam_result_id)\
+                .order('position', desc=False)\
+                .execute()
             
+            # 5. XỬ LÝ BÀI LÀM (Tạo mảng cho câu 'is_sort')
+            student_answers_map = {}
+            for ans in student_answers_res.data:
+                q_id = ans['exam_question_id']
+                chosen_id = ans['chosen_answer_id']
+                
+                if q_id is None:
+                    continue 
+                    
+                is_sort = question_type_map.get(q_id, False)
+
+                if is_sort:
+                    if q_id not in student_answers_map:
+                        student_answers_map[q_id] = []
+                    student_answers_map[q_id].append(chosen_id)
+                else:
+                    student_answers_map[q_id] = chosen_id
+
+            # 6. GỘP (MERGE) DỮ LIỆU
             for section in exam_content.get('sections', []):
                 for qt in section.get('question_types', []):
                     for question in qt.get('questions', []):
+                        if not question:
+                            continue 
+                        
                         q_id = question.get('id')
+                        chosen_data = student_answers_map.get(q_id)
                         
-                        # Lấy câu trả lời học sinh chọn từ map
-                        chosen_id = student_answers_map.get(q_id)
+                        question['student_chosen_answer_id'] = chosen_data
                         
-                        # Thêm trường mới vào
-                        question['student_chosen_answer_id'] = chosen_id
-                        
-                        # Lặp qua các đáp án (A, B, C, D) của câu hỏi này
                         for answer in question.get('answers', []):
+                            if not answer:
+                                continue 
+                                
                             a_id = answer.get('id')
                             
-                            # (answer['is_correct'] đã có sẵn từ get_full_exam_data)
-                            
-                            # Thêm trường mới để báo cho Frontend biết
-                            answer['is_student_choice'] = (a_id == chosen_id)
+                            if isinstance(chosen_data, list):
+                                answer['is_student_choice'] = (a_id in chosen_data)
+                            else:
+                                answer['is_student_choice'] = (a_id == chosen_data)
 
-            # 5. ĐÓNG GÓI DỮ LIỆU TRẢ VỀ
+            # 7. ĐÓNG GÓI
             final_data = {
-                'result_info': result_metadata, # Thông tin (điểm, thời gian)
-                'exam_content': exam_content    # Toàn bộ đề thi đã "đánh dấu"
+                'result_info': result_metadata, 
+                'exam_content': exam_content
             }
             
             return {

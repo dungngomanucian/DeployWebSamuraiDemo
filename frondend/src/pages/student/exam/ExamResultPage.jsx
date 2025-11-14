@@ -115,7 +115,7 @@ export default function ExamReviewPage() {
             }
 
             if (q.student_chosen_answer_id) {
-              const qType = grouped[qt.id].type;
+              const qType = qt; // Sử dụng qt trực tiếp
               if (qType?.is_Sort_Question === true && Array.isArray(q.student_chosen_answer_id)) {
                  sAnswers[q.id] = q.student_chosen_answer_id;
                  aOrder[q.id] = q.student_chosen_answer_id;
@@ -844,6 +844,40 @@ export default function ExamReviewPage() {
                                 )}
                               </div>
                             </div>
+                            
+                            <div className="mt-4" style={{fontFamily: "Nunito"}}>
+                              <div className="bg-green-50 rounded-xl p-6 border-2 border-dashed border-green-300 min-h-[120px]">
+                                <h4 className="text-lg font-semibold text-green-700 mb-4 text-center">
+                                  Thứ tự đáp án đúng là:
+                                </h4>
+                                <div className="flex flex-wrap gap-3 justify-center">
+                                  {(() => {
+                                    const correctAnswers = [...question.answers];
+                                    
+                                    correctAnswers.sort((a, b) => a.position - b.position);
+                                    
+                                    return correctAnswers.map((answer, index) => {
+                                      if (!answer) return null;
+                                      
+                                      return (
+                                        <div
+                                          key={answer.id}
+                                          className="flex items-center gap-2 bg-white px-4 py-3 rounded-lg border-2 border-green-500 cursor-default"
+                                        >
+                                          <span className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                            {index + 1}
+                                          </span>
+                                          <span className="text-gray-800 font-normal">
+                                            {answer.show_order}. {answer.answer_text}
+                                          </span>
+                                        </div>
+                                      );
+                                    });
+                                  })()}
+                                </div>
+                              </div>
+                            </div>
+                            
                           </div>
                         )}
                         
