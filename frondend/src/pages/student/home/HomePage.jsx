@@ -9,6 +9,13 @@ import back2 from "../../../assets/back2.png";
 import back3 from "../../../assets/back3.png";
 import back4 from "../../../assets/back4.png";
 
+// 🌟 NEW IMPORTS FOR HIGHLIGHT/NOTE/TRANSLATE 🌟
+import { AnnotationProvider, useAnnotationContext } from '../../../context/AnnotationContext';
+import ContentHighlighter from '../../../components/Highlight/ContentHighlighter';
+import TranslationModal from '../../../components/Highlight/TranslationModal';
+import { useTranslation } from '../../../hooks/exam/useTranslation';
+import NotepadModal from "../../../components/Highlight/NotepadModal";
+
 const FeatureCard = ({
   title,
   description,
@@ -34,7 +41,7 @@ const FeatureCard = ({
       {/* Card Container: */}
       <div
         className={`relative rounded-[24px] p-8 transition-all duration-300 w-full ${cardMaxWidthClass} ${cardHeightClass} text-left
-          ${isHovered 
+          ${isHovered
             ? `bg-[#2D5BFF] text-white ${glowShadowClass} -translate-y-2`
             : `bg-[#F3F4F6] text-[#0B1320] ${defaultShadowClass}`
           }
@@ -373,26 +380,62 @@ const TabsGallery = () => {
   );
 };
 
-export default function HomePage() {
+const HomePageContent = () => {
   const navigate = useNavigate();
-  // Images for the hero background (using the same placeholder for now)
-  const heroImages = useMemo(() => [heroBg, back1, back2, back3, background], []);
-  const [activeIdx, setActiveIdx] = useState(0);
+  // Images for the hero background (using the same placeholder for now)
+  const heroImages = useMemo(() => [heroBg, back1, back2, back3, background], []);
+  const [activeIdx, setActiveIdx] = useState(0);
 
-  // Auto-rotate background every 5s
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      setActiveIdx((idx) => (idx + 1) % heroImages.length);
-    }, 5000);
-    return () => clearInterval(intervalId);
-  }, [heroImages.length]);
+  // 🌟 NEW: State và handler cho Notepad Modal 🌟
+  const [isNotepadVisible, setIsNotepadVisible] = useState(false);
+  const { annotations } = useAnnotationContext(); // Lấy annotations để kiểm tra
+
+  const noteCount = annotations.filter(a => a.type === 'note').length;
+
+  // Chỉ hiển thị nút Notepad nếu người dùng đã đăng nhập và có ít nhất 1 ghi chú
+  const token = localStorage.getItem('auth_token');
+  const shouldShowNotepad = !!token; // Luôn hiển thị nút nếu đã đăng nhập, huy hiệu sẽ cho biết có note hay không
+
+  const handleNotepadToggle = () => setIsNotepadVisible(prev => !prev);
+
+  // 🌟 NEW: useTranslation hook 🌟
+  const {
+    isLoading,
+    error,
+    translation,
+    originalText,
+    translateText,
+    clearTranslation
+  } = useTranslation();
+
+  // 🌟 NEW: handleTranslateRequest function 🌟
+  const handleTranslateRequest = (selectedText) => {
+    console.log("Yêu cầu dịch từ HomePage cho văn bản:", selectedText);
+    translateText(selectedText);
+  };
+
+  // Auto-rotate background every 5s
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setActiveIdx((idx) => (idx + 1) % heroImages.length);
+    }, 5000);
+    return () => clearInterval(intervalId);
+  }, [heroImages.length]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-base-100">
-      <Navbar />
+    <div className="min-h-screen flex flex-col bg-base-100">
+      <Navbar 
+        showNotepadButton={shouldShowNotepad}
+        onNotepadClick={handleNotepadToggle}
+        noteCount={noteCount}
+      />
 
-      {/* Hero Section: Auto-rotating background (5s) */}
-      {/* Hero Section */}
+      {/* 🌟 WRAP MAIN CONTENT WITH ANNOTATION PROVIDER AND CONTENT HIGHLIGHTER 🌟 */}
+      <ContentHighlighter
+        showTranslateButton={true} // Enable translate button for home page
+        onTranslate={handleTranslateRequest}
+      >
+      {/* Hero Section */}
       <section className="relative w-full h-[80vh] overflow-hidden flex items-center justify-start text-left">
         {/* Image layers */}
         {heroImages.map((src, idx) => (
@@ -427,23 +470,23 @@ export default function HomePage() {
       </section>
 
 
-      {/* Học bài - Tabs + Gallery    */}
+      {/* Học bài - Tabs + Gallery      */}
 
-      {/* Dots below hero, above features (on white bg) */}
-      <div className="bg-white py-6">
-        <div className="flex justify-center gap-3">
-          {heroImages.map((_, idx) => (
-            <button
-              key={idx}
-              aria-label={`Slide ${idx + 1}`}
-              onClick={() => setActiveIdx(idx)}
-              className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-                activeIdx === idx ? "bg-[#2563EB]" : "bg-gray-300 hover:bg-gray-400"
-              }`}
-            />
-          ))}
-        </div>
-      </div>
+      {/* Dots below hero, above features (on white bg) */}
+      <div className="bg-white py-6">
+        <div className="flex justify-center gap-3">
+          {heroImages.map((_, idx) => (
+            <button
+              key={idx}
+              aria-label={`Slide ${idx + 1}`}
+              onClick={() => setActiveIdx(idx)}
+              className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                activeIdx === idx ? "bg-[#2563EB]" : "bg-gray-300 hover:bg-gray-400"
+              }`}
+            />
+          ))}
+        </div>
+      </div>
 
       {/* Features Section (Đã sử dụng component FeatureCard) */}
       <section id="kham-pha-tinh-nang" className="py-16 sm:py-20 bg-white px-4 text-center">
@@ -452,24 +495,24 @@ export default function HomePage() {
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 max-w-4xl mx-auto">
-          {/* Card Học bài */}
-          <FeatureCard 
-            title="Học bài"
-            description="Tính năng độc quyền dành cho học sinh Samurai: Học & Luyện tập Choubundoku, làm & nộp BTVN."
-          />
-          {/* Card Luyện đề */}
-          <FeatureCard 
-            title="Luyện đề"
-            description="Thực chiến đề JLPT và EJU với 2 hình thức: Luyện tập theo dạng bài & Mô phỏng thi thật."
-          />
-        </div>
-      </section>
+          {/* Card Học bài */}
+          <FeatureCard 
+            title="Học bài"
+            description="Tính năng độc quyền dành cho học sinh Samurai: Học & Luyện tập Choubundoku, làm & nộp BTVN."
+          />
+          {/* Card Luyện đề */}
+          <FeatureCard 
+            title="Luyện đề"
+            description="Thực chiến đề JLPT và EJU với 2 hình thức: Luyện tập theo dạng bài & Mô phỏng thi thật."
+          />
+        </div>
+      </section>
 
       {/* Section HỌC BÀI đặt đúng vị trí dưới "Khám phá tính năng" */}
       <section id="hoc-bai" className="w-full bg-[#E9EFFC] pt-14 pb-24 md:pb-28">
         <div className="max-w-6xl mx-auto px-4">
           <p className="text-base md:text-lg font-semibold text-[#5B6476] text-center">Giới thiệu tính năng</p>
-          <h3 className="text-3xl md:text-4xl font-bold text-[#0B1320] text-center mt-2 uppercase">HỌC BÀI</h3>
+          <h3 className="text-3xl md:text-4xl font-bold text-[#0B1320] text-center mt-2 uppercase">勉強する</h3>
           <TabsGallery />
         </div>
       </section>
@@ -588,7 +631,7 @@ export default function HomePage() {
               {/* Card 4 */}
               <div className="bg-white rounded-xl p-6 shadow-md w-[454px] h-[292px] max-w-full">
                 <div className="w-[56px] h-[56px] bg-gray-300 rounded-md mb-4"></div>
-                <h4 className="font-bold text-[#0B1320] text-lg mb-2">
+                <h4 className="font-bold text-[#0B1D] text-lg mb-2">
                   Hệ thống Flashcard thông minh tự động tạo từ dữ liệu lỗi sai của học viên
                 </h4>
                 <p className="text-[#5B6476] text-sm">
@@ -614,7 +657,32 @@ export default function HomePage() {
       {/* Weekly Leaderboard */}
       <WeeklyLeaderboard />
 
-      <Footer />
-    </div>
+    </ContentHighlighter>
+
+    {/* 🌟 NEW: MODAL FOR TRANSLATION (ĐÃ SỬA LỖI) 🌟 */}
+    <TranslationModal
+        isVisible={!!translation || isLoading || !!error}
+        isLoading={isLoading}
+        originalText={originalText}
+        translation={translation}
+        onClose={clearTranslation}
+    />
+    
+    {/* 🌟 NEW: NOTEPAD MODAL 🌟 */}
+    <NotepadModal 
+      isVisible={isNotepadVisible}
+      onClose={() => setIsNotepadVisible(false)}
+    />
+
+    <Footer />
+  </div>
+);
+}
+
+export default function HomePage() {
+  return (
+    <AnnotationProvider>
+      <HomePageContent />
+    </AnnotationProvider>
   );
 }

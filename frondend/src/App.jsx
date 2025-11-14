@@ -28,12 +28,16 @@ import ManageCourses from './pages/admin/course/Index';
 import ManageClassrooms from './pages/admin/classroom/Index';
 import ManageLevels from './pages/admin/level/Index';
 import CreateStudentPage from "./pages/admin/student/Form";
+import { useCopyProtection } from "./hooks/useCopyProtection";
+
 import ExamResultPage from "./pages/student/exam/ExamResultPage";
 
 export default function App() {
+  const copyrightMessage = "© Samurai Japanese App. All rights reserved. Content is protected.";
+  const protectionProps = useCopyProtection(copyrightMessage);
   return (
     <BrowserRouter>
-      <div className="font-sans">
+      <div className="font-sans" {...protectionProps}>
         <Routes>
           {/* Định nghĩa các đường dẫn và component tương ứng */}
           <Route path="/" element={<HomePage />} />

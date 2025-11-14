@@ -16,7 +16,10 @@ urlpatterns = [
     
     path('login/', include('student.login.urls')),
 
-    path('dashboard/', include('student.dashboard.urls')),
+    path('AISearch/', include('student.AISearch.urls')),
+
+    path('dashboard/', include('student.dashboard.urls'))
+
 
     path('exam-results/', include('student.exam-results.urls')),
 ]

@@ -25,18 +25,41 @@ export default function ExamHeader({
   setCurrentQuestionIndex,
   setCurrentQuestionPage,
 
-  TimerProgressBarComponent, 
-  
+  // === Component Props ===
+  TimerProgressBarComponent, // Nhận component TimerProgressBar từ cha
   showSectionTabs = true, 
   titleInFirstRow = false, 
   stickyBackButton = false, 
   autoSubmitCountdownDisplay = null,
+  // === Props mới cho Notepad ===
+  annotations,
+  onNotepadOpen,
 }) {
   const navigate = useNavigate();
-
-  // SỬA 2: Dùng mảng sections đúng cho chế độ review
   const sectionsToRender = isReviewMode ? reviewSections : examData?.sections;
+  // TẠO COMPONENT CON CHO NÚT NOTEPAD ĐỂ TÁI SỬ DỤNG
+  const NotepadButton = ({ className = '' }) => {
+    const noteCount = annotations?.filter(a => a.type === 'note').length || 0;
 
+    return (
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          if (onNotepadOpen) onNotepadOpen();
+        }}
+        className={`px-4 py-2 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-semibold hover:bg-[#5427B4] hover:text-white transition-all relative text-sm ${className}`}
+        style={{ fontFamily: "Nunito" }}
+      >
+        📝 Notepad
+        {noteCount > 0 && (
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+            {noteCount}
+          </span>
+        )}
+      </button>
+    );
+  };
+  // JSX cho phần nội dung (sẽ được bọc bởi 1 trong 2 div dưới)
   const headerContent = (
     <>
       <div className={`flex items-center justify-between gap-4 ${isSticky ? 'mb-4' : ''}`}>
@@ -66,6 +89,17 @@ export default function ExamHeader({
               )
             )}
             
+            {/* 3. Notepad & Submit Button (Bản Sticky) */}
+            <div className="flex items-center gap-3">
+              <NotepadButton className="h-8" />
+              <button
+                onClick={onSubmitExam}
+                disabled={isSubmitting}
+                className="px-4 h-8 rounded-lg border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all text-sm flex items-center"
+              >
+                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
+              </button>
+            </div>
             {stickyBackButton ? (
               <div className="flex-1 flex justify-center">
                 {!isReviewMode && TimerProgressBarComponent && <TimerProgressBarComponent />}
@@ -173,8 +207,21 @@ export default function ExamHeader({
                 >
                   {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
                 </button>
-              </div>
-            )}
+              ))}
+            </div>
+
+            {/* 3. Notepad & Submit Button (Bản Thường) */}
+            <div className="flex items-center gap-3">
+              {/* Nút Nộp bài */}
+              <button
+                style={{ fontFamily: "Nunito", font: Bold }}
+                onClick={onSubmitExam}
+                disabled={isSubmitting}
+                className="px-5 py-2.5 rounded-lg border-2 border-red-500 text-red-500 font-extrabold hover:bg-red-500 hover:text-white transition-all"
+              >
+                {isSubmitting ? 'Đang nộp...' : 'Nộp bài'}
+              </button>
+            </div>
           </>
         )}
       </div>
