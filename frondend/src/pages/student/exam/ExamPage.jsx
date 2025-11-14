@@ -5,7 +5,6 @@ import Footer from "../../../components/Footer";
 import { getFullExamData, submitExam } from "../../../api/examService";
 import ExamCertificateOverlay from "../../../components/JLPTCertificateOverlay";
 import toast, { Toaster } from "react-hot-toast";
-import QuestionButtons from "../../../components/Exam/QuestionButtons";
 import TimeUpModal from "../../../components/Exam/TimeUpModal";
 import { Bold } from "lucide-react";
 import ContentHighlighter from '../../../components/Highlight/ContentHighlighter';
@@ -227,7 +226,19 @@ function ExamPageContent() {
 
   // === 7. CÁC HÀM LOGIC GỐC ===
 
-  // Helper: Bật/tắt Popover câu hỏi QT008
+  // Helper: Kiểm tra xem question type có phải là sort question không (dựa trên is_Sort_Question)
+  const isSortQuestion = (questionTypeId) => {
+    if (!questionTypeId) return false;
+    return groupedQuestions[questionTypeId]?.type?.is_Sort_Question === true;
+  };
+
+  // Helper: Kiểm tra xem question type có phải là perforated question không (dựa trên is_perforated_question)
+  const isPerforatedQuestion = (questionTypeId) => {
+    if (!questionTypeId) return false;
+    return groupedQuestions[questionTypeId]?.type?.is_perforated_question === true;
+  };
+
+  // Helper: Bật/tắt Popover câu hỏi perforated question
   const togglePassageQuestion = (questionId) => {
     setOpenPassageQuestions((prev) => ({
       ...prev,
@@ -254,7 +265,6 @@ function ExamPageContent() {
     });
     return tabs;
   };
-  const sectionTabs = examData?.sections?.map((s) => s.type) || [];
   const questionTypeTabs = getQuestionTypeTabs();
   
   // Hàm render Popover câu hỏi
@@ -302,13 +312,25 @@ function ExamPageContent() {
   const handleSectionChange = (sectionType, questionTypeId = null) => {
     if (!examData) return;
     
+    const newSection = examData.sections.find(s => s.type === sectionType);
+    
+    // Kiểm tra nếu section là phần nghe (is_listening = true)
+    if (newSection && newSection.is_listening === true) {
+      toast.error("Vui lòng nộp bài 2 phần đầu tiên trước khi chuyển sang phần nghe!", {
+        duration: 2000,
+        style: {
+          fontFamily: 'Nunito, sans-serif',
+        },
+      });
+      return; // Không chuyển section, giữ nguyên tab hiện tại
+    }
+    
     userSelectedSectionRef.current = true;
     activeSectionRef.current = sectionType;
     
     setActiveSection(sectionType);
     setCurrentQuestionIndex(0); 
     
-    const newSection = examData.sections.find(s => s.type === sectionType);
     if (newSection && newSection.question_types.length > 0) {
       if (questionTypeId) {
         const targetQuestionType = newSection.question_types.find(qt => qt.id === questionTypeId);
@@ -373,11 +395,6 @@ function ExamPageContent() {
     }
   };
 
-  // Hàm: Đổi trang
-  const handlePageChange = (newPage) => {
-    setCurrentQuestionPage(newPage);
-  };
-
   // Component: Thanh thời gian
   const TimerProgressBar = () => { 
     const barStyles = getProgressBarStyles();
@@ -440,8 +457,11 @@ function ExamPageContent() {
       alert(`Nộp bài thất bại: ${error}`);
     } else {
       console.log("Nộp bài thành công, kết quả:", resultData);
-      setFinalResultData(resultData); 
-      setShowCertificate(true);
+      setFinalResultData(resultData); // Lưu kết quả (chứa submission_id)
+      // Lưu exam_result_id vào localStorage để listening page sử dụng
+      localStorage.setItem('exam_result_id', resultData.id);
+      // Chuyển sang trang ListeningIntro thay vì hiển thị overlay
+      navigate(`/listening-intro?examId=${examId}`);
     }
   };
 
@@ -458,7 +478,7 @@ function ExamPageContent() {
   if (isSubmitting) { 
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#E9EFFC]">
-        <div className="text-2xl font-bold text-[#0B1320]">Đang nộp bài và chấm điểm...</div>
+        <div className="text-2xl font-bold text-[#0B1320]">Chuyển sang phần nghe hiểu...</div>
       </div>
     );
   }
@@ -592,8 +612,8 @@ function ExamPageContent() {
                return null;
              })()}
 
-            {/* QT008: Display question type level passage from jlpt_question_passages */}
-            {activeQuestionType === 'QT008' && groupedQuestions[activeQuestionType]?.type?.passages && groupedQuestions[activeQuestionType]?.type?.passages.length > 0 && (
+            {/* Perforated Question: Display question type level passage from jlpt_question_passages */}
+            {isPerforatedQuestion(activeQuestionType) && groupedQuestions[activeQuestionType]?.type?.passages && groupedQuestions[activeQuestionType]?.type?.passages.length > 0 && (
               <div className="mb-6">
                 <PassageBorderBox isTimeUp={(filteredQuestions.length > 0 && questionTimeRemaining[filteredQuestions[0]?.id] !== undefined && questionTimeRemaining[filteredQuestions[0]?.id] <= 0)}>
                   {groupedQuestions[activeQuestionType].type.passages.map((passage, passageIndex) => (
@@ -617,7 +637,7 @@ function ExamPageContent() {
             )}
 
             {/* Display questions - paginated for reading comprehension types */}
-            {activeQuestionType === 'QT008' ? null : (() => {
+            {isPerforatedQuestion(activeQuestionType) ? null : (() => {
               if (shouldUsePagination) {
                 // Show only current question for pagination
                 const safePageIndex = Math.min(currentQuestionPage, filteredQuestions.length - 1);
@@ -706,7 +726,7 @@ function ExamPageContent() {
                                 (a, b) => Number(a.show_order) - Number(b.show_order)
                               );
                             })().filter((answer) => {
-                              if (currentQuestion.questionTypeId === "QT007") {
+                              if (isSortQuestion(currentQuestion.questionTypeId)) {
                                 const selectedAnswers = answerOrder[currentQuestion.id] || [];
                                 return !selectedAnswers.includes(answer.id);
                               }
@@ -824,7 +844,7 @@ function ExamPageContent() {
                         </div>
                       </div>
                     </div>
-                    {question.questionTypeId === "QT007" && (
+                    {isSortQuestion(question.questionTypeId) && (
                       <div className="mb-8" style={{fontFamily: "Nunito"}}>
                         <div className="bg-gray-100 rounded-xl p-6 border-2 border-dashed border-gray-300 min-h-[120px]">
                           <h4 className="text-lg font-semibold text-gray-700 mb-4 text-center">
@@ -863,7 +883,7 @@ function ExamPageContent() {
                         </div>
                       </div>
                     )}
-                    <div className={activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4 ? "grid grid-cols-4 gap-3" : question.questionTypeId === "QT007" ? "grid grid-cols-4 gap-3" : "space-y-2"}>
+                    <div className={activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4 ? "grid grid-cols-4 gap-3" : isSortQuestion(question.questionTypeId) ? "grid grid-cols-4 gap-3" : "space-y-2"}>
                       {question.answers && question.answers.length > 0 ? (
                         (() => {
                               const byOrder = new Map();
@@ -875,7 +895,7 @@ function ExamPageContent() {
                                 (a, b) => Number(a.show_order) - Number(b.show_order)
                               );
                             })().filter((answer) => {
-                              if (question.questionTypeId === "QT007") {
+                              if (isSortQuestion(question.questionTypeId)) {
                                 const selectedAnswers = answerOrder[question.id] || [];
                                 return !selectedAnswers.includes(answer.id);
                               }
@@ -890,26 +910,26 @@ function ExamPageContent() {
                                   className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all ${
                                     activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4
                                       ? "flex-row"
-                                      : question.questionTypeId === "QT007"
+                                      : isSortQuestion(question.questionTypeId)
                                       ? "flex-row"
                                       : "flex-row"
                                   } ${
                                     isSelected
-                                      ? question.questionTypeId === "QT007"
+                                      ? isSortQuestion(question.questionTypeId)
                                         ? "border-[#874FFF] bg-purple-50 opacity-60"
                                         : "border-[#874FFF] bg-purple-50"
                                       : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50"
                                   }`}
                                 >
                                   <input
-                                    type={question.questionTypeId === "QT007" ? "checkbox" : "radio"}
+                                    type={isSortQuestion(question.questionTypeId) ? "checkbox" : "radio"}
                                     name={`question-${question.id}`}
                                     value={answer.id}
                                     checked={isSelected}
                                     onChange={() => handleAnswerSelect(question.id, answer.id, question.questionTypeId)}
                                     className="hidden"
                                   />
-                                  {question.questionTypeId === "QT007" ? (
+                                  {isSortQuestion(question.questionTypeId) ? (
                                     <span className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-gray-400 flex-shrink-0 font-bold text-xs text-gray-600">
                                       {answer.show_order}
                                     </span>
@@ -929,7 +949,7 @@ function ExamPageContent() {
                                   <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
                                     {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
                                   </span>
-                                  {question.questionTypeId === "QT007" && (
+                                  {isSortQuestion(question.questionTypeId) && (
                                     <span className="ml-auto text-xs text-gray-500" style={{fontFamily: "Nunito"}}>(Click để chọn)</span>
                                   )}
                                 </label>
@@ -963,7 +983,7 @@ function ExamPageContent() {
         show={showCertificate}
         onHide={() => {
           setShowCertificate(false);
-          navigate(`/exam-result/${finalResultData.id}`, { 
+          navigate(`/student-dashboard`, {
             state: { 
               resultData: finalResultData 
             } 
@@ -977,7 +997,8 @@ function ExamPageContent() {
       <Toaster 
         position="top-right"
         toastOptions={{
-          duration: 6000, 
+          duration: 2000,
+          className: 'toast-custom',
           style: {
             background: '#ef4444', 
             color: '#fff', 
@@ -985,7 +1006,8 @@ function ExamPageContent() {
             padding: '12px 24px', 
             fontSize: '14px',
             fontWeight: '500',
-            minWidth: '300px', 
+            minWidth: '300px',
+            fontFamily: 'Nunito, sans-serif',
           },
         }}
       />

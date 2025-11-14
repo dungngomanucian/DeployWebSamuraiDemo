@@ -8,6 +8,7 @@ import ContentTable from '../../../components/admin/ContentTable';
 import PaginationControls from '../../../components/admin/PaginationControls';
 import PageSizeSelector from '../../../components/admin/PageSizeSelector';
 import PaginationInfo from '../../../components/admin/PaginationInfo';
+import UploadExcelModal from '../../../components/admin/UploadExcelModal';
 
 // Hooks và Services
 import { useDataTable } from '../../../hooks/useDataTable';
@@ -48,6 +49,7 @@ function Index() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   // Phân trang
   const [currentPage, setCurrentPage] = useState(1);
@@ -69,31 +71,38 @@ function Index() {
     ...COLUMN_CONFIG[key]
   }));
 
+  const handleAddNew = () => navigate('/admin/students/new');
+  const handleUploadExcel = () => setShowUploadModal(true);
+  const handleUploadSuccess = () => {
+    // Refresh danh sách sau khi upload thành công
+    fetchData();
+  };
+  
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    const { data: apiResponse, error: apiError } = await getAllStudent(currentPage, pageSize);
+
+    if (apiError) {
+      setError(apiError);
+      setLoading(false);
+      return;
+    }
+
+    if (apiResponse && apiResponse.results) {
+      setStudents(apiResponse.results);
+      setTotalCount(apiResponse.count);
+      setTotalPages(apiResponse.total_pages);
+    } else {
+      setStudents([]);
+      setTotalCount(0);
+      setTotalPages(0);
+    }
+    setLoading(false);
+  };
+  
   // Fetch dữ liệu
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      const { data: apiResponse, error: apiError } = await getAllStudent(currentPage, pageSize);
-
-      if (apiError) {
-        setError(apiError);
-        setLoading(false);
-        return;
-      }
-
-      if (apiResponse && apiResponse.results) {
-        setStudents(apiResponse.results);
-        setTotalCount(apiResponse.count);
-        setTotalPages(apiResponse.total_pages);
-      } else {
-        setStudents([]);
-        setTotalCount(0);
-        setTotalPages(0);
-      }
-      setLoading(false);
-    };
-
     fetchData();
   }, [currentPage, pageSize]);
 
@@ -109,7 +118,6 @@ function Index() {
     }
   };
 
-  const handleAddNew = () => navigate('/admin/students/new');
   const handleEdit = (id) => navigate(`/admin/students/edit/${id}`);
   const handleDelete = async (id) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa học viên này?')) {
@@ -157,6 +165,15 @@ function Index() {
       title="Quản lý học viên"
       onAddNew={handleAddNew}
       onSearch={handleSearch}
+      customActions={
+        <button
+          onClick={handleUploadExcel}
+          className="btn btn-primary"
+        >
+          <i className="pi pi-upload mr-2"></i>
+          Upload Excel
+        </button>
+      }
     >
       {/* Phần điều khiển phân trang */}
       <div className="flex justify-between items-center mb-4">
@@ -208,6 +225,13 @@ function Index() {
           />
         </>
       )}
+      
+      {/* Upload Excel Modal */}
+      <UploadExcelModal
+        visible={showUploadModal}
+        onHide={() => setShowUploadModal(false)}
+        onSuccess={handleUploadSuccess}
+      />
     </IndexLayout>
   );
 }

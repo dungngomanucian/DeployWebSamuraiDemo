@@ -7,7 +7,7 @@ import AddNewButton from '../components/Admin/AddNewButton';
  * Nó cung cấp khung sườn bao gồm tiêu đề, nút "Thêm mới", và ô tìm kiếm.
  * Nội dung chính (bảng, lưới thẻ, etc.) sẽ được truyền vào qua prop `children`.
  */
-export default function IndexLayout({ title, onAddNew, onSearch, children }) {
+export default function IndexLayout({ title, onAddNew, onSearch, children, customActions }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleSearchChange = (value) => {
@@ -22,7 +22,10 @@ export default function IndexLayout({ title, onAddNew, onSearch, children }) {
       {/* Header: Tiêu đề và nút Thêm mới */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">{title}</h1>
-        {onAddNew && <AddNewButton onClick={onAddNew} />}
+        <div className="flex gap-2">
+          {customActions}
+          {onAddNew && <AddNewButton onClick={onAddNew} />}
+        </div>
       </div>
 
       {/* Thanh tìm kiếm */}

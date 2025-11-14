@@ -62,3 +62,20 @@ class ClassroomSerializer(serializers.Serializer):
     id = serializers.CharField(read_only=True)
     class_code = serializers.CharField(read_only=True) 
     class_name = serializers.CharField(read_only=True)
+
+class BulkStudentUploadSerializer(serializers.Serializer):
+    """
+    Serializer cho việc upload Excel tạo hàng loạt học viên.
+    """
+    samurai_student_id = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    first_name = serializers.CharField(max_length=255)
+    last_name = serializers.CharField(max_length=255)
+    password = serializers.CharField(max_length=255)
+    classroom_code = serializers.CharField(max_length=100)
+    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    gender = serializers.IntegerField(required=False, allow_null=True)
+    address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    parent_phone_number = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
+    phone_number = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
+    user_name = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)

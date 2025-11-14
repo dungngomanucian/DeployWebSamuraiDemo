@@ -57,9 +57,32 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
   const examTotalScore = examData?.exam?.total_score || 180;
   const passingScore = examData?.exam?.request_score ?? 'N/A';
   const isPassed = (typeof totalScore === 'number' && typeof passingScore === 'number') ? totalScore >= passingScore : false;
-  const resultText = isPassed ? '合格 (Đạt)' : '不合格 (Chưa đạt)';
+  const resultText = isPassed
+    ? (
+        <>
+          <span style={{fontFamily: 'UD Digi Kyokasho N-R'}}>
+            合格
+          </span>
+          &nbsp;
+          <span style={{fontFamily: 'Nunito'}}>
+            (Đạt)
+          </span>
+        </>
+      )
+    : (
+        <>
+          <span style={{fontFamily: 'UD Digi Kyokasho N-R'}}>
+            不合格
+          </span>
+          &nbsp;
+          <span style={{fontFamily: 'Nunito'}}>
+            (Chưa đạt)
+          </span>
+        </>
+      );
   const resultColor = isPassed ? 'text-green-600' : 'text-red-600';
-  // Bỏ qua điểm từng phần
+
+  const sectionScores = resultData?.section_scores || [];
 
   if (!show && !isVisible) {
     return null; // Không render gì cả khi ẩn
@@ -79,20 +102,20 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
       {/* Card nội dung */}
       <div className={`transition-all duration-300 ${contentVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
         <ModalCard onHide={onHide}>
-          <h2 className="text-xl sm:text-2xl font-bold text-blue-700 mb-2">Kết quả bài thi</h2>
-          <p className="text-sm text-gray-500 mb-6">Đây là kết quả cho lần làm bài thi này của bạn.</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-blue-700 mb-2" style={{fontFamily: 'Nunito'}}>Kết quả bài thi</h2>
+          <p className="text-sm text-gray-500 mb-6" style={{fontFamily: 'Nunito'}}>Đây là kết quả cho lần làm bài thi này của bạn.</p>
 
-          <div className="border border-gray-300 rounded-lg p-4 sm:p-6 text-left space-y-3 mb-6 bg-gray-50">
+          <div className="border border-gray-300 rounded-lg p-4 sm:p-6 text-left space-y-3 mb-6 bg-gray-50" style={{fontFamily: 'Nunito'}}>
             {/* Hàng 1: Ngày thi, Mã HV */}
             <div className="flex flex-col sm:flex-row justify-between text-sm">
               <div className="mb-2 sm:mb-0">
                 <span className="font-semibold text-gray-600">Ngày thi:</span>
                 <span className="ml-2 text-gray-800">{examDate}</span>
               </div>
-              <div>
+            </div>
+            <div className="text-sm">
                 <span className="font-semibold text-gray-600">Mã học viên:</span>
                 <span className="ml-2 text-gray-800">{studentId}</span>
-              </div>
             </div>
             {/* Hàng 2: Tên HV */}
             <div className="text-sm">
@@ -102,22 +125,42 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
              {/* Hàng 3: Level */}
              <div className="text-sm">
               <span className="font-semibold text-gray-600">Cấp độ:</span>
-              <span className="ml-2 text-gray-800 font-bold">{level}</span>
+              <span className="ml-2 text-gray-800 font-normal">{level}</span>
             </div>
           </div>
 
           {/* Phần điểm */}
-          <div className="text-center mb-6">
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-1">Điểm tổng</p>
-              <p className="text-4xl font-bold text-blue-700">{totalScore} / {examTotalScore}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Kết quả</p>
-              <p className={`text-2xl font-bold ${resultColor}`}>{resultText}</p>
-              {typeof passingScore === 'number' && (
-                <p className="text-xs text-gray-500">(Điểm đỗ: {passingScore})</p>
-              )}
+          <div className="mb-6">
+            {/* === LƯỚI ĐIỂM TỪNG PHẦN (MỚI) === */}
+            {sectionScores.length > 0 && (
+              <div className="mb-6 border-b pb-6">
+                <p className="text-sm text-gray-600 mb-3 text-center font-bold" style={{fontFamily: 'Nunito'}}>Điểm theo từng phần</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {sectionScores.map((sec) => (
+                    <div key={sec.id} className="bg-gray-100 rounded-lg p-3 text-center">
+                      <p className="text-xs font-semibold text-gray-500 uppercase">{sec.type || sec.id}</p>
+                      <p className="text-xl font-bold text-gray-800">
+                        {sec.score} / {sec.max_score}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Điểm tổng và Kết quả (giữ nguyên) */}
+            <div className="text-center">
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-1 font-bold" style={{fontFamily: 'Nunito'}}>Điểm tổng</p>
+                <p className="text-4xl font-bold text-blue-700">{totalScore} / {examTotalScore}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 mb-1 font-bold" style={{fontFamily: 'Nunito'}}>Kết quả</p>
+                <p className={`text-2xl font-bold ${resultColor}`}>{resultText}</p>
+                {typeof passingScore === 'number' && (
+                  <p className="text-base text-gray-500" style={{fontFamily: 'Nunito'}}>(Điểm đỗ: {passingScore})</p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -125,6 +168,7 @@ const ExamCertificateOverlay = ({ show, onHide, resultData, examData }) => {
           <button
             onClick={onHide}
             className="px-8 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors w-full sm:w-auto"
+            style={{fontFamily: 'Nunito'}}
           >
             OK
           </button>

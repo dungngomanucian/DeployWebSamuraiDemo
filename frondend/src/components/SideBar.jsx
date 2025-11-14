@@ -9,6 +9,7 @@ import {
   HiOutlineCog,
   HiOutlineHome,
 } from 'react-icons/hi';
+import { useNavigate } from "react-router-dom";
 
 import logoFull from '../assets/Logo Samurai (chữ ngang).png';
 // logoIcon sẽ được dùng bên TopBar
@@ -46,7 +47,12 @@ const NavItem = ({ icon, text, active = false, isOpen, onClick }) => (
 );
 
 // Component Sidebar chính
-const Sidebar = ({ isOpen, activeLink, setActiveLink }) => { 
+const Sidebar = ({ isOpen, activeLink, setActiveLink, onNavigateHome }) => { 
+  const navigate = useNavigate();
+  const handleNavigate = (path) => {
+    setActiveLink(path);
+    navigate(path);
+  };
   return (
     <div
       className={`
@@ -114,8 +120,8 @@ const Sidebar = ({ isOpen, activeLink, setActiveLink }) => {
           icon={<HiOutlinePencilAlt className="w-5 h-5" />} 
           text="LUYỆN ĐỀ" 
           isOpen={isOpen}
-          active={activeLink === 'LUYENDE'}
-          onClick={() => setActiveLink('LUYENDE')}
+          active={activeLink === '/practice-jlpt'}
+          onClick={() => handleNavigate('/practice-jlpt')}
         />
         <NavItem 
           icon={<HiOutlineCollection className="w-5 h-5" />} 
@@ -147,7 +153,7 @@ const Sidebar = ({ isOpen, activeLink, setActiveLink }) => {
           text="TRANG CHỦ" 
           isOpen={isOpen}
           active={activeLink === 'TRANGCHU'}
-          onClick={() => setActiveLink('TRANGCHU')}
+          onClick={onNavigateHome}
         />
       </div>
     </div>
