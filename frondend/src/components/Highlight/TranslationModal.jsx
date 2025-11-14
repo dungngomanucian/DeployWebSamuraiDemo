@@ -1,11 +1,39 @@
 import React from 'react';
 
 const CloseIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>;
+const SpeakerIcon = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>;
 
 const TranslationModal = ({ isVisible, onClose, isLoading, error, translation, originalText }) => {
     if (!isVisible) {
         return null;
     }
+
+    /**
+     * Sử dụng Web Speech API để phát âm văn bản.
+     * @param {string} textToSpeak - Văn bản cần phát âm.
+     * @param {string} lang - Mã ngôn ngữ (ví dụ: 'ja-JP' cho tiếng Nhật).
+     */
+    const handleSpeak = (textToSpeak, lang = 'ja-JP') => {
+        if (!('speechSynthesis' in window)) {
+            alert('Rất tiếc, trình duyệt của bạn không hỗ trợ tính năng này.');
+            return;
+        }
+
+        // Dừng mọi âm thanh đang phát trước đó
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+        utterance.lang = lang;
+        utterance.rate = 0.9; // Điều chỉnh tốc độ đọc cho dễ nghe
+
+        // Cố gắng chọn giọng đọc tiếng Nhật nếu có
+        const japaneseVoice = window.speechSynthesis.getVoices().find(voice => voice.lang === 'ja-JP');
+        if (japaneseVoice) {
+            utterance.voice = japaneseVoice;
+        }
+
+        window.speechSynthesis.speak(utterance);
+    };
 
     // Component để render chi tiết từ vựng
     const WordDetails = ({ data }) => (
@@ -56,7 +84,15 @@ const TranslationModal = ({ isVisible, onClose, isLoading, error, translation, o
                         {/* Văn bản gốc */}
                         <div>
                             <p className="font-semibold text-gray-600 text-sm mb-1">Văn bản gốc:</p>
-                            <p className="bg-gray-100 p-3 rounded-md text-gray-800 italic">"{originalText}"</p>
+                            <div className="bg-gray-100 p-3 rounded-md text-gray-800 italic flex items-center justify-between">
+                                <span>"{originalText}"</span>
+                                <button 
+                                    className="btn btn-ghost btn-sm p-1 ml-2" 
+                                    onClick={() => handleSpeak(originalText)}
+                                    aria-label="Nghe phát âm">
+                                    <SpeakerIcon className="w-5 h-5 text-gray-600 hover:text-blue-600" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Kết quả dịch */}

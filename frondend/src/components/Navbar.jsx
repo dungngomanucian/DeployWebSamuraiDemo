@@ -4,10 +4,10 @@ import logo from "../assets/logo.png";
 // SỬA LỖI: Sử dụng Default Import (hoặc Named Import tùy phiên bản)
 // Trong môi trường hiện đại, thường sử dụng Named Import nếu thư viện hỗ trợ
 // Nếu lỗi, hãy thử lại: import jwtDecode from 'jwt-decode';
-import { jwtDecode } from 'jwt-decode'; 
-import { User, LogOut } from "lucide-react"; 
+import { jwtDecode } from 'jwt-decode';
+import { User, LogOut } from "lucide-react"; // Bỏ Notebook icon, dùng emoji
 
-export default function Navbar() {
+export default function Navbar({ showNotepadButton = false, onNotepadClick, noteCount = 0 }) { // 🌟 THÊM PROPS noteCount
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { pathname } = useLocation();
   const navigate = useNavigate(); // Sử dụng hook điều hướng
@@ -113,6 +113,21 @@ export default function Navbar() {
 
         {/* 4. Vùng hiển thị ĐĂNG NHẬP / AVATAR (DESKTOP) */}
         <div className="hidden sm:flex items-center space-x-4">
+          {/* 🌟 NÚT NOTEPAD (DESKTOP) 🌟 */}
+          {showNotepadButton && (
+            <button
+              onClick={onNotepadClick}
+              className="px-4 py-2 rounded-lg border-2 border-[#5427B4] text-[#5427B4] font-semibold hover:bg-[#5427B4] hover:text-white transition-all relative text-sm"
+              style={{ fontFamily: "Nunito" }}
+              aria-label="Mở Notepad"
+            >
+              📝 Notepad
+              {noteCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{noteCount}</span>
+              )}
+            </button>
+          )}
+
           {isLoggedIn ? (
             // TRẠNG THÁI 1: ĐÃ ĐĂNG NHẬP (Avatar/Username - Ảnh 2)
             <div className="flex items-center space-x-2 relative group cursor-pointer">
@@ -167,6 +182,16 @@ export default function Navbar() {
               <Link to="/practice-eju" onClick={closeMobileMenu} className="block text-[#111827] hover:text-[#4F46E5] py-2">Luyện thi EJU</Link>
             </div>
             
+            {/* 🌟 NÚT NOTEPAD (MOBILE) 🌟 */}
+            {showNotepadButton && (
+                <button onClick={() => { onNotepadClick(); closeMobileMenu(); }} className="w-full flex items-center justify-start text-[#111827] hover:text-[#4F46E5] py-2 font-medium relative">
+                    <span className="mr-3">📝</span> Notepad
+                    {noteCount > 0 && (
+                        <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">{noteCount}</span>
+                    )}
+                </button>
+            )}
+
             {/* Mobile: Hồ sơ và Đăng xuất */}
             {isLoggedIn && (
               <NavLink to="/student-dashboard" onClick={closeMobileMenu} className={getMobileNavLinkClass('/student-dashboard')}>Hồ sơ học viên</NavLink>

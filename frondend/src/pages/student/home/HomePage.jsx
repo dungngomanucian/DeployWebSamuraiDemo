@@ -10,10 +10,11 @@ import back3 from "../../../assets/back3.png";
 import back4 from "../../../assets/back4.png";
 
 // 🌟 NEW IMPORTS FOR HIGHLIGHT/NOTE/TRANSLATE 🌟
-import { AnnotationProvider } from '../../../context/AnnotationContext';
+import { AnnotationProvider, useAnnotationContext } from '../../../context/AnnotationContext';
 import ContentHighlighter from '../../../components/Highlight/ContentHighlighter';
 import TranslationModal from '../../../components/Highlight/TranslationModal';
 import { useTranslation } from '../../../hooks/exam/useTranslation';
+import NotepadModal from "../../../components/Highlight/NotepadModal";
 
 const FeatureCard = ({
   title,
@@ -379,11 +380,23 @@ const TabsGallery = () => {
   );
 };
 
-export default function HomePage() {
+const HomePageContent = () => {
   const navigate = useNavigate();
   // Images for the hero background (using the same placeholder for now)
   const heroImages = useMemo(() => [heroBg, back1, back2, back3, background], []);
   const [activeIdx, setActiveIdx] = useState(0);
+
+  // 🌟 NEW: State và handler cho Notepad Modal 🌟
+  const [isNotepadVisible, setIsNotepadVisible] = useState(false);
+  const { annotations } = useAnnotationContext(); // Lấy annotations để kiểm tra
+
+  const noteCount = annotations.filter(a => a.type === 'note').length;
+
+  // Chỉ hiển thị nút Notepad nếu người dùng đã đăng nhập và có ít nhất 1 ghi chú
+  const token = localStorage.getItem('auth_token');
+  const shouldShowNotepad = !!token; // Luôn hiển thị nút nếu đã đăng nhập, huy hiệu sẽ cho biết có note hay không
+
+  const handleNotepadToggle = () => setIsNotepadVisible(prev => !prev);
 
   // 🌟 NEW: useTranslation hook 🌟
   const {
@@ -411,14 +424,17 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-base-100">
-      <Navbar />
+      <Navbar 
+        showNotepadButton={shouldShowNotepad}
+        onNotepadClick={handleNotepadToggle}
+        noteCount={noteCount}
+      />
 
       {/* 🌟 WRAP MAIN CONTENT WITH ANNOTATION PROVIDER AND CONTENT HIGHLIGHTER 🌟 */}
-      <AnnotationProvider>
-        <ContentHighlighter
-          showTranslateButton={true} // Enable translate button for home page
-          onTranslate={handleTranslateRequest}
-        >
+      <ContentHighlighter
+        showTranslateButton={true} // Enable translate button for home page
+        onTranslate={handleTranslateRequest}
+      >
       {/* Hero Section */}
       <section className="relative w-full h-[80vh] overflow-hidden flex items-center justify-start text-left">
         {/* Image layers */}
@@ -641,8 +657,7 @@ export default function HomePage() {
       {/* Weekly Leaderboard */}
       <WeeklyLeaderboard />
 
-      </ContentHighlighter>
-    </AnnotationProvider>
+    </ContentHighlighter>
 
     {/* 🌟 NEW: MODAL FOR TRANSLATION (ĐÃ SỬA LỖI) 🌟 */}
     <TranslationModal
@@ -652,8 +667,22 @@ export default function HomePage() {
         translation={translation}
         onClose={clearTranslation}
     />
+    
+    {/* 🌟 NEW: NOTEPAD MODAL 🌟 */}
+    <NotepadModal 
+      isVisible={isNotepadVisible}
+      onClose={() => setIsNotepadVisible(false)}
+    />
 
     <Footer />
   </div>
 );
+}
+
+export default function HomePage() {
+  return (
+    <AnnotationProvider>
+      <HomePageContent />
+    </AnnotationProvider>
+  );
 }
