@@ -3,6 +3,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.core.mail import send_mail
 from config.supabase_client import get_supabase_client
 from django.conf import settings
+from django.contrib.auth.hashers import make_password
 import json, secrets, hashlib
 from datetime import datetime, timezone, timedelta
 from rest_framework.decorators import api_view
@@ -116,8 +117,8 @@ def reset_password(request):
     user_id = token_record["user_id"]
 
     # Cập nhật mật khẩu mới 
-    # Dùng bcrypt để mã hóa
-    hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    # Dùng Argon2 với salt để mã hóa 
+    hashed_password = make_password(new_password)
     supabase.table("account").update({"password": hashed_password}).eq("id", user_id).execute()
 
     # Đánh dấu token là đã dùng
