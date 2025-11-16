@@ -64,10 +64,12 @@ class ExamService:
     
     @staticmethod
     def get_exams_by_level(level_id: str) -> Dict:
-        """Get all exams for a specific level"""
+        """Get all exams for a specific level - optimized query"""
         try:
+            # Chỉ select các field cần thiết để tối ưu performance
+            # Bao gồm level_id vì serializer yêu cầu field này
             response = supabase.table('jlpt_exams')\
-                .select('*, level:levels(id, title, description)')\
+                .select('id, level_id, title, type, total_duration, request_score, created_at, level:levels(id, title, description)')\
                 .eq('level_id', level_id)\
                 .is_('deleted_at', 'null')\
                 .order('created_at', desc=True)\

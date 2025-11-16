@@ -1,5 +1,5 @@
 // src/hooks/exam/useExamState.js
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 /**
  * Hook tùy chỉnh để quản lý state của các câu trả lời (trắc nghiệm và sắp xếp).
@@ -76,7 +76,7 @@ export const useExamState = (examId = null) => {
    * @param {string} questionTypeId - ID của loại câu hỏi (để tương thích ngược)
    * @param {boolean} isSortQuestion - Flag cho biết có phải câu hỏi sắp xếp không (ưu tiên hơn questionTypeId)
    */
-  const handleAnswerSelect = (questionId, answerId, questionTypeId, isSortQuestion = false) => {
+  const handleAnswerSelect = useCallback((questionId, answerId, questionTypeId, isSortQuestion = false) => {
     // Kiểm tra isSortQuestion (được truyền từ nơi gọi, dựa trên is_Sort_Question của question type)
     const isSort = isSortQuestion;
     
@@ -118,7 +118,7 @@ export const useExamState = (examId = null) => {
         [questionId]: answerId, // Ghi đè đáp án cũ
       }));
     }
-  };
+  }, []);
 
   /**
    * Helper: Lấy số thứ tự (1, 2, 3...) cho câu sắp xếp.

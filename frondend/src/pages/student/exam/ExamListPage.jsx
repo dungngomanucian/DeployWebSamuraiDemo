@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "../../../components/Navbar";
 import Footer from "../../../components/Footer";
@@ -37,18 +37,20 @@ export default function ExamListPage() {
     }
   }, [searchParams]);
   
+  // Memoize level data để tránh tìm lại mỗi lần render
+  const levelData = useMemo(() => {
+    return levels.find(l => l.title === selectedLevel);
+  }, [levels, selectedLevel]);
+
   // Load exam data when level changes
   useEffect(() => {
     const loadExamData = async () => {
-      setLoading(true);
-      
-      // Find level_id from title
-      const levelData = levels.find(l => l.title === selectedLevel);
       if (!levelData) {
         setLoading(false);
         return;
       }
 
+      setLoading(true);
       const { data, error } = await getExamsByLevel(levelData.id);
       
       if (error) {
@@ -64,15 +66,15 @@ export default function ExamListPage() {
     if (levels.length > 0) {
       loadExamData();
     }
-  }, [selectedLevel, levels]);
+  }, [selectedLevel, levelData, levels.length]);
 
-  const handleStartExam = (examId) => {
+  const handleStartExam = useCallback((examId) => {
     navigate(`/exam-intro?examId=${examId}`);
-  };
+  }, [navigate]);
 
-  const handleContinueExam = (examId) => {
+  const handleContinueExam = useCallback((examId) => {
     navigate(`/exam-start?examId=${examId}`);
-  };
+  }, [navigate]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#E9EFFC]">

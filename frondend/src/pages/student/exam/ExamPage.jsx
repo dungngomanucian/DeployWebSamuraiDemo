@@ -331,6 +331,64 @@ function ExamPageContent() {
     });
     return tabs;
   }, [activeSection, examData]);
+
+  // Helper: Render question_text với underline_text chỉ gạch chân lần xuất hiện đầu tiên
+  const renderQuestionTextWithUnderline = (questionText, underlineText) => {
+    if (!underlineText || !questionText.includes(underlineText)) {
+      return (questionText ?? '')
+        .split('<enter>')
+        .map((part, index, arr) => (
+          <span key={index}>
+            {part}
+            {index < arr.length - 1 && <br />}
+          </span>
+        ));
+    }
+
+    // Tìm vị trí đầu tiên của underline_text
+    const firstIndex = questionText.indexOf(underlineText);
+    if (firstIndex === -1) {
+      return (questionText ?? '')
+        .split('<enter>')
+        .map((part, index, arr) => (
+          <span key={index}>
+            {part}
+            {index < arr.length - 1 && <br />}
+          </span>
+        ));
+    }
+
+    // Chia text thành 3 phần: trước, phần gạch chân, sau
+    const beforeText = questionText.substring(0, firstIndex);
+    const underlinedText = questionText.substring(firstIndex, firstIndex + underlineText.length);
+    const afterText = questionText.substring(firstIndex + underlineText.length);
+
+    // Render từng phần với xử lý <enter>
+    return (
+      <>
+        {beforeText.split('<enter>').map((part, index, arr) => (
+          <span key={`before-${index}`}>
+            {part}
+            {index < arr.length - 1 && <br />}
+          </span>
+        ))}
+        <u className="decoration-black decoration-1 underline-offset-4">
+          {underlinedText.split('<enter>').map((part, index, arr) => (
+            <span key={`underline-${index}`}>
+              {part}
+              {index < arr.length - 1 && <br />}
+            </span>
+          ))}
+        </u>
+        {afterText.split('<enter>').map((part, index, arr) => (
+          <span key={`after-${index}`}>
+            {part}
+            {index < arr.length - 1 && <br />}
+          </span>
+        ))}
+      </>
+    );
+  };
   
   // Hàm render Popover câu hỏi
   const renderPassageQuestionPopover = (q) => {
@@ -821,32 +879,8 @@ function ExamPageContent() {
                         <div className="w-9 h-9 border-2 border-gray-300 rounded-md flex items-center justify-center text-base font-semibold text-gray-700 select-none">
                           {currentQuestion.position}
                         </div>
-                        <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>                          {currentQuestion.underline_text && currentQuestion.question_text.includes(currentQuestion.underline_text) ? (
-                            currentQuestion.question_text.split('<enter>').map((line, lineIndex, lineArr) => (
-                              <React.Fragment key={lineIndex}>
-                                {line.split(currentQuestion.underline_text).map((part, partIndex, partArr) => (
-                                  <React.Fragment key={partIndex}>
-                                    {part}
-                                    {partIndex < partArr.length - 1 && (
-                                      <u className="decoration-black decoration-1 underline-offset-4">
-                                        {currentQuestion.underline_text}
-                                      </u>
-                                    )}
-                                  </React.Fragment>
-                                ))}
-                                {lineIndex < lineArr.length - 1 && <br />}
-                              </React.Fragment>
-                            ))
-                          ) : (
-                            (currentQuestion?.question_text ?? '')
-                              .split('<enter>')
-                              .map((part, index, arr) => (
-                                <span key={index}>
-                                  {part}
-                                  {index < arr.length - 1 && <br />}
-                                </span>
-                              ))
-                          )}
+                        <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
+                          {renderQuestionTextWithUnderline(currentQuestion.question_text, currentQuestion.underline_text)}
                         </div>
                       </div>
                     </div>
@@ -957,32 +991,8 @@ function ExamPageContent() {
                         <div className="w-9 h-9 border-2 border-gray-300 rounded-md flex items-center justify-center text-base font-semibold text-gray-700 select-none">
                           {question.position}
                         </div>
-                        <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>                          {question.underline_text && question.question_text.includes(question.underline_text) ? (
-                            question.question_text.split('<enter>').map((line, lineIndex, lineArr) => (
-                              <React.Fragment key={lineIndex}>
-                                {line.split(question.underline_text).map((part, partIndex, partArr) => (
-                                  <React.Fragment key={partIndex}>
-                                    {part}
-                                    {partIndex < partArr.length - 1 && (
-                                      <u className="decoration-black decoration-1 underline-offset-4">
-                                        {question.underline_text}
-                                      </u>
-                                    )}
-                                  </React.Fragment>
-                                ))}
-                                {lineIndex < lineArr.length - 1 && <br />}
-                              </React.Fragment>
-                            ))
-                          ) : (
-                            (question?.question_text ?? '')
-                              .split('<enter>')
-                              .map((part, index, arr) => (
-                                <span key={index}>
-                                  {part}
-                                  {index < arr.length - 1 && <br />}
-                                </span>
-                              ))
-                          )}
+                        <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
+                          {renderQuestionTextWithUnderline(question.question_text, question.underline_text)}
                         </div>
                       </div>
                     </div>

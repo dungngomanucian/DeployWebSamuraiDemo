@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo, Suspense, lazy } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense, lazy, memo } from "react";
+import { flushSync } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { submitListeningExam } from "../../../api/examService";
 import { Toaster } from "react-hot-toast";
@@ -479,23 +480,49 @@ export default function ListeningPage() {
     );
   };
 
-  const AnswerOption = ({ question, answer }) => {
-    const isSelected = isAnswerSelected(question.id, answer.id, question.questionTypeId);
+  const AnswerOption = memo(({ question, answer, handleAnswerSelect, isAnswerSelected }) => {
+    const questionTypeId = question.questionTypeId || question.question_type_id;
+    
+    if (!question?.id || !answer?.id || !questionTypeId) {
+      return null;
+    }
+    
+    const isSelected = isAnswerSelected(question.id, answer.id, questionTypeId);
+    
+    const handleClick = useCallback((e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      flushSync(() => {
+        handleAnswerSelect(question.id, answer.id, questionTypeId);
+      });
+    }, [question.id, answer.id, questionTypeId, handleAnswerSelect]);
+    
     return (
-      <label
-        className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all ${
+      <div
+        onClick={handleClick}
+        className={`flex items-center p-2 border rounded-lg cursor-pointer ${
           isSelected
             ? "border-[#874FFF] bg-purple-50"
             : "border-gray-300"
         }`}
+        style={{ userSelect: 'none', WebkitTapHighlightColor: 'transparent' }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleClick(e);
+          }
+        }}
       >
         <input
           type="radio"
           name={`question-${question.id}`}
           value={answer.id}
           checked={isSelected}
-          onChange={() => handleAnswerSelect(question.id, answer.id, question.questionTypeId)}
+          onChange={handleClick}
           className="hidden"
+          readOnly
         />
         <span
           className={`flex items-center justify-center w-5 h-5 rounded-full border-2 flex-shrink-0 ${
@@ -509,11 +536,20 @@ export default function ListeningPage() {
           />
         </span>
         <span className="ml-3 text-base font-normal text-gray-800" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
-          {formatAnswerText(answer.answer_text, question.question_text, question.questionTypeId)}
+          {formatAnswerText(answer.answer_text, question.question_text, questionTypeId)}
         </span>
-      </label>
+      </div>
     );
-  };
+  }, (prevProps, nextProps) => {
+    return (
+      prevProps.question?.id === nextProps.question?.id &&
+      prevProps.answer?.id === nextProps.answer?.id &&
+      (prevProps.question?.questionTypeId || prevProps.question?.question_type_id) === 
+      (nextProps.question?.questionTypeId || nextProps.question?.question_type_id) &&
+      prevProps.handleAnswerSelect === nextProps.handleAnswerSelect &&
+      prevProps.isAnswerSelected === nextProps.isAnswerSelected
+    );
+  });
   
   useEffect(() => {
     if (audioSetupDoneRef.current || !examData || loading) {
@@ -857,9 +893,15 @@ export default function ListeningPage() {
     savedAudioTimeRef.current = null;
     setHasSavedTime(false);
 
+    // Dừng phát âm thanh khi nộp bài
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+      try {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.load(); // Reset audio hoàn toàn
+      } catch (error) {
+        console.error('Error stopping audio:', error);
+      }
       setHasStartedListening(false);
     }
 
@@ -1079,6 +1121,47 @@ export default function ListeningPage() {
                 
                 return (
                   <div key={currentQuestion.id} id={`question-${currentQuestion.id}`} className="scroll-mt-30" style={{ scrollMarginTop: '90px' }}>
+                    {currentQuestion.question_text && (
+                      <div className="mb-8">
+                        <div className="flex items-start gap-3">
+                          <div className="text-3xl font-medium text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-B", fontWeight: 300 }}>
+                            {currentQuestion.underline_text ? (
+                              <>
+                                {currentQuestion.question_text.split(currentQuestion.underline_text)[0].split('<enter>').map((part, index) => (
+                                  <span key={index}>
+                                    {part}
+                                    {index < currentQuestion.question_text.split(currentQuestion.underline_text)[0].split('<enter>').length - 1 && <br />}
+                                  </span>
+                                ))}
+                                <Underline weight={1}>
+                                  {currentQuestion.underline_text.split('<enter>').map((part, index) => (
+                                    <span key={index}>
+                                      {part}
+                                      {index < currentQuestion.underline_text.split('<enter>').length - 1 && <br />}
+                                    </span>
+                                  ))}
+                                </Underline>
+                                {currentQuestion.question_text.split(currentQuestion.underline_text)[1].split('<enter>').map((part, index) => (
+                                  <span key={index}>
+                                    {part}
+                                    {index < currentQuestion.question_text.split(currentQuestion.underline_text)[1].split('<enter>').length - 1 && <br />}
+                                  </span>
+                                ))}
+                              </>
+                            ) : (
+                              (currentQuestion?.question_text ?? '')
+                                .split('<enter>')
+                                .map((part, index, arr) => (
+                                  <span key={index}>
+                                    {part}
+                                    {index < arr.length - 1 && <br />}
+                                  </span>
+                                ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <QuestionImage question={currentQuestion} />
                     
                     <div className="space-y-2">
@@ -1093,7 +1176,13 @@ export default function ListeningPage() {
                                 (a, b) => Number(a.show_order) - Number(b.show_order)
                               );
                             }).map((answer) => (
-                              <AnswerOption key={answer.id} question={currentQuestion} answer={answer} />
+                              <AnswerOption 
+                                key={answer.id} 
+                                question={currentQuestion} 
+                                answer={answer}
+                                handleAnswerSelect={handleAnswerSelect}
+                                isAnswerSelected={isAnswerSelected}
+                              />
                             ))
                       ) : (
                         <p className="text-gray-500">Không có đáp án</p>
@@ -1109,8 +1198,6 @@ export default function ListeningPage() {
                 className={`${questionIndex > 0 ? 'mt-8' : ''} scroll-mt-30`}
                 style={{ scrollMarginTop: '10px' }}
               >
-                <QuestionImage question={question} />
-
                 <div className="mb-8">
                   <div className="flex items-start gap-3">
                     <div className="text-3xl font-medium text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-B", fontWeight: 300 }}>
@@ -1150,6 +1237,7 @@ export default function ListeningPage() {
                     </div>
                   </div>
                 </div>
+                <QuestionImage question={question} />
 
                 <div className="space-y-2">
                   {question.answers && question.answers.length > 0 ? (
@@ -1163,7 +1251,13 @@ export default function ListeningPage() {
                             (a, b) => Number(a.show_order) - Number(b.show_order)
                           );
                         })().map((answer) => (
-                          <AnswerOption key={answer.id} question={question} answer={answer} />
+                          <AnswerOption 
+                            key={answer.id} 
+                            question={question} 
+                            answer={answer}
+                            handleAnswerSelect={handleAnswerSelect}
+                            isAnswerSelected={isAnswerSelected}
+                          />
                         ))
                   ) : (
                     <p className="text-gray-500">Không có đáp án</p>

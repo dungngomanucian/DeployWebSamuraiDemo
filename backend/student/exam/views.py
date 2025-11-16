@@ -50,9 +50,15 @@ def get_exams_by_level(request, level_id):
     result = ExamService.get_exams_by_level(level_id)
     
     if result['success']:
-        serializer = ExamSerializer(result['data'], many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    return Response({'error': result['error']}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        try:
+            serializer = ExamSerializer(result['data'], many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Error serializing exam data: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response({'error': f'Serialization error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response({'error': result.get('error', 'Unknown error')}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['GET'])
