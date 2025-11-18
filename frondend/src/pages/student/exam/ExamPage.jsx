@@ -332,10 +332,20 @@ function ExamPageContent() {
     return tabs;
   }, [activeSection, examData]);
 
+  // Helper: Replace placeholder parentheses with visible spaces
+  const preservePlaceholderSpacing = (text) => {
+    if (!text) return '';
+    const nonBreakingSpaces = '\u00A0'.repeat(5);
+    return text.replace(/（\s{5}）/g, `（${nonBreakingSpaces}）`);
+  };
+
   // Helper: Render question_text với underline_text chỉ gạch chân lần xuất hiện đầu tiên
   const renderQuestionTextWithUnderline = (questionText, underlineText) => {
-    if (!underlineText || !questionText.includes(underlineText)) {
-      return (questionText ?? '')
+    const formattedQuestionText = preservePlaceholderSpacing(questionText ?? '');
+    const formattedUnderlineText = underlineText ? preservePlaceholderSpacing(underlineText) : underlineText;
+
+    if (!formattedUnderlineText || !formattedQuestionText.includes(formattedUnderlineText)) {
+      return formattedQuestionText
         .split('<enter>')
         .map((part, index, arr) => (
           <span key={index}>
@@ -346,9 +356,9 @@ function ExamPageContent() {
     }
 
     // Tìm vị trí đầu tiên của underline_text
-    const firstIndex = questionText.indexOf(underlineText);
+    const firstIndex = formattedQuestionText.indexOf(formattedUnderlineText);
     if (firstIndex === -1) {
-      return (questionText ?? '')
+      return formattedQuestionText
         .split('<enter>')
         .map((part, index, arr) => (
           <span key={index}>
@@ -359,9 +369,9 @@ function ExamPageContent() {
     }
 
     // Chia text thành 3 phần: trước, phần gạch chân, sau
-    const beforeText = questionText.substring(0, firstIndex);
-    const underlinedText = questionText.substring(firstIndex, firstIndex + underlineText.length);
-    const afterText = questionText.substring(firstIndex + underlineText.length);
+    const beforeText = formattedQuestionText.substring(0, firstIndex);
+    const underlinedText = formattedQuestionText.substring(firstIndex, firstIndex + formattedUnderlineText.length);
+    const afterText = formattedQuestionText.substring(firstIndex + formattedUnderlineText.length);
 
     // Render từng phần với xử lý <enter>
     return (
@@ -759,7 +769,8 @@ function ExamPageContent() {
               <div className="px-4 py-2 rounded-xl bg-[#FFD24D] text-[#1E1E1E] font-bold text-lg whitespace-nowrap">
                 {(() => {
                   const currentTab = questionTypeTabs.find(tab => tab.id === activeQuestionType);
-                  return currentTab?.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || `問題 ${currentQuestionIndex + 1}`;
+                  const label = currentTab?.taskInstructions?.match(/問題\s*[０-９0-9]+/)?.[0] || `問題 ${currentQuestionIndex + 1}`;
+                  return preservePlaceholderSpacing(label);
                 })()} 
               </div>
               {currentQuestion?.taskInstructions && (
@@ -770,7 +781,9 @@ function ExamPageContent() {
                     handleQuestionTypeChange(currentQuestion.questionTypeId);
                   }}
                 >
-                  {currentQuestion.taskInstructions.replace(/^問題\s*[０-９0-9]+\s*[：:]\s*/, '')}
+                  {preservePlaceholderSpacing(
+                    currentQuestion.taskInstructions.replace(/^問題\s*[０-９0-9]+\s*[：:]\s*/, '')
+                  )}
                 </p>
               )}
               </div>
