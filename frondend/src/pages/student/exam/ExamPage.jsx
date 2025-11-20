@@ -67,6 +67,12 @@ function ExamPageContent() {
 
   
   // === 5. GỌI CÁC HOOK MỚI ===
+  // Helper: Lọc các câu hỏi không phải example (is_example !== true)
+  const filterNonExampleQuestions = useCallback((questions) => {
+    if (!questions) return [];
+    return questions.filter(q => !q.is_example);
+  }, []);
+
   // Memoize filteredQuestions để tránh tính toán lại không cần thiết
   const filteredQuestions = useMemo(() => {
     if (!activeQuestionType || !groupedQuestions[activeQuestionType]) return [];
@@ -320,11 +326,13 @@ function ExamPageContent() {
     examData.sections.forEach((section) => {
       if (section.type === activeSection) {
         section.question_types.forEach((qt) => {
+          // Đếm chỉ các câu hỏi không phải example
+          const nonExampleQuestions = qt.questions.filter(q => !q.is_example);
           tabs.push({
             id: qt.id,
             name: qt.name || qt.id,
             taskInstructions: qt.task_instructions,
-            questionCount: qt.questions.length,
+            questionCount: nonExampleQuestions.length,
             question_guides: qt.question_guides
           });
         });
@@ -365,12 +373,24 @@ function ExamPageContent() {
               return normalizedAnswers.map((ans) => {
                 const sortQuestion = isSortQuestion(q.question_type_id);
                 const selected = isAnswerSelected(q.id, ans.id, q.question_type_id, sortQuestion);
+                const isExample = q.is_example === true;
                 return (
                   <button
                     key={ans.id}
                     type="button"
-                    onClick={() => handleAnswerSelect(q.id, ans.id, q.question_type_id, sortQuestion)}
-                    className={`text-left w-full px-3 py-2.5 transition-colors ${selected ? 'bg-[#DDE5FF]' : 'bg-white hover:bg-gray-50'}`}
+                    disabled={isExample}
+                    onClick={() => {
+                      if (!isExample) {
+                        handleAnswerSelect(q.id, ans.id, q.question_type_id, sortQuestion);
+                      }
+                    }}
+                    className={`text-left w-full px-3 py-2.5 transition-colors ${
+                      isExample 
+                        ? 'bg-gray-100 cursor-not-allowed opacity-60' 
+                        : selected 
+                        ? 'bg-[#DDE5FF]' 
+                        : 'bg-white hover:bg-gray-50'
+                    }`}
                   >
                     <div className="flex items-start text-gray-900 leading-6">
                       <span className="whitespace-pre-wrap break-words">
@@ -551,7 +571,23 @@ function ExamPageContent() {
     stopQuestionTimer();
     const duration_taken = totalTime - timeRemaining; 
     const answersList = [];
-    Object.keys(studentAnswers).forEach(qId => { 
+    
+    // Lấy danh sách tất cả các câu hỏi để kiểm tra is_example
+    const allQuestions = [];
+    Object.values(groupedQuestions).forEach(qt => {
+      if (qt.questions) {
+        allQuestions.push(...qt.questions);
+      }
+    });
+    const questionMap = new Map(allQuestions.map(q => [q.id, q]));
+    
+    Object.keys(studentAnswers).forEach(qId => {
+      // Bỏ qua các câu hỏi có is_example === true
+      const question = questionMap.get(qId);
+      if (question && question.is_example) {
+        return;
+      }
+      
       const answerData = studentAnswers[qId];
       if (Array.isArray(answerData)) {
         answerData.forEach((answerId, index) => {
@@ -866,13 +902,17 @@ function ExamPageContent() {
                               const isSelected = isAnswerSelected(currentQuestion.id, answer.id, currentQuestion.questionTypeId, sortQuestion);
                               const orderNumber = getAnswerOrder(currentQuestion.id, answer.id);
                               
+                              const isExample = currentQuestion.is_example === true;
+                              
                               return (
                                 <label
                                   key={answer.id}
-                                  className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all ${
-                                    isSelected
-                                      ? "border-[#874FFF] bg-purple-50"
-                                      : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50"
+                                  className={`flex items-center p-2 border rounded-lg transition-all ${
+                                    isExample 
+                                      ? "border-gray-200 bg-gray-100 cursor-not-allowed opacity-60"
+                                      : isSelected
+                                      ? "border-[#874FFF] bg-purple-50 cursor-pointer"
+                                      : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50 cursor-pointer"
                                   }`}
                                 >
                                   <input
@@ -880,7 +920,12 @@ function ExamPageContent() {
                                     name={`question-${currentQuestion.id}`}
                                     value={answer.id}
                                     checked={isSelected}
-                                    onChange={() => handleAnswerSelect(currentQuestion.id, answer.id, currentQuestion.questionTypeId, sortQuestion)}
+                                    disabled={isExample}
+                                    onChange={() => {
+                                      if (!isExample) {
+                                        handleAnswerSelect(currentQuestion.id, answer.id, currentQuestion.questionTypeId, sortQuestion);
+                                      }
+                                    }}
                                     className="hidden"
                                   />
                                   <span
@@ -906,7 +951,7 @@ function ExamPageContent() {
                               );
                         })
                       ) : (
-                        <p className="text-gray-500">Không có đáp án</p>
+                        !currentQuestion.is_example && <p className="text-gray-500">Không có đáp án</p>
                       )}
                     </div>
                   </div>
@@ -969,11 +1014,21 @@ function ExamPageContent() {
                                 const answer = question.answers.find(a => a.id === answerId);
                                 if (!answer) return null;
                                 
+                                const isExample = question.is_example === true;
+                                
                                 return (
                                   <div
                                     key={answerId}
-                                    className="flex items-center gap-2 bg-white px-4 py-3 rounded-lg border-2 border-[#874FFF] cursor-pointer hover:bg-purple-50 transition-all"
-                                    onClick={() => handleAnswerSelect(question.id, answerId, question.questionTypeId, true)}
+                                    className={`flex items-center gap-2 bg-white px-4 py-3 rounded-lg border-2 transition-all ${
+                                      isExample
+                                        ? "border-gray-300 bg-gray-100 cursor-not-allowed opacity-60"
+                                        : "border-[#874FFF] cursor-pointer hover:bg-purple-50"
+                                    }`}
+                                    onClick={() => {
+                                      if (!isExample) {
+                                        handleAnswerSelect(question.id, answerId, question.questionTypeId, true);
+                                      }
+                                    }}
                                   >
                                     <span className="w-8 h-8 bg-[#874FFF] text-white rounded-full flex items-center justify-center font-bold text-sm">
                                       {index + 1}
@@ -1016,22 +1071,25 @@ function ExamPageContent() {
                               const sortQuestion = isSortQuestion(question.questionTypeId);
                               const isSelected = isAnswerSelected(question.id, answer.id, question.questionTypeId, sortQuestion);
                               const orderNumber = getAnswerOrder(question.id, answer.id);
+                              const isExample = question.is_example === true;
                               
                               return (
                                 <label
                                   key={answer.id}
-                                  className={`flex items-center p-2 border rounded-lg cursor-pointer transition-all ${
+                                  className={`flex items-center p-2 border rounded-lg transition-all ${
                                     activeSection.trim() === '(文字・語彙)' && questionTypeTabs.findIndex(tab => tab.id === activeQuestionType) < 4
                                       ? "flex-row"
                                       : sortQuestion
                                       ? "flex-row"
                                       : "flex-row"
                                   } ${
-                                    isSelected
+                                    isExample
+                                      ? "border-gray-200 bg-gray-100 cursor-not-allowed opacity-60"
+                                      : isSelected
                                       ? sortQuestion
-                                        ? "border-[#874FFF] bg-purple-50 opacity-60"
-                                        : "border-[#874FFF] bg-purple-50"
-                                      : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50"
+                                        ? "border-[#874FFF] bg-purple-50 opacity-60 cursor-pointer"
+                                        : "border-[#874FFF] bg-purple-50 cursor-pointer"
+                                      : "border-gray-300 hover:border-[#874FFF]/60 hover:bg-gray-50 cursor-pointer"
                                   }`}
                                 >
                                   <input
@@ -1039,7 +1097,12 @@ function ExamPageContent() {
                                     name={`question-${question.id}`}
                                     value={answer.id}
                                     checked={isSelected}
-                                    onChange={() => handleAnswerSelect(question.id, answer.id, question.questionTypeId, sortQuestion)}
+                                    disabled={isExample}
+                                    onChange={() => {
+                                      if (!isExample) {
+                                        handleAnswerSelect(question.id, answer.id, question.questionTypeId, sortQuestion);
+                                      }
+                                    }}
                                     className="hidden"
                                   />
                                   {isSortQuestion(question.questionTypeId) ? (
@@ -1074,7 +1137,7 @@ function ExamPageContent() {
                               );
                         })
                       ) : (
-                        <p className="text-gray-500">Không có đáp án</p>
+                        !question.is_example && <p className="text-gray-500">Không có đáp án</p>
                       )}
                     </div>
                   </div>

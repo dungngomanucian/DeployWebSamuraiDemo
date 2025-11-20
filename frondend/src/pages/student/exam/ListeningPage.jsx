@@ -431,11 +431,13 @@ export default function ListeningPage() {
     examData.sections.forEach((section) => {
       if (section.type === activeSection) {
         section.question_types.forEach((qt) => {
+          // Đếm chỉ các câu hỏi không phải example
+          const nonExampleQuestions = qt.questions.filter(q => !q.is_example);
           tabs.push({
             id: qt.id,
             name: qt.name || qt.id,
             taskInstructions: qt.task_instructions,
-            questionCount: qt.questions.length,
+            questionCount: nonExampleQuestions.length,
             question_guides: qt.question_guides
           });
         });
@@ -483,6 +485,7 @@ export default function ListeningPage() {
 
   const AnswerOption = memo(({ question, answer, handleAnswerSelect, isAnswerSelected }) => {
     const questionTypeId = question.questionTypeId || question.question_type_id;
+    const isExample = question.is_example === true;
     
     if (!question?.id || !answer?.id || !questionTypeId) {
       return null;
@@ -491,25 +494,33 @@ export default function ListeningPage() {
     const isSelected = isAnswerSelected(question.id, answer.id, questionTypeId);
     
     const handleClick = useCallback((e) => {
+      if (isExample) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
       flushSync(() => {
         handleAnswerSelect(question.id, answer.id, questionTypeId);
       });
-    }, [question.id, answer.id, questionTypeId, handleAnswerSelect]);
+    }, [question.id, answer.id, questionTypeId, handleAnswerSelect, isExample]);
     
     return (
       <div
         onClick={handleClick}
-        className={`flex items-center p-2 border rounded-lg cursor-pointer ${
-          isSelected
-            ? "border-[#874FFF] bg-purple-50"
-            : "border-gray-300"
+        className={`flex items-center p-2 border rounded-lg transition-all ${
+          isExample
+            ? "border-gray-200 bg-gray-100 cursor-not-allowed opacity-60"
+            : isSelected
+            ? "border-[#874FFF] bg-purple-50 cursor-pointer"
+            : "border-gray-300 cursor-pointer"
         }`}
         style={{ userSelect: 'none', WebkitTapHighlightColor: 'transparent' }}
         role="button"
-        tabIndex={0}
+        tabIndex={isExample ? -1 : 0}
         onKeyDown={(e) => {
+          if (isExample) return;
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             handleClick(e);
@@ -521,6 +532,7 @@ export default function ListeningPage() {
           name={`question-${question.id}`}
           value={answer.id}
           checked={isSelected}
+          disabled={isExample}
           onChange={handleClick}
           className="hidden"
           readOnly
@@ -913,7 +925,29 @@ export default function ListeningPage() {
     const duration_taken = totalTime - timeRemaining;
 
     const answersList = [];
+    
+    // Lấy danh sách tất cả các câu hỏi để kiểm tra is_example
+    const allQuestions = [];
+    if (examData && examData.sections) {
+      examData.sections.forEach(section => {
+        if (section.question_types) {
+          section.question_types.forEach(qt => {
+            if (qt.questions) {
+              allQuestions.push(...qt.questions);
+            }
+          });
+        }
+      });
+    }
+    const questionMap = new Map(allQuestions.map(q => [q.id, q]));
+    
     Object.keys(studentAnswers).forEach(qId => {
+      // Bỏ qua các câu hỏi có is_example === true
+      const question = questionMap.get(qId);
+      if (question && question.is_example) {
+        return;
+      }
+      
       const answerData = studentAnswers[qId];
       
       if (Array.isArray(answerData)) {
@@ -1154,7 +1188,7 @@ export default function ListeningPage() {
                               />
                             ))
                       ) : (
-                        <p className="text-gray-500">Không có đáp án</p>
+                        !currentQuestion.is_example && <p className="text-gray-500">Không có đáp án</p>
                       )}
                     </div>
                   </div>
@@ -1197,7 +1231,7 @@ export default function ListeningPage() {
                           />
                         ))
                   ) : (
-                    <p className="text-gray-500">Không có đáp án</p>
+                    !question.is_example && <p className="text-gray-500">Không có đáp án</p>
                   )}
                 </div>
               </div>
