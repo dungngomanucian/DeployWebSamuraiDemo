@@ -19,7 +19,8 @@ import {
   renderFramedPassageBlocks,
   PassageBorderBox,
   Underline,
-  formatAnswerText
+  formatAnswerText,
+  renderQuestionText
 } from "../../../components/Exam/ExamRenderUtils"; // Đảm bảo đường dẫn này đúng
 
 // 2. IMPORT 2 HOOK MỚI (Giả sử nằm trong 'src/hooks/exam/')
@@ -339,65 +340,11 @@ function ExamPageContent() {
     return text.replace(/（\s{5}）/g, `（${nonBreakingSpaces}）`);
   };
 
-  // Helper: Render question_text với underline_text chỉ gạch chân lần xuất hiện đầu tiên
+  // Helper: Render question_text với underline_text và các tag (bolder, underline, tab, center, right, table, enter)
   const renderQuestionTextWithUnderline = (questionText, underlineText) => {
     const formattedQuestionText = preservePlaceholderSpacing(questionText ?? '');
     const formattedUnderlineText = underlineText ? preservePlaceholderSpacing(underlineText) : underlineText;
-
-    if (!formattedUnderlineText || !formattedQuestionText.includes(formattedUnderlineText)) {
-      return formattedQuestionText
-        .split('<enter>')
-        .map((part, index, arr) => (
-          <span key={index}>
-            {part}
-            {index < arr.length - 1 && <br />}
-          </span>
-        ));
-    }
-
-    // Tìm vị trí đầu tiên của underline_text
-    const firstIndex = formattedQuestionText.indexOf(formattedUnderlineText);
-    if (firstIndex === -1) {
-      return formattedQuestionText
-        .split('<enter>')
-        .map((part, index, arr) => (
-          <span key={index}>
-            {part}
-            {index < arr.length - 1 && <br />}
-          </span>
-        ));
-    }
-
-    // Chia text thành 3 phần: trước, phần gạch chân, sau
-    const beforeText = formattedQuestionText.substring(0, firstIndex);
-    const underlinedText = formattedQuestionText.substring(firstIndex, firstIndex + formattedUnderlineText.length);
-    const afterText = formattedQuestionText.substring(firstIndex + formattedUnderlineText.length);
-
-    // Render từng phần với xử lý <enter>
-    return (
-      <>
-        {beforeText.split('<enter>').map((part, index, arr) => (
-          <span key={`before-${index}`}>
-            {part}
-            {index < arr.length - 1 && <br />}
-          </span>
-        ))}
-        <u className="decoration-black decoration-1 underline-offset-4">
-          {underlinedText.split('<enter>').map((part, index, arr) => (
-            <span key={`underline-${index}`}>
-              {part}
-              {index < arr.length - 1 && <br />}
-            </span>
-          ))}
-        </u>
-        {afterText.split('<enter>').map((part, index, arr) => (
-          <span key={`after-${index}`}>
-            {part}
-            {index < arr.length - 1 && <br />}
-          </span>
-        ))}
-      </>
-    );
+    return renderQuestionText(formattedQuestionText, formattedUnderlineText);
   };
   
   // Hàm render Popover câu hỏi

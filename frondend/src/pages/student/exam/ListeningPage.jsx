@@ -14,7 +14,8 @@ const TimeUpModal = lazy(() => import("../../../components/Exam/TimeUpModal"));
 import {
   Underline,
   formatAnswerText,
-  formatTime
+  formatTime,
+  renderQuestionText
 } from "../../../components/Exam/ExamRenderUtils";
 import { useExamTimers } from "../../../hooks/exam/useExamTimers";
 import { useExamState } from "../../../hooks/exam/useExamState";
@@ -1125,39 +1126,7 @@ export default function ListeningPage() {
                       <div className="mb-8">
                         <div className="flex items-start gap-3">
                           <div className="text-3xl font-medium text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-B", fontWeight: 300 }}>
-                            {currentQuestion.underline_text ? (
-                              <>
-                                {currentQuestion.question_text.split(currentQuestion.underline_text)[0].split('<enter>').map((part, index) => (
-                                  <span key={index}>
-                                    {part}
-                                    {index < currentQuestion.question_text.split(currentQuestion.underline_text)[0].split('<enter>').length - 1 && <br />}
-                                  </span>
-                                ))}
-                                <Underline weight={1}>
-                                  {currentQuestion.underline_text.split('<enter>').map((part, index) => (
-                                    <span key={index}>
-                                      {part}
-                                      {index < currentQuestion.underline_text.split('<enter>').length - 1 && <br />}
-                                    </span>
-                                  ))}
-                                </Underline>
-                                {currentQuestion.question_text.split(currentQuestion.underline_text)[1].split('<enter>').map((part, index) => (
-                                  <span key={index}>
-                                    {part}
-                                    {index < currentQuestion.question_text.split(currentQuestion.underline_text)[1].split('<enter>').length - 1 && <br />}
-                                  </span>
-                                ))}
-                              </>
-                            ) : (
-                              (currentQuestion?.question_text ?? '')
-                                .split('<enter>')
-                                .map((part, index, arr) => (
-                                  <span key={index}>
-                                    {part}
-                                    {index < arr.length - 1 && <br />}
-                                  </span>
-                                ))
-                            )}
+                            {renderQuestionText(currentQuestion.question_text, currentQuestion.underline_text)}
                           </div>
                         </div>
                       </div>
@@ -1201,39 +1170,7 @@ export default function ListeningPage() {
                 <div className="mb-8">
                   <div className="flex items-start gap-3">
                     <div className="text-3xl font-medium text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-B", fontWeight: 300 }}>
-                      {question.underline_text ? (
-                        <>
-                          {question.question_text.split(question.underline_text)[0].split('<enter>').map((part, index) => (
-                            <span key={index}>
-                              {part}
-                              {index < question.question_text.split(question.underline_text)[0].split('<enter>').length - 1 && <br />}
-                            </span>
-                          ))}
-                          <Underline weight={1}>
-                            {question.underline_text.split('<enter>').map((part, index) => (
-                              <span key={index}>
-                                {part}
-                                {index < question.underline_text.split('<enter>').length - 1 && <br />}
-                              </span>
-                            ))}
-                          </Underline>
-                          {question.question_text.split(question.underline_text)[1].split('<enter>').map((part, index) => (
-                            <span key={index}>
-                              {part}
-                              {index < question.question_text.split(question.underline_text)[1].split('<enter>').length - 1 && <br />}
-                            </span>
-                          ))}
-                        </>
-                      ) : (
-                        (question?.question_text ?? '')
-                          .split('<enter>')
-                          .map((part, index, arr) => (
-                            <span key={index}>
-                              {part}
-                              {index < arr.length - 1 && <br />}
-                            </span>
-                          ))
-                      )}
+                      {renderQuestionText(question.question_text, question.underline_text)}
                     </div>
                   </div>
                 </div>

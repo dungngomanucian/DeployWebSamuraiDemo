@@ -12,7 +12,8 @@ import {
   renderFramedPassageBlocks,
   PassageBorderBox,
   Underline,
-  formatAnswerText
+  formatAnswerText,
+  renderQuestionText
 } from "../../../components/Exam/ExamRenderUtils";
 
 import ExamHeader from "../../../components/Exam/ExamHeader";
@@ -446,7 +447,7 @@ export default function ExamReviewPage() {
                               {question.position}
                            </div>
                           <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
-                            {question.question_text}
+                            {renderQuestionText(question.question_text)}
                           </div>
                         </div>
                       </div>
@@ -617,39 +618,7 @@ export default function ExamReviewPage() {
                               {currentPaginationQuestion.position}
                             </div>
                             <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
-                              {currentPaginationQuestion.underline_text ? (
-                                <>
-                                  {currentPaginationQuestion.question_text.split(currentPaginationQuestion.underline_text)[0].split('<enter>').map((part, index) => (
-                                    <span key={index}>
-                                      {part}
-                                      {index < currentPaginationQuestion.question_text.split(currentPaginationQuestion.underline_text)[0].split('<enter>').length - 1 && <br />}
-                                    </span>
-                                  ))}
-                              <Underline weight={1}>
-                                    {currentPaginationQuestion.underline_text.split('<enter>').map((part, index) => (
-                                      <span key={index}>
-                                        {part}
-                                        {index < currentPaginationQuestion.underline_text.split('<enter>').length - 1 && <br />}
-                                      </span>
-                                    ))}
-                              </Underline>
-                                  {currentPaginationQuestion.question_text.split(currentPaginationQuestion.underline_text)[1].split('<enter>').map((part, index) => (
-                                    <span key={index}>
-                                      {part}
-                                      {index < currentPaginationQuestion.question_text.split(currentPaginationQuestion.underline_text)[1].split('<enter>').length - 1 && <br />}
-                                    </span>
-                                  ))}
-                                </>
-                              ) : (
-                                (currentPaginationQuestion?.question_text ?? '')
-                                  .split('<enter>')
-                                  .map((part, index, arr) => (
-                                    <span key={index}>
-                                      {part}
-                                      {index < arr.length - 1 && <br />}
-                                    </span>
-                                  ))
-                              )}
+                              {renderQuestionText(currentPaginationQuestion.question_text, currentPaginationQuestion.underline_text)}
                             </div>
                           </div>
                         </div>
@@ -751,39 +720,7 @@ export default function ExamReviewPage() {
                               {question.position}
                             </div>
                             <div className="text-xl font-light text-[#0B1320] leading-relaxed" style={{ fontFamily: "UD Digi Kyokasho N-R", fontWeight: 300 }}>
-                              {question.underline_text ? (
-                                <>
-                                  {question.question_text.split(question.underline_text)[0].split('<enter>').map((part, index) => (
-                                    <span key={index}>
-                                      {part}
-                                      {index < question.question_text.split(question.underline_text)[0].split('<enter>').length - 1 && <br />}
-                                    </span>
-                                  ))}
-                                  <Underline weight={1}>
-                                    {question.underline_text.split('<enter>').map((part, index) => (
-                                      <span key={index}>
-                                        {part}
-                                        {index < question.underline_text.split('<enter>').length - 1 && <br />}
-                                      </span>
-                                    ))}
-                                  </Underline>
-                                  {question.question_text.split(question.underline_text)[1].split('<enter>').map((part, index) => (
-                                    <span key={index}>
-                                      {part}
-                                      {index < question.question_text.split(question.underline_text)[1].split('<enter>').length - 1 && <br />}
-                                    </span>
-                                  ))}
-                                </>
-                              ) : (
-                                (question?.question_text ?? '')
-                                  .split('<enter>')
-                                  .map((part, index, arr) => (
-                                    <span key={index}>
-                                      {part}
-                                      {index < arr.length - 1 && <br />}
-                                    </span>
-                                  ))
-                              )}
+                              {renderQuestionText(question.question_text, question.underline_text)}
                             </div>
                           </div>
                         </div>
