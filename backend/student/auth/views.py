@@ -4,7 +4,7 @@ from django.core.mail import send_mail
 from config.supabase_client import get_supabase_client
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-import json, secrets, hashlib
+import json, secrets, hashlib, os
 from datetime import datetime, timezone, timedelta
 from rest_framework.decorators import api_view
 
@@ -37,7 +37,8 @@ def forgot_password(request):
     token = secrets.token_urlsafe(32)
 
     # Gửi email reset
-    reset_link = f"http://localhost:5173/reset-password?token={token}"
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+    reset_link = f"{frontend_url}/reset-password?token={token}"
 
     subject = "Đặt lại mật khẩu của bạn"
     message = (
@@ -234,7 +235,8 @@ def resend_reset_email(request):
 
     # Tạo token mới
     token = secrets.token_urlsafe(32)
-    reset_link = f"http://localhost:5173/reset-password?token={token}"
+    frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+    reset_link = f"{frontend_url}/reset-password?token={token}"
 
     subject = "Đặt lại mật khẩu của bạn (Gửi lại)"
     message = (
