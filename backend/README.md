@@ -1,7 +1,9 @@
 # install python > 3.10
 
 # install dependencies. follow these command below, remember use them in correct path (/backend):
-python -m venv venv
+cd backend
+py -3.11 -m venv venv
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 venv\Scripts\activate
 pip install -r requirements.txt
 
@@ -17,6 +19,12 @@ DB_USER=postgres
 DB_PASSWORD=
 DB_HOST=
 DB_PORT=5432
+
+DJANGO_SECRET_KEY=
+
+SUPABASE_URL= 
+SUPABASE_PUBLISHABLE_KEY= 
+SUPABASE_SECRET_KEY= 
 
 # create .env file
 cp .env.example .env

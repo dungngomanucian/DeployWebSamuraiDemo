@@ -1,0 +1,79 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+/* removed Nunito override; using default font */
+@font-face {
+  font-family: 'UD Digi Kyokasho N-B';
+  src: url('/fonts/ud-digi-kyokasho-n-b.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'UD Digi Kyokasho N-R';
+  src: url('/fonts/ud-digi-kyokasho-n-r.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'UD Digi Kyokasho NK-B';
+  src: url('/fonts/UDDigiKyokashoNK-B-03.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'UD Digi Kyokasho NP-B';
+  src: url('/fonts/UDDigiKyokashoNP-B-02.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter-VariableFont_opsz,wght.ttf') format('woff2-variations'),
+       url('/fonts/Inter-VariableFont_opsz,wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  src: url('/fonts/Nunito-VariableFont_wght.ttf') format('woff2-variations'),
+       url('/fonts/Nunito-VariableFont_wght.ttf') format('truetype');
+  font-weight: 200 1000; /* dải weight hỗ trợ */
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url('/fonts/Poppins-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+body {
+  font-family: 'UD Digi Kyokasho N-B', 'Inter', 'Noto Sans JP', sans-serif;
+}
+/* Volume Slider Styles - From AudioPlayer.jsx */
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #535353;
+  cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #535353;
+  cursor: pointer;
+  border: none;
+}

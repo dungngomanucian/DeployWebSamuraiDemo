@@ -14,3 +14,20 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Các bước cài đặt môi trường ********
+cd frondend
+npm create vite@latest . -- --template react
+Remove existing files and continue
+No
+Yes
+
+Cài đặt DaisyUI
+npm install -D tailwindcss postcss autoprefixer
+npx tailwindcss init -p
+npm install -D daisyui@latest
+
+
+Để chạy frondend gõ lệnh:
+npm run dev
+
