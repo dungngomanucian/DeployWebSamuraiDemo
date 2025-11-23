@@ -12,9 +12,9 @@ export const Underline = ({ children, weight = 1, offset = 4, colorClass = '' })
   );
 };
 
-// Helper: Border Box
+// Helper: Border Box (không có border, chỉ có màu nền mờ)
 export const PassageBorderBox = ({ isTimeUp, children }) => (
-  <div className={`border-2 border-black p-6 rounded-lg ${isTimeUp ? 'bg-red-100' : 'bg-white'}`}>
+  <div className={`p-6 rounded-lg ${isTimeUp ? 'bg-red-100' : 'bg-gray-50'}`}>
     <div className="text-lg md:text-xl leading-relaxed text-gray-800 font-normal" style={{fontFamily: "UD Digi Kyokasho N-R"}}>
       {children}
     </div>
@@ -255,34 +255,87 @@ const renderTextWithTables = (rawText, keyBase) => {
     
     const tableContent = tMatch.content || '';
     const rows = [];
-    const rowRegex = /<r\d+>([\s\S]*?)<\/r\d+>/gi;
-    const rowMatches = [];
-    let rowMatch;
-    rowRegex.lastIndex = 0;
+      // Parse từng hàng
+      const rowMatches = [];
+    let searchIndex = 0;
     
-    while ((rowMatch = rowRegex.exec(tableContent)) !== null) {
-      rowMatches.push({
-        index: rowMatch.index,
-        content: rowMatch[1]
-      });
+    while (searchIndex < tableContent.length) {
+      // Tìm thẻ mở <r\d+>
+      const openTagMatch = tableContent.substring(searchIndex).match(/<r(\d+)>/i);
+      if (!openTagMatch) break;
+      
+      const rowNum = openTagMatch[1];
+      const openTagStart = searchIndex + openTagMatch.index;
+      const contentStart = openTagStart + openTagMatch[0].length;
+      
+      // Tìm thẻ đóng </r\d+> tương ứng
+      const closeTag = `</r${rowNum}>`;
+      const closeIndex = tableContent.indexOf(closeTag, contentStart);
+      
+      if (closeIndex !== -1) {
+        const content = tableContent.substring(contentStart, closeIndex);
+        rowMatches.push({
+          index: openTagStart,
+          content: content
+        });
+        searchIndex = closeIndex + closeTag.length;
+      } else {
+        // Không tìm thấy thẻ đóng, bỏ qua và tiếp tục
+        searchIndex = contentStart;
+      }
     }
     
-    for (const rMatch of rowMatches) {
+      // Track các ô đã được merge từ hàng trước (rowspan)
+      const rowspanMap = new Map();
+    
+    for (let rowIndex = 0; rowIndex < rowMatches.length; rowIndex++) {
+      const rMatch = rowMatches[rowIndex];
       const rowHtml = rMatch.content || '';
       const cells = [];
       
+      // Lấy danh sách các cột bị chiếm bởi rowspan từ hàng trước
+      const occupiedCols = rowspanMap.get(rowIndex) || new Set();
+      
       // Tìm tất cả merge tags và cell tags
-      const mergeRegex = /<merge>([\s\S]*?)<\/merge>/gi;
+      const mergeRegex = /<merge\s*([^>]*)>([\s\S]*?)<\/merge>/gi;
       const cellRegex = /<c\d+>([\s\S]*?)<\/c\d+>/gi;
       
       const mergeMatches = [];
       let mergeMatch;
       mergeRegex.lastIndex = 0;
       while ((mergeMatch = mergeRegex.exec(rowHtml)) !== null) {
+        const attributes = mergeMatch[1] || '';
+        const mergeContent = mergeMatch[2] || '';
+        
+        // Parse rowspan và colspan từ attributes string
+        let rowspan = 1;
+        let colspan = 1;
+        
+        // Tìm rowspan="N" hoặc rowspan='N' hoặc rowspan=N
+        const rowspanMatch = attributes.match(/rowspan\s*=\s*["']?(\d+)["']?/i);
+        if (rowspanMatch) {
+          rowspan = parseInt(rowspanMatch[1], 10) || 1;
+        }
+        
+        // Tìm colspan="N" hoặc colspan='N' hoặc colspan=N
+        const colspanMatch = attributes.match(/colspan\s*=\s*["']?(\d+)["']?/i);
+        if (colspanMatch) {
+          colspan = parseInt(colspanMatch[1], 10) || 1;
+        } else {
+          // Nếu không có colspan trong thuộc tính, đếm số cell tags bên trong
+          const cellCountRegex = /<c\d+>[\s\S]*?<\/c\d+>/gi;
+          const cellCount = (mergeContent.match(cellCountRegex) || []).length;
+          if (cellCount > 0) {
+            colspan = cellCount;
+          }
+        }
+        
         mergeMatches.push({
           index: mergeMatch.index,
           endIndex: mergeMatch.index + mergeMatch[0].length,
-          content: mergeMatch[1]
+          content: mergeContent,
+          rowspan: rowspan,
+          colspan: colspan
         });
       }
       
@@ -299,8 +352,7 @@ const renderTextWithTables = (rawText, keyBase) => {
           cellMatches.push({
             index: cellMatch.index,
             endIndex: cellMatch.index + cellMatch[0].length,
-            content: cellMatch[1],
-            isMerge: false
+            content: cellMatch[1]
           });
         }
       }
@@ -312,60 +364,130 @@ const renderTextWithTables = (rawText, keyBase) => {
       ].sort((a, b) => a.index - b.index);
       
       // Xử lý từng match
+      // colIndex: chỉ số cột tuyệt đối trong bảng
+      // Nếu không có rowspan, occupiedCols sẽ là Set rỗng và logic này vẫn hoạt động đúng
+      let colIndex = 0;
+      
       for (const match of allMatches) {
+        // Bỏ qua các cột bị chiếm bởi rowspan từ hàng trước
+        // Nếu không có rowspan, occupiedCols rỗng nên vòng lặp này không chạy
+        while (occupiedCols.has(colIndex)) {
+          colIndex++;
+        }
+        
         if (match.type === 'merge') {
           // Xử lý merge tag
           const mergeContent = match.content || '';
-          // Đếm số lượng cell tags bên trong merge
-          const cellCountRegex = /<c\d+>[\s\S]*?<\/c\d+>/gi;
-          const cellCount = (mergeContent.match(cellCountRegex) || []).length;
           
           // Lấy nội dung giữa các cell tags (loại bỏ các cell tags)
           const contentWithoutCells = mergeContent.replace(/<c\d+>[\s\S]*?<\/c\d+>/gi, '').trim();
           
-          cells.push({
+          const cellData = {
             content: renderRichText(contentWithoutCells, `${keyBase}-merge-${rMatch.index}-${match.index}`),
-            colspan: cellCount || 1,
-            isMerge: true
-          });
+            colspan: match.colspan || 1,
+            rowspan: match.rowspan || 1,
+            colIndex: colIndex
+          };
+          
+          cells.push(cellData);
+          
+          // Nếu có rowspan > 1, đánh dấu các cột trong các hàng sau bị chiếm
+          if (cellData.rowspan > 1) {
+            for (let r = 1; r < cellData.rowspan; r++) {
+              const targetRowIndex = rowIndex + r;
+              if (!rowspanMap.has(targetRowIndex)) {
+                rowspanMap.set(targetRowIndex, new Set());
+              }
+              const targetOccupiedCols = rowspanMap.get(targetRowIndex);
+              for (let c = 0; c < cellData.colspan; c++) {
+                targetOccupiedCols.add(colIndex + c);
+              }
+            }
+          }
+          
+          colIndex += cellData.colspan;
         } else {
           // Xử lý cell tag bình thường
           const cellContent = match.content || '';
           cells.push({
             content: renderRichText(cellContent, `${keyBase}-cell-${rMatch.index}-${match.index}`),
             colspan: 1,
-            isMerge: false
+            rowspan: 1,
+            colIndex: colIndex
           });
+          colIndex += 1;
         }
       }
       
-      // Chỉ thêm row nếu có cells
-      if (cells.length > 0) {
-        rows.push(cells);
-      }
+      rows.push(cells);
     }
     
-    // Chỉ render table nếu có rows
     if (rows.length > 0) {
+      // Tính số cột tối đa trong bảng
+      let maxCols = 0;
+      rows.forEach(rowCells => {
+        rowCells.forEach(cell => {
+          const endCol = (cell.colIndex || 0) + (cell.colspan || 1);
+          if (endCol > maxCols) {
+            maxCols = endCol;
+          }
+        });
+      });
+      
       out.push(
         <div key={`${keyBase}-table-${tMatch.index}`} className="my-2 overflow-x-auto">
           <table className="mx-auto table-auto min-w-[540px] border border-gray-400 text-base">
             <tbody>
-              {rows.map((cells, ri) => (
-                <tr key={`r-${ri}`}>
-                  {cells.map((cell, ci) => (
-                    <td 
-                      key={`c-${ci}`} 
-                      colSpan={cell.colspan || 1}
-                      className={`border border-gray-400 px-4 py-2 whitespace-pre-wrap min-w-[160px] font-normal text-base ${
-                        cell.isMerge ? 'text-center' : 'text-left'
-                      }`}
-                    >
-                      {cell.content}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {rows.map((cells, ri) => {
+                // Lấy danh sách các cột bị chiếm bởi rowspan từ hàng trước
+                const occupiedCols = rowspanMap.get(ri) || new Set();
+                
+                // Sắp xếp cells theo colIndex để đảm bảo thứ tự đúng
+                const sortedCells = [...cells].sort((a, b) => (a.colIndex || 0) - (b.colIndex || 0));
+                
+                const renderedCells = [];
+                let currentCol = 0;
+                let cellIndex = 0;
+                
+                // Render từng cột tuần tự
+                // Nếu không có rowspan, occupiedCols rỗng nên không skip cột nào
+                while (currentCol < maxCols && cellIndex < sortedCells.length) {
+                  // Bỏ qua các cột bị chiếm bởi rowspan từ hàng trước
+                  if (occupiedCols.has(currentCol)) {
+                    currentCol++;
+                    continue;
+                  }
+                  
+                  const cell = sortedCells[cellIndex];
+                  const cellStartCol = cell.colIndex || 0;
+                  
+                  // Render cell nếu nó bắt đầu ở vị trí hiện tại
+                  if (cellStartCol === currentCol) {
+                    renderedCells.push(
+                      <td 
+                        key={`c-${ri}-${currentCol}`} 
+                        colSpan={cell.colspan || 1}
+                        rowSpan={cell.rowspan > 1 ? cell.rowspan : undefined}
+                        className="border border-gray-400 px-4 py-2 whitespace-pre-wrap min-w-[160px] font-normal text-base text-left"
+                      >
+                        {cell.content}
+                      </td>
+                    );
+                    currentCol += cell.colspan || 1;
+                    cellIndex++;
+                  } else if (cellStartCol > currentCol) {
+                    currentCol++;
+                  } else {
+                    cellIndex++;
+                  }
+                }
+                
+                return (
+                  <tr key={`r-${ri}`}>
+                    {renderedCells}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

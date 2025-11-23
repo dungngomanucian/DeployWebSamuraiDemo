@@ -5,10 +5,10 @@ import { format } from 'date-fns';
 
 // Layouts và Components (Đảm bảo đường dẫn đúng)
 import IndexLayout from '../../../layouts/IndexLayout';
-import ContentTable from '../../../components/admin/ContentTable';
-import PaginationControls from '../../../components/admin/PaginationControls';
-import PageSizeSelector from '../../../components/admin/PageSizeSelector';
-import PaginationInfo from '../../../components/admin/PaginationInfo';
+import ContentTable from '../../../components/Admin/ContentTable';
+import PaginationControls from '../../../components/Admin/PaginationControls';
+import PageSizeSelector from '../../../components/Admin/PageSizeSelector';
+import PaginationInfo from '../../../components/Admin/PaginationInfo';
 
 // Hooks và Services (Đảm bảo đường dẫn đúng)
 import { useDataTable } from '../../../hooks/useDataTable'; // Giả sử bạn có hook này
